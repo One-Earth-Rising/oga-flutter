@@ -1,0 +1,10 @@
+build/
+.dart_tool/
+.flutter-plugins
+.packages
+.pub/
+ios/
+android/
+macos/
+windows/
+linux/
