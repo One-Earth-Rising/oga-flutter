@@ -18,6 +18,7 @@ import 'screens/invite_landing_screen.dart';
 import 'screens/invite_signup_screen.dart'; // ← ADD
 import 'screens/invite_welcome_screen.dart'; // ← ADD
 import 'services/friend_service.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // ← ADD
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -80,6 +81,26 @@ class _OgaAppState extends State<OgaApp> {
         final uri = Uri.parse(settings.name ?? '');
         // Confirmation Buffer Route
         if (settings.name?.startsWith('/confirm') ?? false) {
+          final baseUri = Uri.base;
+          if (baseUri.queryParameters.containsKey('code')) {
+            return MaterialPageRoute(
+              builder: (context) => FutureBuilder<Widget>(
+                future: _getLandingPage(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Scaffold(
+                      body: Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF00C806),
+                        ),
+                      ),
+                    );
+                  }
+                  return snapshot.data ?? const OgaLandingPage();
+                },
+              ),
+            );
+          }
           return MaterialPageRoute(
             builder: (context) => const ConfirmLoginScreen(),
           );
@@ -229,30 +250,20 @@ class _OgaAppState extends State<OgaApp> {
             // ═══════════════════════════════════════════════════════
             String? pendingInvite;
 
-            // Method 1: Check static holder (same-session navigation)
-            pendingInvite = PendingInvite.code;
-            if (pendingInvite != null && pendingInvite.isNotEmpty) {
-              debugPrint(
-                '🎟️ Found invite code in PendingInvite: $pendingInvite',
-              );
-              PendingInvite.code = null; // Clear so it doesn't fire again
-            }
-
-            // Method 2: Check URL query params (survives page reload via redirect URL)
-            if (pendingInvite == null || pendingInvite.isEmpty) {
-              final currentUri = Uri.base;
-              // Check fragment params: /#/confirm?invite=OGA-ZJDR
-              final fragment = currentUri.fragment;
-              if (fragment.contains('invite=')) {
-                final fragUri = Uri.parse('/?${fragment.split('?').last}');
-                pendingInvite = fragUri.queryParameters['invite'];
-                if (pendingInvite != null) {
-                  debugPrint('🎟️ Found invite code in URL: $pendingInvite');
-                }
+            // Method 1: shared_preferences (survives page reload on web)
+            try {
+              pendingInvite = await PendingInvite.read();
+              if (pendingInvite != null && pendingInvite.isNotEmpty) {
+                debugPrint(
+                  '🎟️ Found invite code in shared_preferences: $pendingInvite',
+                );
+                await PendingInvite.clear(); // One-time use
               }
+            } catch (e) {
+              debugPrint('⚠️ Error reading PendingInvite: $e');
             }
 
-            // Method 3: Check user metadata (set during signInWithOtp)
+            // Method 2: Supabase user metadata (works for first-time signups)
             if (pendingInvite == null || pendingInvite.isEmpty) {
               pendingInvite = user.userMetadata?['invite_code'] as String?;
               if (pendingInvite != null) {
@@ -289,7 +300,6 @@ class _OgaAppState extends State<OgaApp> {
               }
             }
             // ═══════════════════════════════════════════════════════
-
             // If from FBS campaign
             if (campaignId == 'fbs_launch') {
               if (joinedAt != null) {

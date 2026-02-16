@@ -1,12 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/friend_service.dart';
 
-/// Static holder for invite code — survives navigation within same session.
-/// For cross-page-reload persistence, the invite code is embedded in the
-/// redirect URL and also stored in Supabase user metadata.
+/// Helper to persist invite code across page reloads (uses shared_preferences
+/// which maps to localStorage on web — but through Flutter's abstraction,
+/// so no dart:html lint warnings).
 class PendingInvite {
-  static String? code;
+  static const _key = 'pending_invite_code';
+
+  static Future<void> save(String code) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, code);
+    debugPrint('💾 PendingInvite saved: $code');
+  }
+
+  static Future<String?> read() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_key);
+  }
+
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key);
+    debugPrint('🗑️ PendingInvite cleared');
+  }
 }
 
 /// Dedicated sign-up screen for invited users.
@@ -537,12 +555,11 @@ class _InviteSignUpScreenState extends State<InviteSignUpScreen> {
     });
 
     try {
-      // Store invite code in static holder (survives within same session)
-      PendingInvite.code = widget.inviteCode;
-      debugPrint('💾 Stored invite code: ${widget.inviteCode}');
+      // Persist invite code — survives page reload on web
+      await PendingInvite.save(widget.inviteCode);
 
       // Send magic link via Supabase
-      // Invite code is passed via: 1) redirect URL param, 2) user metadata
+      // Invite code also passed via user metadata (works for new users)
       await Supabase.instance.client.auth.signInWithOtp(
         email: email,
         emailRedirectTo: _buildRedirectUrl(),
@@ -569,12 +586,11 @@ class _InviteSignUpScreenState extends State<InviteSignUpScreen> {
   /// After auth, the confirm screen / callback can extract this
   /// and call setInvitedBy() to trigger auto-friend linking.
   String _buildRedirectUrl() {
-    // Include invite code in the redirect URL so it survives the page reload
-    // After PKCE verification, main.dart reads it from Uri.base
+    // Simple redirect to confirm buffer page — no extra params needed
+    // The invite code is persisted via shared_preferences
     final base = Uri.base;
     final port = (base.port != 80 && base.port != 443) ? ':${base.port}' : '';
-    final redirectUrl =
-        '${base.scheme}://${base.host}$port/#/confirm?invite=${widget.inviteCode}';
+    final redirectUrl = '${base.scheme}://${base.host}$port/#/confirm';
 
     debugPrint('🔗 Redirect URL: $redirectUrl');
     return redirectUrl;
