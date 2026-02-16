@@ -8,6 +8,7 @@ import 'tabs/friends_tab.dart';
 import 'tabs/about_tab.dart';
 import 'faq_page.dart';
 import 'contact_modal.dart';
+import 'share_profile_screen.dart';
 
 class OGAAccountDashboard extends StatefulWidget {
   final String? sessionId;
@@ -29,8 +30,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   bool _isLoading = true;
   Map<String, dynamic>? _userData;
   String? _ownedCharacterId;
+  String? _avatarUrl;
   String _currentTab = 'PROFILE';
   DateTime? _joinedDate;
+  bool _isGridView = true; // Grid vs list toggle
 
   // V2 Brand Colors (Heimdal Aesthetic)
   static const Color neonGreen = Color(0xFF39FF14);
@@ -39,8 +42,6 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   static const Color ironGrey = Color(0xFF2C2C2C);
 
   static const List<String> _tabs = ['PROFILE', 'FRIENDS', 'ABOUT'];
-
-  // Month names for joined date display
   static const _months = [
     '',
     'January',
@@ -76,7 +77,6 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         return;
       }
 
-      // Get joined date from auth user metadata
       _joinedDate = user.createdAt != null
           ? DateTime.tryParse(user.createdAt)
           : null;
@@ -88,7 +88,6 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           .maybeSingle();
 
       if (response != null) {
-        // Also try to get joined date from profile if available
         if (_joinedDate == null && response['created_at'] != null) {
           _joinedDate = DateTime.tryParse(response['created_at'].toString());
         }
@@ -98,10 +97,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               widget.acquiredCharacterId ??
               response['starter_character'] ??
               'ryu';
+          _avatarUrl = response['avatar_url'] as String?;
           _isLoading = false;
         });
       } else {
-        debugPrint('\u26a0\ufe0f No profile found for ${user.email}');
         setState(() {
           _ownedCharacterId = widget.acquiredCharacterId ?? 'ryu';
           _isLoading = false;
@@ -127,6 +126,26 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       context,
       userData: _userData,
       avatarImagePath: ownedChar.imagePath,
+      onProfileUpdated: _loadUserData, // Refresh on save
+    );
+  }
+
+  void _openShareProfile() {
+    final firstName = _userData?['first_name'] ?? '';
+    final lastName = _userData?['last_name'] ?? '';
+    final fullName = '$firstName $lastName'.trim();
+    final displayName = fullName.isNotEmpty
+        ? fullName
+        : (_userData?['full_name'] ?? 'Player');
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShareProfileScreen(
+          inviteCode: _userData?['invite_code'] as String?,
+          displayName: displayName,
+        ),
+      ),
     );
   }
 
@@ -170,7 +189,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           ],
         );
       case 'ABOUT':
-        return CustomScrollView(slivers: [const AboutTab()]);
+        return const CustomScrollView(slivers: [AboutTab()]);
       case 'PROFILE':
       default:
         return CustomScrollView(
@@ -179,7 +198,9 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             SliverToBoxAdapter(child: _buildSectionHeader(isMobile)),
             SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 40),
-              sliver: _buildCharacterGrid(isMobile),
+              sliver: _isGridView
+                  ? _buildCharacterGrid(isMobile)
+                  : _buildCharacterList(isMobile),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 60)),
           ],
@@ -187,9 +208,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // APP BAR
-  // ═══════════════════════════════════════════════════════════
+  // ─── APP BAR ──────────────────────────────────────────────
 
   PreferredSizeWidget _buildAppBar(bool isMobile) {
     return AppBar(
@@ -218,9 +237,9 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               left: 0,
               child: isMobile
                   ? Builder(
-                      builder: (context) => IconButton(
+                      builder: (ctx) => IconButton(
                         icon: const Icon(Icons.menu, color: Colors.white),
-                        onPressed: () => Scaffold.of(context).openDrawer(),
+                        onPressed: () => Scaffold.of(ctx).openDrawer(),
                       ),
                     )
                   : _buildNavPill(),
@@ -243,7 +262,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: _tabs.map((tab) => _buildNavTab(tab)).toList(),
+        children: _tabs.map((t) => _buildNavTab(t)).toList(),
       ),
     );
   }
@@ -275,22 +294,20 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   Widget _buildActionIcons(bool isMobile) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.north_east, color: neonGreen, size: 18),
-        const SizedBox(width: 12),
-        const Icon(Icons.bolt, color: Colors.white, size: 18),
-        if (!isMobile) ...[const SizedBox(width: 12), _buildAvatarDropdown()],
-      ],
+      children: [if (!isMobile) _buildAvatarDropdown()],
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // AVATAR DROPDOWN
-  // ═══════════════════════════════════════════════════════════
+  // ─── AVATAR DROPDOWN ──────────────────────────────────────
 
   Widget _buildAvatarDropdown() {
     final owned = OGACharacter.fromId(_ownedCharacterId);
-    final userName = _userData?['full_name'] ?? 'Player';
+    final firstName = _userData?['first_name'] ?? '';
+    final lastName = _userData?['last_name'] ?? '';
+    final fullName = '$firstName $lastName'.trim();
+    final userName = fullName.isNotEmpty
+        ? fullName
+        : (_userData?['full_name'] ?? 'Player');
     final email = supabase.auth.currentUser?.email ?? '';
 
     return PopupMenuButton<String>(
@@ -325,27 +342,13 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             break;
         }
       },
-      itemBuilder: (context) => [
-        // User info header
+      itemBuilder: (_) => [
         PopupMenuItem<String>(
           enabled: false,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: owned.cardColor,
-                child: ClipOval(
-                  child: Image.asset(
-                    owned.imagePath,
-                    fit: BoxFit.cover,
-                    width: 32,
-                    height: 32,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.person, color: Colors.white, size: 16),
-                  ),
-                ),
-              ),
+              _buildAvatarCircle(20),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -374,48 +377,31 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           ),
         ),
         const PopupMenuDivider(height: 1),
-        _buildDropdownItem('profile', 'My Profile'),
-        _buildDropdownItem('settings', 'Settings'),
-        _buildDropdownItem('about', 'About OGA'),
-        _buildDropdownItem('faq', 'FAQ'),
-        _buildDropdownItem('contact', 'Contact'),
+        _dropItem('profile', 'My Profile'),
+        _dropItem('settings', 'Settings'),
+        _dropItem('about', 'About OGA'),
+        _dropItem('faq', 'FAQ'),
+        _dropItem('contact', 'Contact'),
         const PopupMenuDivider(height: 1),
-        _buildDropdownItem('logout', 'Log out', dimmed: true),
+        _dropItem('logout', 'Log out', dimmed: true),
       ],
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: owned.cardColor,
-            child: ClipOval(
-              child: Image.asset(
-                owned.imagePath,
-                fit: BoxFit.cover,
-                width: 24,
-                height: 24,
-                errorBuilder: (_, __, ___) =>
-                    const Icon(Icons.person, color: Colors.white, size: 14),
-              ),
-            ),
-          ),
+          _buildAvatarCircle(12),
           const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 16),
         ],
       ),
     );
   }
 
-  PopupMenuItem<String> _buildDropdownItem(
-    String value,
-    String label, {
-    bool dimmed = false,
-  }) {
+  PopupMenuItem<String> _dropItem(String v, String l, {bool dimmed = false}) {
     return PopupMenuItem<String>(
-      value: value,
+      value: v,
       height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Text(
-        label,
+        l,
         style: TextStyle(
           color: dimmed
               ? Colors.white.withValues(alpha: 0.35)
@@ -427,9 +413,42 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // MOBILE DRAWER
-  // ═══════════════════════════════════════════════════════════
+  /// Builds a circular avatar using network URL if available,
+  /// falling back to character asset image.
+  Widget _buildAvatarCircle(double radius) {
+    final owned = OGACharacter.fromId(_ownedCharacterId);
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: owned.cardColor,
+      child: ClipOval(
+        child: _avatarUrl != null
+            ? Image.network(
+                _avatarUrl!,
+                fit: BoxFit.cover,
+                width: radius * 2,
+                height: radius * 2,
+                errorBuilder: (_, __, ___) => Image.asset(
+                  owned.imagePath,
+                  fit: BoxFit.cover,
+                  width: radius * 2,
+                  height: radius * 2,
+                  errorBuilder: (_, __, ___) =>
+                      Icon(Icons.person, color: Colors.white, size: radius),
+                ),
+              )
+            : Image.asset(
+                owned.imagePath,
+                fit: BoxFit.cover,
+                width: radius * 2,
+                height: radius * 2,
+                errorBuilder: (_, __, ___) =>
+                    Icon(Icons.person, color: Colors.white, size: radius),
+              ),
+      ),
+    );
+  }
+
+  // ─── MOBILE DRAWER ────────────────────────────────────────
 
   Widget _buildMobileDrawer() {
     return Drawer(
@@ -453,40 +472,32 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               ),
             ),
           ),
-          // Nav tabs
           ...[
             ('PROFILE', Icons.person_outline),
             ('FRIENDS', Icons.people_outline),
             ('ABOUT', Icons.info_outline),
-          ].map((item) => _buildDrawerItem(item.$1, item.$2)),
-
+          ].map((item) => _drawerTab(item.$1, item.$2)),
           const Divider(color: ironGrey, height: 32),
-
-          // Extra items (matching dropdown)
-          _buildDrawerAction('SETTINGS', Icons.settings_outlined, () {
+          _drawerAction('SETTINGS', Icons.settings_outlined, () {
             Navigator.pop(context);
             _openSettings();
           }),
-          _buildDrawerAction('FAQ', Icons.help_outline, () {
+          _drawerAction('FAQ', Icons.help_outline, () {
             Navigator.pop(context);
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const FaqPage()),
             );
           }),
-          _buildDrawerAction('CONTACT', Icons.mail_outline, () {
+          _drawerAction('CONTACT', Icons.mail_outline, () {
             Navigator.pop(context);
             ContactModal.show(context);
           }),
-
           const Spacer(),
-
-          // Log out
-          _buildDrawerAction('LOG OUT', Icons.logout, () {
+          _drawerAction('LOG OUT', Icons.logout, () {
             Navigator.pop(context);
             _handleLogout();
           }),
-
           const Divider(color: ironGrey),
           Padding(
             padding: const EdgeInsets.all(16),
@@ -505,7 +516,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  Widget _buildDrawerItem(String label, IconData icon) {
+  Widget _drawerTab(String label, IconData icon) {
     final isActive = _currentTab == label;
     return ListTile(
       leading: Icon(
@@ -530,7 +541,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  Widget _buildDrawerAction(String label, IconData icon, VoidCallback onTap) {
+  Widget _drawerAction(String label, IconData icon, VoidCallback onTap) {
     return ListTile(
       leading: Icon(icon, color: Colors.white54, size: 22),
       title: Text(
@@ -546,12 +557,17 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // HERO SECTION
-  // ═══════════════════════════════════════════════════════════
+  // ─── HERO SECTION ─────────────────────────────────────────
 
   Widget _buildHeroSection(bool isMobile) {
-    final userName = _userData?['full_name'] ?? 'PLAYER';
+    final firstName = _userData?['first_name'] ?? '';
+    final lastName = _userData?['last_name'] ?? '';
+    final fullName = '$firstName $lastName'.trim();
+    final displayName = fullName.isNotEmpty
+        ? fullName
+        : (_userData?['full_name'] ?? 'PLAYER');
+    final username =
+        _userData?['username'] ?? displayName.toLowerCase().replaceAll(' ', '');
     final ownedChar = OGACharacter.fromId(_ownedCharacterId);
 
     return Stack(
@@ -586,7 +602,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar
+              // Avatar (network or asset fallback)
               Container(
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
@@ -601,29 +617,20 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    ownedChar.imagePath,
-                    height: 70,
-                    width: 70,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 70,
-                      width: 70,
-                      color: deepCharcoal,
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white38,
-                        size: 32,
-                      ),
-                    ),
-                  ),
+                  child: _avatarUrl != null
+                      ? Image.network(
+                          _avatarUrl!,
+                          height: 70,
+                          width: 70,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _assetAvatar(ownedChar),
+                        )
+                      : _assetAvatar(ownedChar),
                 ),
               ),
               const SizedBox(height: 14),
-
-              // Username
               Text(
-                userName.toUpperCase(),
+                displayName.toUpperCase(),
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: isMobile ? 28 : 32,
@@ -631,13 +638,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                   letterSpacing: 1,
                 ),
               ),
-              // Handle
               Text(
-                '@${userName.toUpperCase().replaceAll(' ', '')}',
+                '@${username.toUpperCase()}',
                 style: const TextStyle(color: Colors.white38, fontSize: 14),
               ),
-
-              // Joined date
               if (_joinedText.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Row(
@@ -659,16 +663,17 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                 ),
               ],
               const SizedBox(height: 14),
-
-              // Action buttons
               Row(
                 children: [
                   GestureDetector(
                     onTap: _openSettings,
-                    child: _buildHeroButton('SETTINGS', false),
+                    child: _heroBtn('SETTINGS'),
                   ),
                   const SizedBox(width: 10),
-                  _buildHeroButton('SHARE PROFILE', false),
+                  GestureDetector(
+                    onTap: _openShareProfile,
+                    child: _heroBtn('SHARE PROFILE'),
+                  ),
                 ],
               ),
             ],
@@ -678,18 +683,33 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  Widget _buildHeroButton(String label, bool primary) {
+  Widget _assetAvatar(OGACharacter char) {
+    return Image.asset(
+      char.imagePath,
+      height: 70,
+      width: 70,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        height: 70,
+        width: 70,
+        color: deepCharcoal,
+        child: const Icon(Icons.person, color: Colors.white38, size: 32),
+      ),
+    );
+  }
+
+  Widget _heroBtn(String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: primary ? neonGreen : Colors.white.withValues(alpha: 0.08),
+        color: Colors.white.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: primary ? neonGreen : ironGrey, width: 1),
+        border: Border.all(color: ironGrey),
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: primary ? Colors.black : Colors.white70,
+        style: const TextStyle(
+          color: Colors.white70,
           fontSize: 10,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.5,
@@ -698,9 +718,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // SECTION HEADER + CHARACTER GRID (PROFILE tab)
-  // ═══════════════════════════════════════════════════════════
+  // ─── SECTION HEADER + GRID (PROFILE tab) ──────────────────
 
   Widget _buildSectionHeader(bool isMobile) {
     return Padding(
@@ -740,18 +758,46 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           ),
           const Spacer(),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(
               color: deepCharcoal,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: ironGrey, width: 0.5),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.grid_view, color: Colors.white54, size: 14),
-                SizedBox(width: 6),
-                Icon(Icons.view_list, color: Colors.white24, size: 14),
+                GestureDetector(
+                  onTap: () => setState(() => _isGridView = true),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: _isGridView ? ironGrey : Colors.transparent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Icon(
+                      Icons.grid_view,
+                      color: _isGridView ? Colors.white : Colors.white24,
+                      size: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => setState(() => _isGridView = false),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: !_isGridView ? ironGrey : Colors.transparent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Icon(
+                      Icons.view_list,
+                      color: !_isGridView ? Colors.white : Colors.white24,
+                      size: 14,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -761,8 +807,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   }
 
   Widget _buildCharacterGrid(bool isMobile) {
-    final characters = OGACharacter.allCharacters;
-
+    final chars = OGACharacter.allCharacters;
     return SliverGrid(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: isMobile ? 2 : 5,
@@ -771,44 +816,153 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         childAspectRatio: 0.72,
       ),
       delegate: SliverChildBuilderDelegate((context, index) {
-        final charIndex = index % characters.length;
-        final character = characters[charIndex];
-        final isOwned =
-            index < characters.length && character.id == _ownedCharacterId;
-
+        final ci = index % chars.length;
+        final ch = chars[ci];
+        final owned = index < chars.length && ch.id == _ownedCharacterId;
         return CharacterCard(
-          character: character,
-          isOwned: isOwned,
-          progress: isOwned ? 0.99 : 0.0,
-          onTap: () => _openCharacterDetail(character, isOwned),
+          character: ch,
+          isOwned: owned,
+          progress: owned ? 0.99 : 0.0,
+          onTap: () => _openDetail(ch, owned),
         );
-      }, childCount: characters.length * 2),
+      }, childCount: chars.length * 2),
     );
   }
 
-  void _openCharacterDetail(OGACharacter character, bool isOwned) {
+  Widget _buildCharacterList(bool isMobile) {
+    final chars = OGACharacter.allCharacters;
+    // For list view, show each character once (no duplication)
+    final allChars = [...chars, ...chars]; // match grid count
+    return SliverList(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final ci = index % chars.length;
+        final ch = chars[ci];
+        final owned = index < chars.length && ch.id == _ownedCharacterId;
+
+        return GestureDetector(
+          onTap: () => _openDetail(ch, owned),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: deepCharcoal,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: owned
+                    ? ch.glowColor.withValues(alpha: 0.4)
+                    : ironGrey.withValues(alpha: 0.5),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Character image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    ch.imagePath,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 56,
+                      height: 56,
+                      color: ch.cardColor,
+                      child: const Icon(Icons.person, color: Colors.white24),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Name + franchise
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ch.name.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        ch.ip,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Progress ring or lock
+                if (owned) ...[
+                  SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          value: 0.99,
+                          strokeWidth: 2.5,
+                          color: neonGreen,
+                          backgroundColor: ironGrey,
+                        ),
+                        const Text(
+                          '99%',
+                          style: TextStyle(
+                            color: neonGreen,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  Icon(
+                    Icons.lock_outline,
+                    color: Colors.white.withValues(alpha: 0.15),
+                    size: 20,
+                  ),
+                ],
+
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right,
+                  color: Colors.white.withValues(alpha: 0.2),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        );
+      }, childCount: allChars.length),
+    );
+  }
+
+  void _openDetail(OGACharacter ch, bool owned) {
     Navigator.push(
       context,
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 300),
-        pageBuilder: (context, animation, secondaryAnimation) {
-          return CharacterDetailScreen(character: character, isOwned: isOwned);
-        },
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position:
-                  Tween<Offset>(
-                    begin: const Offset(0, 0.05),
-                    end: Offset.zero,
-                  ).animate(
-                    CurvedAnimation(parent: animation, curve: Curves.easeOut),
-                  ),
-              child: child,
-            ),
-          );
-        },
+        pageBuilder: (_, anim, __) =>
+            CharacterDetailScreen(character: ch, isOwned: owned),
+        transitionsBuilder: (_, anim, __, child) => FadeTransition(
+          opacity: anim,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.05),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+            child: child,
+          ),
+        ),
       ),
     );
   }

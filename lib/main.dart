@@ -14,6 +14,10 @@ import 'screens/fbs_account_screen.dart';
 import 'screens/fbs_success_screen.dart';
 import 'screens/fbs_campaign_dashboard.dart';
 import 'screens/oga_signin_screen.dart';
+import 'screens/invite_landing_screen.dart';
+import 'screens/invite_signup_screen.dart'; // ← ADD
+import 'screens/invite_welcome_screen.dart'; // ← ADD
+import 'services/friend_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -73,12 +77,31 @@ class _OgaAppState extends State<OgaApp> {
         },
       ),
       onGenerateRoute: (settings) {
+        final uri = Uri.parse(settings.name ?? '');
         // Confirmation Buffer Route
         if (settings.name?.startsWith('/confirm') ?? false) {
           return MaterialPageRoute(
             builder: (context) => const ConfirmLoginScreen(),
           );
         }
+        // Invite route: /#/invite/OGA-XXXX
+        if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'invite') {
+          final inviteCode = uri.pathSegments[1];
+          return MaterialPageRoute(
+            builder: (_) => InviteLandingScreen(inviteCode: inviteCode),
+          );
+        }
+        // Also handle the join URL redirect:
+        // /#/join?code=OGA-XXXX (from the QR code / share link)
+        if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'join') {
+          final inviteCode = uri.queryParameters['code'] ?? '';
+          if (inviteCode.isNotEmpty) {
+            return MaterialPageRoute(
+              builder: (_) => InviteLandingScreen(inviteCode: inviteCode),
+            );
+          }
+        }
+
         if (settings.name == '/signin') {
           return MaterialPageRoute(
             builder: (context) => const OGASignInScreen(),
@@ -186,7 +209,7 @@ class _OgaAppState extends State<OgaApp> {
             final response = await Supabase.instance.client
                 .from('profiles')
                 .select(
-                  'starter_character, session_id, campaign_id, campaign_joined_at',
+                  'starter_character, session_id, campaign_id, campaign_joined_at, invited_by',
                 )
                 .eq('email', user.email!)
                 .maybeSingle();
@@ -200,6 +223,72 @@ class _OgaAppState extends State<OgaApp> {
             debugPrint('✅ User logged in: ${user.email}');
             debugPrint('   Character: $character');
             debugPrint('   Campaign: $campaignId');
+
+            // ═══════════════════════════════════════════════════════
+            // INVITE FLOW: Check if user signed up via invite
+            // ═══════════════════════════════════════════════════════
+            String? pendingInvite;
+
+            // Method 1: Check static holder (same-session navigation)
+            pendingInvite = PendingInvite.code;
+            if (pendingInvite != null && pendingInvite.isNotEmpty) {
+              debugPrint(
+                '🎟️ Found invite code in PendingInvite: $pendingInvite',
+              );
+              PendingInvite.code = null; // Clear so it doesn't fire again
+            }
+
+            // Method 2: Check URL query params (survives page reload via redirect URL)
+            if (pendingInvite == null || pendingInvite.isEmpty) {
+              final currentUri = Uri.base;
+              // Check fragment params: /#/confirm?invite=OGA-ZJDR
+              final fragment = currentUri.fragment;
+              if (fragment.contains('invite=')) {
+                final fragUri = Uri.parse('/?${fragment.split('?').last}');
+                pendingInvite = fragUri.queryParameters['invite'];
+                if (pendingInvite != null) {
+                  debugPrint('🎟️ Found invite code in URL: $pendingInvite');
+                }
+              }
+            }
+
+            // Method 3: Check user metadata (set during signInWithOtp)
+            if (pendingInvite == null || pendingInvite.isEmpty) {
+              pendingInvite = user.userMetadata?['invite_code'] as String?;
+              if (pendingInvite != null) {
+                debugPrint(
+                  '🎟️ Found invite code in user metadata: $pendingInvite',
+                );
+              }
+            }
+
+            // If we have a pending invite, process it
+            if (pendingInvite != null && pendingInvite.isNotEmpty) {
+              final alreadyLinked = response?['invited_by'] as String?;
+
+              if (alreadyLinked == null || alreadyLinked.isEmpty) {
+                // Store the invite code — DB trigger auto-creates friendship
+                await FriendService.setInvitedBy(pendingInvite);
+                debugPrint('✅ Set invited_by to $pendingInvite');
+
+                // Look up inviter name for welcome screen
+                final inviterProfile = await FriendService.getPublicProfile(
+                  pendingInvite,
+                );
+                final inviterName = inviterProfile?.displayName ?? 'a friend';
+
+                debugPrint('🎉 Routing to invite welcome screen');
+                return InviteWelcomeScreen(
+                  sessionId: sessionId,
+                  characterId: character,
+                  inviterName: inviterName,
+                  inviteCode: pendingInvite,
+                );
+              } else {
+                debugPrint('ℹ️ User already linked to inviter: $alreadyLinked');
+              }
+            }
+            // ═══════════════════════════════════════════════════════
 
             // If from FBS campaign
             if (campaignId == 'fbs_launch') {

@@ -1,20 +1,33 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/friend_service.dart';
+
+// For web file picking
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 /// Account settings modal.
 /// Desktop: Centered overlay with sidebar navigation + content panel.
 /// Mobile: Full-screen with horizontal pill tabs.
+/// Fields are editable and persist to Supabase.
 class SettingsModal extends StatefulWidget {
   final Map<String, dynamic>? userData;
   final String? avatarImagePath;
+  final VoidCallback? onProfileUpdated;
 
-  const SettingsModal({super.key, this.userData, this.avatarImagePath});
+  const SettingsModal({
+    super.key,
+    this.userData,
+    this.avatarImagePath,
+    this.onProfileUpdated,
+  });
 
-  /// Show as a dialog overlay
   static Future<void> show(
     BuildContext context, {
     Map<String, dynamic>? userData,
     String? avatarImagePath,
+    VoidCallback? onProfileUpdated,
   }) {
     final isMobile = MediaQuery.of(context).size.width < 900;
 
@@ -25,6 +38,7 @@ class SettingsModal extends StatefulWidget {
           builder: (_) => SettingsModal(
             userData: userData,
             avatarImagePath: avatarImagePath,
+            onProfileUpdated: onProfileUpdated,
           ),
         ),
       );
@@ -39,6 +53,7 @@ class SettingsModal extends StatefulWidget {
           child: SettingsModal(
             userData: userData,
             avatarImagePath: avatarImagePath,
+            onProfileUpdated: onProfileUpdated,
           ),
         ),
       ),
@@ -56,8 +71,92 @@ class _SettingsModalState extends State<SettingsModal> {
   static const Color surfaceCard = Color(0xFF1A1A1A);
   static const Color ironGrey = Color(0xFF2C2C2C);
 
+  static const _months = [
+    '',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
   final _tabs = ['Profile', 'Account', 'Password', 'Payment Method', 'Connect'];
-  int _selectedTabIndex = 1; // Default to Account
+  int _selectedTabIndex = 0; // Default to Profile
+
+  // Editable controllers - Profile tab
+  late TextEditingController _displayNameCtrl;
+  late TextEditingController _bioCtrl;
+  late TextEditingController _locationCtrl;
+
+  // Editable controllers - Account tab
+  late TextEditingController _usernameCtrl;
+  late TextEditingController _firstNameCtrl;
+  late TextEditingController _lastNameCtrl;
+
+  bool _isSaving = false;
+  bool _isUploadingAvatar = false;
+  bool _hasChanges = false;
+  String? _avatarUrl;
+  String? _inviteCode;
+  DateTime? _joinedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    final data = widget.userData ?? {};
+    _displayNameCtrl = TextEditingController(text: data['full_name'] ?? '');
+    _bioCtrl = TextEditingController(text: data['bio'] ?? '');
+    _locationCtrl = TextEditingController(text: data['location'] ?? '');
+    _usernameCtrl = TextEditingController(text: data['username'] ?? '');
+    _firstNameCtrl = TextEditingController(text: data['first_name'] ?? '');
+    _lastNameCtrl = TextEditingController(text: data['last_name'] ?? '');
+    _avatarUrl = data['avatar_url'] as String?;
+    _inviteCode = data['invite_code'] as String?;
+
+    // Get joined date
+    final user = Supabase.instance.client.auth.currentUser;
+    _joinedDate = user?.createdAt != null
+        ? DateTime.tryParse(user!.createdAt)
+        : null;
+    if (_joinedDate == null && data['created_at'] != null) {
+      _joinedDate = DateTime.tryParse(data['created_at'].toString());
+    }
+
+    // Listen for changes
+    _displayNameCtrl.addListener(_markChanged);
+    _bioCtrl.addListener(_markChanged);
+    _locationCtrl.addListener(_markChanged);
+    _usernameCtrl.addListener(_markChanged);
+    _firstNameCtrl.addListener(_markChanged);
+    _lastNameCtrl.addListener(_markChanged);
+  }
+
+  void _markChanged() {
+    if (!_hasChanges) setState(() => _hasChanges = true);
+  }
+
+  @override
+  void dispose() {
+    _displayNameCtrl.dispose();
+    _bioCtrl.dispose();
+    _locationCtrl.dispose();
+    _usernameCtrl.dispose();
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    super.dispose();
+  }
+
+  String get _joinedText {
+    if (_joinedDate == null) return '';
+    return 'Joined ${_months[_joinedDate!.month]} ${_joinedDate!.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,13 +165,13 @@ class _SettingsModalState extends State<SettingsModal> {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // DESKTOP: Centered modal with sidebar
+  // DESKTOP LAYOUT
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildDesktopLayout() {
     return Container(
-      width: 680,
-      height: 520,
+      width: 700,
+      height: 560,
       decoration: BoxDecoration(
         color: surfaceCard,
         borderRadius: BorderRadius.circular(16),
@@ -82,11 +181,8 @@ class _SettingsModalState extends State<SettingsModal> {
         borderRadius: BorderRadius.circular(16),
         child: Row(
           children: [
-            // Sidebar
             SizedBox(width: 200, child: _buildSidebar()),
-            // Divider
             Container(width: 1, color: ironGrey),
-            // Content
             Expanded(child: _buildContent()),
           ],
         ),
@@ -101,16 +197,34 @@ class _SettingsModalState extends State<SettingsModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar
           _buildAvatarSection(),
-          const SizedBox(height: 28),
-
-          // Tab list
+          const SizedBox(height: 12),
+          // Name under avatar
+          Text(
+            '${_firstNameCtrl.text} ${_lastNameCtrl.text}'.trim().isEmpty
+                ? _displayNameCtrl.text
+                : '${_firstNameCtrl.text} ${_lastNameCtrl.text}'.trim(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (_usernameCtrl.text.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              '@${_usernameCtrl.text}',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.35),
+                fontSize: 12,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 20),
           ..._tabs.asMap().entries.map((e) => _buildSidebarTab(e.key, e.value)),
-
           const Spacer(),
-
-          // Log out
           GestureDetector(
             onTap: _handleLogout,
             child: Padding(
@@ -131,42 +245,64 @@ class _SettingsModalState extends State<SettingsModal> {
   }
 
   Widget _buildAvatarSection() {
-    return Stack(
-      children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: deepCharcoal,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: ironGrey),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(9),
-            child: widget.avatarImagePath != null
-                ? Image.asset(
-                    widget.avatarImagePath!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _avatarFallback(),
-                  )
-                : _avatarFallback(),
-          ),
-        ),
-        Positioned(
-          bottom: 0,
-          right: 0,
-          child: Container(
-            width: 22,
-            height: 22,
+    return GestureDetector(
+      onTap: _pickAvatar,
+      child: Stack(
+        children: [
+          Container(
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
-              color: voidBlack,
-              borderRadius: BorderRadius.circular(5),
+              color: deepCharcoal,
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: ironGrey),
             ),
-            child: const Icon(Icons.edit, color: Colors.white54, size: 12),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(9),
+              child: _isUploadingAvatar
+                  ? const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: neonGreen,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    )
+                  : _avatarUrl != null
+                  ? Image.network(
+                      _avatarUrl!,
+                      fit: BoxFit.cover,
+                      width: 72,
+                      height: 72,
+                      errorBuilder: (_, __, ___) => _avatarFallback(),
+                    )
+                  : widget.avatarImagePath != null
+                  ? Image.asset(
+                      widget.avatarImagePath!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _avatarFallback(),
+                    )
+                  : _avatarFallback(),
+            ),
           ),
-        ),
-      ],
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: voidBlack,
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: ironGrey),
+              ),
+              child: const Icon(Icons.edit, color: Colors.white54, size: 12),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -181,7 +317,6 @@ class _SettingsModalState extends State<SettingsModal> {
 
   Widget _buildSidebarTab(int index, String label) {
     final isActive = _selectedTabIndex == index;
-    // Show green dot for "Account" tab
     final showDot = label == 'Account';
 
     return GestureDetector(
@@ -224,81 +359,95 @@ class _SettingsModalState extends State<SettingsModal> {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // MOBILE: Full-screen with pill tabs
+  // MOBILE LAYOUT
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildMobileLayout() {
     return Scaffold(
       backgroundColor: voidBlack,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Horizontal pill tabs
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: SizedBox(
-                height: 38,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _tabs.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final isActive = _selectedTabIndex == index;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedTabIndex = index),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isActive ? Colors.white : Colors.transparent,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: isActive ? Colors.white : ironGrey,
-                          ),
-                        ),
-                        child: Text(
-                          _tabs[index],
-                          style: TextStyle(
-                            color: isActive ? Colors.black : Colors.white54,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
+      appBar: AppBar(
+        backgroundColor: voidBlack,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'SETTINGS',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          // Pill tabs
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: SizedBox(
+              height: 38,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _tabs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final isActive = _selectedTabIndex == index;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedTabIndex = index),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isActive ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isActive ? Colors.white : ironGrey,
                         ),
                       ),
-                    );
-                  },
-                ),
+                      child: Text(
+                        _tabs[index],
+                        style: TextStyle(
+                          color: isActive ? Colors.black : Colors.white54,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
-            const SizedBox(height: 24),
-
-            // Avatar (mobile)
-            Padding(
+          ),
+          const SizedBox(height: 24),
+          // Avatar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _buildAvatarSection(),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: _buildAvatarSection(),
-              ),
+              child: _buildTabContent(),
             ),
-            const SizedBox(height: 20),
-
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildTabContent(),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   // ═══════════════════════════════════════════════════════════
-  // CONTENT PANEL
+  // CONTENT
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildContent() {
@@ -308,7 +457,6 @@ class _SettingsModalState extends State<SettingsModal> {
           padding: const EdgeInsets.all(32),
           child: SingleChildScrollView(child: _buildTabContent()),
         ),
-        // Close button
         Positioned(
           top: 16,
           right: 16,
@@ -346,7 +494,7 @@ class _SettingsModalState extends State<SettingsModal> {
     }
   }
 
-  // ─── Profile Tab ──────────────────────────────────────────
+  // ─── Profile Tab (editable) ───────────────────────────────
 
   Widget _buildProfileContent() {
     return Column(
@@ -354,9 +502,18 @@ class _SettingsModalState extends State<SettingsModal> {
       children: [
         _sectionTitle('PROFILE'),
         const SizedBox(height: 20),
-        _buildTextField('DISPLAY NAME', widget.userData?['full_name'] ?? ''),
-        _buildTextField('BIO', widget.userData?['bio'] ?? '', maxLines: 3),
-        _buildTextField('LOCATION', ''),
+        _buildEditableField('DISPLAY NAME', _displayNameCtrl),
+        _buildEditableField('BIO', _bioCtrl, maxLines: 3),
+        _buildEditableField('LOCATION', _locationCtrl),
+
+        // Invite code (read-only)
+        if (_inviteCode != null) ...[
+          const SizedBox(height: 8),
+          _buildReadOnlyField('YOUR INVITE CODE', _inviteCode!),
+        ],
+
+        const SizedBox(height: 24),
+        _buildSaveButton(),
       ],
     );
   }
@@ -365,24 +522,24 @@ class _SettingsModalState extends State<SettingsModal> {
 
   Widget _buildAccountContent() {
     final email = Supabase.instance.client.auth.currentUser?.email ?? '';
-    final username = widget.userData?['full_name'] ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('ACCOUNT'),
         const SizedBox(height: 20),
-        _buildTextField(
-          'USERNAME',
-          '@${username.toLowerCase().replaceAll(' ', '')}',
-        ),
-        _buildTextField('FIRST NAME', username.split(' ').first),
-        _buildTextField(
-          'LAST NAME',
-          username.split(' ').length > 1 ? username.split(' ').last : '',
-        ),
-        _buildTextField('EMAIL', email),
-        const SizedBox(height: 20),
+        _buildEditableField('USERNAME', _usernameCtrl, prefix: '@'),
+        _buildEditableField('FIRST NAME', _firstNameCtrl),
+        _buildEditableField('LAST NAME', _lastNameCtrl),
+        _buildReadOnlyField('EMAIL', email),
+
+        // Joined date
+        if (_joinedText.isNotEmpty)
+          _buildReadOnlyField('MEMBER SINCE', _joinedText),
+
+        const SizedBox(height: 24),
+        _buildSaveButton(),
+        const SizedBox(height: 16),
         _buildOutlinedButton('DELETE MY ACCOUNT'),
       ],
     );
@@ -396,7 +553,7 @@ class _SettingsModalState extends State<SettingsModal> {
       children: [
         _sectionTitle('PASSWORD'),
         const SizedBox(height: 20),
-        _buildTextField('CURRENT PASSWORD', '••••••••••••••', obscure: true),
+        _buildReadOnlyField('CURRENT PASSWORD', '••••••••••••••'),
         const SizedBox(height: 16),
         _buildOutlinedButton('CHANGE MY PASSWORD'),
       ],
@@ -478,12 +635,62 @@ class _SettingsModalState extends State<SettingsModal> {
     );
   }
 
-  Widget _buildTextField(
+  Widget _buildEditableField(
     String label,
-    String value, {
-    bool obscure = false,
+    TextEditingController controller, {
     int maxLines = 1,
+    String? prefix,
   }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.4),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: deepCharcoal,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: ironGrey),
+            ),
+            child: TextField(
+              controller: controller,
+              maxLines: maxLines,
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
+              decoration: InputDecoration(
+                prefixText: prefix,
+                prefixStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.35),
+                  fontSize: 14,
+                ),
+                hintText: label,
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyField(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -505,20 +712,48 @@ class _SettingsModalState extends State<SettingsModal> {
             decoration: BoxDecoration(
               color: deepCharcoal,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: ironGrey),
+              border: Border.all(color: ironGrey.withValues(alpha: 0.5)),
             ),
             child: Text(
-              obscure ? '••••••••••••••' : value,
+              value,
               style: TextStyle(
-                color: value.isEmpty
-                    ? Colors.white.withValues(alpha: 0.2)
-                    : Colors.white70,
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 14,
               ),
-              maxLines: maxLines,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return GestureDetector(
+      onTap: _hasChanges && !_isSaving ? _handleSave : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+        decoration: BoxDecoration(
+          color: _hasChanges ? neonGreen : ironGrey,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: _isSaving
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  color: Colors.black,
+                  strokeWidth: 2,
+                ),
+              )
+            : Text(
+                'SAVE CHANGES',
+                style: TextStyle(
+                  color: _hasChanges ? Colors.black : Colors.white38,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
       ),
     );
   }
@@ -552,7 +787,6 @@ class _SettingsModalState extends State<SettingsModal> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
-          // Platform icon
           Container(
             width: 40,
             height: 40,
@@ -564,8 +798,6 @@ class _SettingsModalState extends State<SettingsModal> {
             child: Icon(icon, color: Colors.white54, size: 20),
           ),
           const SizedBox(width: 14),
-
-          // Name + status
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,8 +820,6 @@ class _SettingsModalState extends State<SettingsModal> {
               ],
             ),
           ),
-
-          // Action
           isConnected
               ? Container(
                   width: 24,
@@ -608,6 +838,80 @@ class _SettingsModalState extends State<SettingsModal> {
         ],
       ),
     );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ACTIONS
+  // ═══════════════════════════════════════════════════════════
+
+  Future<void> _handleSave() async {
+    setState(() => _isSaving = true);
+
+    // Compute full_name from first + last
+    final first = _firstNameCtrl.text.trim();
+    final last = _lastNameCtrl.text.trim();
+    final computedFullName = '$first $last'.trim();
+
+    final success = await FriendService.updateProfile(
+      fullName: computedFullName.isNotEmpty
+          ? computedFullName
+          : _displayNameCtrl.text.trim(),
+      firstName: first,
+      lastName: last,
+      username: _usernameCtrl.text.trim().toLowerCase().replaceAll(' ', ''),
+      bio: _bioCtrl.text.trim(),
+      location: _locationCtrl.text.trim(),
+    );
+
+    setState(() {
+      _isSaving = false;
+      if (success) _hasChanges = false;
+    });
+
+    if (success) {
+      widget.onProfileUpdated?.call();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Profile updated!'),
+            backgroundColor: neonGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  void _pickAvatar() {
+    // Web file picker
+    final input = html.FileUploadInputElement()..accept = 'image/*';
+    input.click();
+
+    input.onChange.listen((event) async {
+      final file = input.files?.first;
+      if (file == null) return;
+
+      setState(() => _isUploadingAvatar = true);
+
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(file);
+      await reader.onLoad.first;
+
+      final bytes = Uint8List.fromList(reader.result as List<int>);
+      final url = await FriendService.uploadAvatar(bytes, file.name);
+
+      setState(() {
+        _isUploadingAvatar = false;
+        if (url != null) _avatarUrl = url;
+      });
+
+      if (url != null) {
+        widget.onProfileUpdated?.call();
+      }
+    });
   }
 
   void _handleLogout() async {

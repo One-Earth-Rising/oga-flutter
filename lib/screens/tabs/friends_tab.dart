@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../services/friend_service.dart';
+import '../share_profile_screen.dart';
 
-/// Friends tab content for the dashboard.
-/// Shows friend list with online status, character avatars, and search.
+/// Friends tab with real Supabase data.
+/// Features: friend list, invite code search, add friend, pending requests.
 class FriendsTab extends StatefulWidget {
   const FriendsTab({super.key});
 
@@ -16,64 +19,52 @@ class _FriendsTabState extends State<FriendsTab> {
   static const Color ironGrey = Color(0xFF2C2C2C);
 
   final _searchController = TextEditingController();
+
+  List<FriendProfile> _friends = [];
+  List<FriendProfile> _pendingRequests = [];
+  String? _myInviteCode;
+  bool _isLoading = true;
   String _searchQuery = '';
 
-  // Hardcoded friends for MVP
-  static const List<_FriendData> _friends = [
-    _FriendData(
-      name: 'NIGHT KNIGHT',
-      handle: '@nknight',
-      character: 'Vegeta',
-      characterColor: Color(0xFF2563EB),
-      isOnline: true,
-      level: 12,
-    ),
-    _FriendData(
-      name: 'BISKIT',
-      handle: '@BISKIT',
-      character: 'Ryu',
-      characterColor: Color(0xFFDC2626),
-      isOnline: true,
-      level: 8,
-    ),
-    _FriendData(
-      name: 'OVERLY-OVER',
-      handle: '@O-O',
-      character: 'Guggimon',
-      characterColor: Color(0xFF7C3AED),
-      isOnline: false,
-      level: 15,
-    ),
-    _FriendData(
-      name: 'RYUMAIN99',
-      handle: '@ryumain',
-      character: 'Ryu',
-      characterColor: Color(0xFFDC2626),
-      isOnline: false,
-      level: 22,
-    ),
-    _FriendData(
-      name: 'GUGGIFAN',
-      handle: '@guggifan',
-      character: 'Guggimon',
-      characterColor: Color(0xFF7C3AED),
-      isOnline: true,
-      level: 5,
-    ),
-  ];
+  // Invite code search state
+  bool _isSearchingCode = false;
+  FriendProfile? _foundUser;
+  String? _searchError;
+  bool _requestSent = false;
 
-  List<_FriendData> get _filteredFriends {
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+
+    final results = await Future.wait([
+      FriendService.getFriends(),
+      FriendService.getPendingRequests(),
+      FriendService.getMyInviteCode(),
+    ]);
+
+    setState(() {
+      _friends = results[0] as List<FriendProfile>;
+      _pendingRequests = results[1] as List<FriendProfile>;
+      _myInviteCode = results[2] as String?;
+      _isLoading = false;
+    });
+  }
+
+  List<FriendProfile> get _filteredFriends {
     if (_searchQuery.isEmpty) return _friends;
     return _friends
         .where(
           (f) =>
               f.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              f.handle.toLowerCase().contains(_searchQuery.toLowerCase()),
+              f.email.toLowerCase().contains(_searchQuery.toLowerCase()),
         )
         .toList();
   }
-
-  int get _onlineCount => _friends.where((f) => f.isOnline).length;
 
   @override
   void dispose() {
@@ -118,146 +109,65 @@ class _FriendsTabState extends State<FriendsTab> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    '${_friends.length}',
-                    style: const TextStyle(
-                      color: Colors.white24,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                  if (!_isLoading)
+                    Text(
+                      '${_friends.length}',
+                      style: const TextStyle(
+                        color: Colors.white24,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: neonGreen,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$_onlineCount ONLINE',
-                    style: const TextStyle(
-                      color: Colors.white24,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1,
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: 20),
 
-              // Search bar
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: deepCharcoal,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: ironGrey),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, color: Colors.white24, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (v) => setState(() => _searchQuery = v),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search friends...',
-                          hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            fontSize: 13,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Add friend button
-              GestureDetector(
-                onTap: () {
-                  // TODO: Add friend flow
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: neonGreen.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: neonGreen.withValues(alpha: 0.2),
-                      style: BorderStyle.solid,
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.person_add, color: neonGreen, size: 16),
-                      SizedBox(width: 8),
-                      Text(
-                        'ADD FRIEND',
-                        style: TextStyle(
-                          color: neonGreen,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Online friends section
-              if (_filteredFriends.any((f) => f.isOnline)) ...[
-                _buildSubHeader('ONLINE'),
+              // Your invite code card
+              if (_myInviteCode != null) _buildMyInviteCode(),
+              if (_myInviteCode != null) ...[
                 const SizedBox(height: 10),
-                ..._filteredFriends
-                    .where((f) => f.isOnline)
-                    .map((f) => _buildFriendRow(f)),
-                const SizedBox(height: 24),
+                _buildShareProfileButton(),
+              ],
+              const SizedBox(height: 16),
+
+              // Add friend by code
+              _buildAddByCode(),
+              const SizedBox(height: 16),
+
+              // Search existing friends
+              if (_friends.isNotEmpty) ...[
+                _buildSearchBar(),
+                const SizedBox(height: 16),
               ],
 
-              // Offline friends section
-              if (_filteredFriends.any((f) => !f.isOnline)) ...[
-                _buildSubHeader('OFFLINE'),
-                const SizedBox(height: 10),
-                ..._filteredFriends
-                    .where((f) => !f.isOnline)
-                    .map((f) => _buildFriendRow(f)),
-              ],
-
-              // Empty state
-              if (_filteredFriends.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
+              // Loading
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
                   child: Center(
-                    child: Text(
-                      _searchQuery.isEmpty
-                          ? 'No friends yet. Start by adding someone!'
-                          : 'No friends matching "$_searchQuery"',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.3),
-                        fontSize: 14,
-                      ),
-                    ),
+                    child: CircularProgressIndicator(color: neonGreen),
                   ),
-                ),
+                )
+              else ...[
+                // Pending requests
+                if (_pendingRequests.isNotEmpty) ...[
+                  _buildSubHeader('PENDING REQUESTS'),
+                  const SizedBox(height: 10),
+                  ..._pendingRequests.map((f) => _buildPendingRow(f)),
+                  const SizedBox(height: 24),
+                ],
+
+                // Friends list
+                if (_filteredFriends.isNotEmpty) ...[
+                  _buildSubHeader('YOUR FRIENDS'),
+                  const SizedBox(height: 10),
+                  ..._filteredFriends.map((f) => _buildFriendRow(f)),
+                ],
+
+                // Empty state
+                if (_friends.isEmpty && _pendingRequests.isEmpty)
+                  _buildEmptyState(),
+              ],
 
               const SizedBox(height: 60),
             ],
@@ -266,6 +176,386 @@ class _FriendsTabState extends State<FriendsTab> {
       ),
     );
   }
+
+  // ═══════════════════════════════════════════════════════════
+  // YOUR INVITE CODE
+  // ═══════════════════════════════════════════════════════════
+
+  Widget _buildMyInviteCode() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: neonGreen.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: neonGreen.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'YOUR INVITE CODE',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _myInviteCode!,
+                  style: const TextStyle(
+                    color: neonGreen,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Share this code with friends to connect',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: _myInviteCode!));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Invite code copied!'),
+                  backgroundColor: neonGreen,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: neonGreen.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.copy, color: neonGreen, size: 18),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShareProfileButton() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ShareProfileScreen(inviteCode: _myInviteCode),
+          ),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: neonGreen,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.share, color: Colors.black, size: 16),
+            SizedBox(width: 8),
+            Text(
+              'SHARE PROFILE',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ADD BY INVITE CODE
+  // ═══════════════════════════════════════════════════════════
+
+  Widget _buildAddByCode() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: deepCharcoal,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: ironGrey),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ADD FRIEND BY CODE',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: voidBlack,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: ironGrey),
+                  ),
+                  child: TextField(
+                    onChanged: (_) => setState(() {
+                      _foundUser = null;
+                      _searchError = null;
+                      _requestSent = false;
+                    }),
+                    onSubmitted: (_) => _searchByCode(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                    ),
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      hintText: 'OGA-XXXX',
+                      hintStyle: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        fontSize: 14,
+                        letterSpacing: 1,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                    ),
+                    controller: _codeController,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: _isSearchingCode ? null : _searchByCode,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: neonGreen,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: _isSearchingCode
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            color: Colors.black,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.search, color: Colors.black, size: 18),
+                ),
+              ),
+            ],
+          ),
+
+          // Search result
+          if (_foundUser != null && !_requestSent) ...[
+            const SizedBox(height: 14),
+            _buildFoundUserCard(_foundUser!),
+          ],
+          if (_requestSent) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: neonGreen.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: neonGreen.withValues(alpha: 0.2)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: neonGreen, size: 16),
+                  SizedBox(width: 8),
+                  Text(
+                    'Friend request sent!',
+                    style: TextStyle(color: neonGreen, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (_searchError != null) ...[
+            const SizedBox(height: 14),
+            Text(
+              _searchError!,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  final _codeController = TextEditingController();
+
+  Future<void> _searchByCode() async {
+    final code = _codeController.text.trim();
+    if (code.isEmpty) return;
+
+    setState(() {
+      _isSearchingCode = true;
+      _foundUser = null;
+      _searchError = null;
+      _requestSent = false;
+    });
+
+    final result = await FriendService.findByInviteCode(code);
+
+    setState(() {
+      _isSearchingCode = false;
+      if (result != null) {
+        // Check if already friends
+        final alreadyFriend = _friends.any((f) => f.email == result.email);
+        if (alreadyFriend) {
+          _searchError = 'You\'re already friends with ${result.name}!';
+        } else {
+          _foundUser = result;
+        }
+      } else {
+        _searchError = 'No user found with code "$code"';
+      }
+    });
+  }
+
+  Widget _buildFoundUserCard(FriendProfile user) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: voidBlack,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ironGrey),
+      ),
+      child: Row(
+        children: [
+          _buildAvatar(user, size: 36),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.name.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (user.starterCharacter != null)
+                  Text(
+                    user.starterCharacter!.toUpperCase(),
+                    style: TextStyle(
+                      color: user.characterColor.withValues(alpha: 0.7),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () async {
+              final success = await FriendService.sendFriendRequest(user.email);
+              if (success) {
+                setState(() => _requestSent = true);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: neonGreen,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'ADD',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // SEARCH BAR
+  // ═══════════════════════════════════════════════════════════
+
+  Widget _buildSearchBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: deepCharcoal,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ironGrey),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search, color: Colors.white24, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _searchQuery = v),
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Search friends...',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  fontSize: 13,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // FRIEND ROWS
+  // ═══════════════════════════════════════════════════════════
 
   Widget _buildSubHeader(String label) {
     return Text(
@@ -279,7 +569,7 @@ class _FriendsTabState extends State<FriendsTab> {
     );
   }
 
-  Widget _buildFriendRow(_FriendData friend) {
+  Widget _buildFriendRow(FriendProfile friend) {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -290,55 +580,14 @@ class _FriendsTabState extends State<FriendsTab> {
       ),
       child: Row(
         children: [
-          // Avatar with online indicator
-          Stack(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: friend.characterColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: friend.characterColor.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    friend.character[0],
-                    style: TextStyle(
-                      color: friend.characterColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ),
-              if (friend.isOnline)
-                Positioned(
-                  bottom: -1,
-                  right: -1,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: neonGreen,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: deepCharcoal, width: 2),
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          _buildAvatar(friend, size: 40),
           const SizedBox(width: 12),
-
-          // Name + handle
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  friend.name,
+                  friend.name.toUpperCase(),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
@@ -347,62 +596,260 @@ class _FriendsTabState extends State<FriendsTab> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  friend.handle,
+                  friend.email,
                   style: const TextStyle(color: Colors.white38, fontSize: 11),
                 ),
               ],
             ),
           ),
-
-          // Character + level
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                friend.character.toUpperCase(),
+          // Character badge
+          if (friend.starterCharacter != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: friend.characterColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: friend.characterColor.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Text(
+                friend.starterCharacter!.toUpperCase(),
                 style: TextStyle(
                   color: friend.characterColor.withValues(alpha: 0.7),
-                  fontSize: 10,
+                  fontSize: 9,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                'LVL ${friend.level}',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
+            ),
+          const SizedBox(width: 8),
+          // Remove button
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_horiz, color: Colors.white24, size: 18),
+            color: deepCharcoal,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(color: ironGrey.withValues(alpha: 0.5)),
+            ),
+            onSelected: (value) async {
+              if (value == 'remove') {
+                final confirmed = await _confirmRemove(friend.name);
+                if (confirmed) {
+                  await FriendService.removeFriend(friend.email);
+                  _loadData();
+                }
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'remove',
+                child: Text(
+                  'Remove Friend',
+                  style: TextStyle(color: Colors.redAccent, fontSize: 13),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(width: 10),
-
-          // More options
-          const Icon(Icons.more_horiz, color: Colors.white24, size: 18),
         ],
       ),
     );
   }
-}
 
-class _FriendData {
-  final String name;
-  final String handle;
-  final String character;
-  final Color characterColor;
-  final bool isOnline;
-  final int level;
+  Widget _buildPendingRow(FriendProfile friend) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: deepCharcoal,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: neonGreen.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        children: [
+          _buildAvatar(friend, size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  friend.name.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Wants to be your friend',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Accept
+          GestureDetector(
+            onTap: () async {
+              await FriendService.acceptRequest(friend.email);
+              _loadData();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: neonGreen,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'ACCEPT',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Decline
+          GestureDetector(
+            onTap: () async {
+              await FriendService.declineRequest(friend.email);
+              _loadData();
+            },
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                border: Border.all(color: ironGrey),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.close, color: Colors.white38, size: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  const _FriendData({
-    required this.name,
-    required this.handle,
-    required this.character,
-    required this.characterColor,
-    required this.isOnline,
-    required this.level,
-  });
+  // ═══════════════════════════════════════════════════════════
+  // AVATAR & HELPERS
+  // ═══════════════════════════════════════════════════════════
+
+  Widget _buildAvatar(FriendProfile friend, {double size = 40}) {
+    if (friend.avatarUrl != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(size * 0.2),
+        child: Image.network(
+          friend.avatarUrl!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildLetterAvatar(friend, size),
+        ),
+      );
+    }
+    return _buildLetterAvatar(friend, size);
+  }
+
+  Widget _buildLetterAvatar(FriendProfile friend, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: friend.characterColor.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(size * 0.2),
+        border: Border.all(color: friend.characterColor.withValues(alpha: 0.3)),
+      ),
+      child: Center(
+        child: Text(
+          friend.name.isNotEmpty ? friend.name[0].toUpperCase() : '?',
+          style: TextStyle(
+            color: friend.characterColor,
+            fontSize: size * 0.4,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(
+              Icons.people_outline,
+              color: Colors.white.withValues(alpha: 0.15),
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No friends yet',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.35),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Share your invite code to start connecting!',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.2),
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmRemove(String name) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: deepCharcoal,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: ironGrey),
+            ),
+            title: const Text(
+              'Remove Friend',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            content: Text(
+              'Remove $name from your friends?',
+              style: const TextStyle(color: Colors.white54),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text(
+                  'CANCEL',
+                  style: TextStyle(color: Colors.white38),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'REMOVE',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
 }
