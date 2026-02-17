@@ -19,13 +19,13 @@ import 'screens/invite_signup_screen.dart'; // ← ADD
 import 'screens/invite_welcome_screen.dart'; // ← ADD
 import 'services/friend_service.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // ← ADD
+import 'package:oga_web_showcase/config/environment.dart'; // ← ADD
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
-    url: 'https://mlpinkcxdsmxicipseux.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1scGlua2N4ZHNteGljaXBzZXV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4MTI4MDAsImV4cCI6MjA4MzM4ODgwMH0.iX7By6rcSDrQ13reRrZ12C5SfHGOkKDvEOfI2dxfuDA',
+    url: EnvironmentConfig.supabaseUrl,
+    anonKey: EnvironmentConfig.supabaseAnonKey,
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
     ),
