@@ -1,5 +1,5 @@
 [build]
-  command = "git clone https://github.com/flutter/flutter.git --depth 1 -b stable flutter-sdk && export PATH=$PATH:$PWD/flutter-sdk/bin && flutter --version && flutter config --no-analytics && flutter pub get && flutter build web --release --web-renderer html"
+  command = "git clone https://github.com/flutter/flutter.git --depth 1 -b stable flutter-sdk && export PATH=$PWD/flutter-sdk/bin:$PATH && flutter --version && flutter config --no-analytics && flutter pub get && flutter build web --release"
   publish = "build/web"
 
 [build.environment]
