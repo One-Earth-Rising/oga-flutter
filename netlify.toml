@@ -1,0 +1,45 @@
+[build]
+  command = "git clone https://github.com/flutter/flutter.git --depth 1 -b stable flutter-sdk && export PATH=$PATH:$PWD/flutter-sdk/bin && flutter --version && flutter config --no-analytics && flutter pub get && flutter build web --release --web-renderer html"
+  publish = "build/web"
+
+[build.environment]
+  FLUTTER_SKIP_ANALYTICS = "true"
+
+# SPA Routing - all routes to index.html for Flutter router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+
+# Security and caching headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/canvaskit/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Environment contexts
+[context.production]
+  environment = { ENVIRONMENT = "production" }
+
+[context.develop]
+  environment = { ENVIRONMENT = "staging" }
+
+[context.branch-deploy]
+  environment = { ENVIRONMENT = "development" }
+
+[context.deploy-preview]
+  environment = { ENVIRONMENT = "development" }
