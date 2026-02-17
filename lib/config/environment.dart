@@ -21,7 +21,7 @@ class EnvironmentConfig {
   /// - development: Local testing on localhost:3000
   /// - staging: Netlify staging site with test Supabase data
   /// - production: Live site with production Supabase data
-  static const Environment current = Environment.development;
+  static const Environment current = Environment.production;
 
   /// Returns true if running in production
   static bool get isProduction => current == Environment.production;
