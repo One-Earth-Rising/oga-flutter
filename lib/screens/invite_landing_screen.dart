@@ -874,7 +874,10 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
     );
   }
 
-  void _navigateToSignUp() {
+  void _navigateToSignUp() async {
+    // Save invite code early — survives PKCE redirect
+    await PendingInvite.save(widget.inviteCode);
+
     // If inviter was found, go to dedicated sign-up page
     if (_inviter != null) {
       Navigator.push(
@@ -887,7 +890,6 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
         ),
       );
     } else {
-      // Not found — send to regular landing/onboarding
       Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     }
   }
