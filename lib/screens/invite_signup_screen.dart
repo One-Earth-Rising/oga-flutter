@@ -586,12 +586,10 @@ class _InviteSignUpScreenState extends State<InviteSignUpScreen> {
   /// After auth, the confirm screen / callback can extract this
   /// and call setInvitedBy() to trigger auto-friend linking.
   String _buildRedirectUrl() {
-    // Simple redirect to confirm buffer page — no extra params needed
-    // The invite code is persisted via shared_preferences
     final base = Uri.base;
     final port = (base.port != 80 && base.port != 443) ? ':${base.port}' : '';
-    final redirectUrl = '${base.scheme}://${base.host}$port/#/confirm';
-
+    final redirectUrl =
+        '${base.scheme}://${base.host}$port/#/confirm?invite=${widget.inviteCode}';
     debugPrint('🔗 Redirect URL: $redirectUrl');
     return redirectUrl;
   }

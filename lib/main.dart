@@ -95,7 +95,14 @@ class _OgaAppState extends State<OgaApp> {
         if (settings.name?.startsWith('/confirm') ?? false) {
           final baseUri = Uri.base;
 
-          // If PKCE code is present, handle auth callback
+          // Extract invite code from URL if present (e.g. /confirm?invite=OGA-83E9)
+          final routeUri = Uri.parse(settings.name!);
+          final inviteFromUrl = routeUri.queryParameters['invite'];
+          if (inviteFromUrl != null && inviteFromUrl.isNotEmpty) {
+            debugPrint('🎟️ Found invite code in redirect URL: $inviteFromUrl');
+            PendingInvite.save(inviteFromUrl);
+          }
+
           if (baseUri.queryParameters.containsKey('code')) {
             return MaterialPageRoute(
               builder: (context) => FutureBuilder<Widget>(
@@ -116,7 +123,6 @@ class _OgaAppState extends State<OgaApp> {
             );
           }
 
-          // Otherwise show the confirm buffer page
           return MaterialPageRoute(
             builder: (context) => const ConfirmLoginScreen(),
           );

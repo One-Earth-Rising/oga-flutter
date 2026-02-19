@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/friend_service.dart';
 import '../share_profile_screen.dart';
 
 /// Friends tab with real Supabase data.
-/// Features: friend list, invite code search, add friend, pending requests.
+/// Features: "Invited by" card, friend list, invite code search, add friend, pending requests.
 class FriendsTab extends StatefulWidget {
   const FriendsTab({super.key});
 
@@ -25,6 +26,10 @@ class _FriendsTabState extends State<FriendsTab> {
   String? _myInviteCode;
   bool _isLoading = true;
   String _searchQuery = '';
+
+  // Invited-by state
+  String? _invitedByCode;
+  InviterProfile? _invitedByProfile;
 
   // Invite code search state
   bool _isSearchingCode = false;
@@ -47,12 +52,39 @@ class _FriendsTabState extends State<FriendsTab> {
       FriendService.getMyInviteCode(),
     ]);
 
+    // Load invited_by info
+    await _loadInvitedBy();
+
     setState(() {
       _friends = results[0] as List<FriendProfile>;
       _pendingRequests = results[1] as List<FriendProfile>;
       _myInviteCode = results[2] as String?;
       _isLoading = false;
     });
+  }
+
+  Future<void> _loadInvitedBy() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final response = await Supabase.instance.client
+          .from('profiles')
+          .select('invited_by')
+          .eq('email', user.email!)
+          .maybeSingle();
+
+      final code = response?['invited_by'] as String?;
+      if (code != null && code.isNotEmpty) {
+        final profile = await FriendService.getPublicProfile(code);
+        setState(() {
+          _invitedByCode = code;
+          _invitedByProfile = profile;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error loading invited_by: $e');
+    }
   }
 
   List<FriendProfile> get _filteredFriends {
@@ -122,6 +154,14 @@ class _FriendsTabState extends State<FriendsTab> {
               ),
               const SizedBox(height: 20),
 
+              // ═══════════════════════════════════════════════════════
+              // INVITED BY — permanent card (Clubhouse style)
+              // ═══════════════════════════════════════════════════════
+              if (_invitedByProfile != null) ...[
+                _buildInvitedByCard(),
+                const SizedBox(height: 16),
+              ],
+
               // Your invite code card
               if (_myInviteCode != null) _buildMyInviteCode(),
               if (_myInviteCode != null) ...[
@@ -174,6 +214,129 @@ class _FriendsTabState extends State<FriendsTab> {
           ),
         ),
       ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // INVITED BY CARD
+  // ═══════════════════════════════════════════════════════════
+
+  Widget _buildInvitedByCard() {
+    final inviter = _invitedByProfile!;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: deepCharcoal,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ironGrey),
+      ),
+      child: Row(
+        children: [
+          // Inviter avatar
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: inviter.characterColor,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: inviter.characterColor.withValues(alpha: 0.2),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: inviter.avatarUrl != null
+                  ? Image.network(
+                      inviter.avatarUrl!,
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          _buildInviterFallbackAvatar(),
+                    )
+                  : _buildInviterFallbackAvatar(),
+            ),
+          ),
+          const SizedBox(width: 14),
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.person_add,
+                      color: neonGreen.withValues(alpha: 0.6),
+                      size: 13,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'INVITED BY',
+                      style: TextStyle(
+                        color: neonGreen.withValues(alpha: 0.7),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  inviter.displayName.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                if (inviter.username.isNotEmpty) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    '@${inviter.username}',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // Code badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: neonGreen.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: neonGreen.withValues(alpha: 0.15)),
+            ),
+            child: Text(
+              _invitedByCode!,
+              style: TextStyle(
+                color: neonGreen.withValues(alpha: 0.5),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInviterFallbackAvatar() {
+    return Container(
+      width: 44,
+      height: 44,
+      color: deepCharcoal,
+      child: const Icon(Icons.person, color: Colors.white38, size: 22),
     );
   }
 
@@ -438,7 +601,6 @@ class _FriendsTabState extends State<FriendsTab> {
     setState(() {
       _isSearchingCode = false;
       if (result != null) {
-        // Check if already friends
         final alreadyFriend = _friends.any((f) => f.email == result.email);
         if (alreadyFriend) {
           _searchError = 'You\'re already friends with ${result.name}!';
