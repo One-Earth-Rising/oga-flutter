@@ -15,12 +15,12 @@ import 'screens/fbs_success_screen.dart';
 import 'screens/fbs_campaign_dashboard.dart';
 import 'screens/oga_signin_screen.dart';
 import 'screens/invite_landing_screen.dart';
-import 'screens/invite_signup_screen.dart'; // ← ADD
-import 'screens/invite_welcome_screen.dart'; // ← ADD
-import 'services/friend_service.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // ← ADD
-import 'package:oga_web_showcase/config/environment.dart'; // ← ADD
+import 'screens/invite_signup_screen.dart';
+import 'screens/invite_welcome_screen.dart';
 import 'screens/invite_onboarding_screen.dart';
+import 'services/friend_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:oga_web_showcase/config/environment.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,7 +48,6 @@ class _OgaAppState extends State<OgaApp> {
   }
 
   void _setupSilentFailGuard() {
-    // Listens globally for successful Magic Link logins
     Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       if (data.event == AuthChangeEvent.signedIn && data.session != null) {
         debugPrint('⚡ Global Guard: Auth Handshake Complete');
@@ -80,14 +79,23 @@ class _OgaAppState extends State<OgaApp> {
       ),
       onGenerateRoute: (settings) {
         final uri = Uri.parse(settings.name ?? '');
-        // Confirmation Buffer Route
+
+        // ═══════════════════════════════════════════════════════
+        // INVITE ONBOARDING (profile setup after invite signup)
+        // ═══════════════════════════════════════════════════════
+        if (settings.name == '/invite-setup') {
+          return MaterialPageRoute(
+            builder: (_) => const InviteOnboardingScreen(),
+          );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // CONFIRMATION BUFFER ROUTE
+        // ═══════════════════════════════════════════════════════
         if (settings.name?.startsWith('/confirm') ?? false) {
           final baseUri = Uri.base;
-          if (uri.path == '/invite-setup') {
-            return MaterialPageRoute(
-              builder: (_) => const InviteOnboardingScreen(),
-            );
-          }
+
+          // If PKCE code is present, handle auth callback
           if (baseUri.queryParameters.containsKey('code')) {
             return MaterialPageRoute(
               builder: (context) => FutureBuilder<Widget>(
@@ -107,19 +115,26 @@ class _OgaAppState extends State<OgaApp> {
               ),
             );
           }
+
+          // Otherwise show the confirm buffer page
           return MaterialPageRoute(
             builder: (context) => const ConfirmLoginScreen(),
           );
         }
-        // Invite route: /#/invite/OGA-XXXX
+
+        // ═══════════════════════════════════════════════════════
+        // INVITE ROUTES
+        // ═══════════════════════════════════════════════════════
+
+        // /#/invite/OGA-XXXX
         if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'invite') {
           final inviteCode = uri.pathSegments[1];
           return MaterialPageRoute(
             builder: (_) => InviteLandingScreen(inviteCode: inviteCode),
           );
         }
-        // Also handle the join URL redirect:
-        // /#/join?code=OGA-XXXX (from the QR code / share link)
+
+        // /#/join?code=OGA-XXXX (from QR code / share link)
         if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'join') {
           final inviteCode = uri.queryParameters['code'] ?? '';
           if (inviteCode.isNotEmpty) {
@@ -129,13 +144,18 @@ class _OgaAppState extends State<OgaApp> {
           }
         }
 
+        // ═══════════════════════════════════════════════════════
+        // SIGN IN
+        // ═══════════════════════════════════════════════════════
         if (settings.name == '/signin') {
           return MaterialPageRoute(
             builder: (context) => const OGASignInScreen(),
           );
         }
 
-        // FBS Account Screen
+        // ═══════════════════════════════════════════════════════
+        // FBS CAMPAIGN ROUTES
+        // ═══════════════════════════════════════════════════════
         if (settings.name == '/fbs-account') {
           final args = settings.arguments as Map?;
           return MaterialPageRoute(
@@ -146,7 +166,6 @@ class _OgaAppState extends State<OgaApp> {
           );
         }
 
-        // FBS Success Screen
         if (settings.name == '/fbs-success') {
           final args = settings.arguments as Map?;
           return MaterialPageRoute(
@@ -157,7 +176,9 @@ class _OgaAppState extends State<OgaApp> {
           );
         }
 
-        // Welcome Screen
+        // ═══════════════════════════════════════════════════════
+        // WELCOME SCREEN
+        // ═══════════════════════════════════════════════════════
         if (settings.name == '/welcome') {
           return MaterialPageRoute(
             builder: (context) => FutureBuilder<Widget>(
@@ -178,24 +199,23 @@ class _OgaAppState extends State<OgaApp> {
           );
         }
 
-        // Dashboard Screen
+        // ═══════════════════════════════════════════════════════
+        // DASHBOARD
+        // ═══════════════════════════════════════════════════════
         if (settings.name == '/dashboard') {
           final args = settings.arguments as Map?;
           final sessionId = args?['sessionId'];
           final character = args?['character'];
-          final campaignId = args?['campaignId']; // Add campaign check
+          final campaignId = args?['campaignId'];
 
           return MaterialPageRoute(
             builder: (context) {
-              // If FBS campaign, show FBS dashboard
               if (campaignId == 'fbs_launch') {
                 return FBSCampaignDashboard(
                   sessionId: sessionId,
                   acquiredCharacterId: character,
                 );
               }
-
-              // Otherwise show main dashboard
               return OGAAccountDashboard(
                 sessionId: sessionId,
                 acquiredCharacterId: character,
@@ -209,11 +229,15 @@ class _OgaAppState extends State<OgaApp> {
     );
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // LANDING PAGE LOGIC
+  // ═══════════════════════════════════════════════════════════
+
   static Future<Widget> _getLandingPage() async {
     try {
       final uri = Uri.base;
 
-      // ✅ Check if this is an auth callback (has access_token or code)
+      // Check if this is an auth callback (has access_token or code)
       if (uri.fragment.contains('access_token') ||
           uri.queryParameters.containsKey('code')) {
         debugPrint('🔐 Handling auth callback...');
@@ -305,14 +329,15 @@ class _OgaAppState extends State<OgaApp> {
                 debugPrint('ℹ️ User already linked to inviter: $alreadyLinked');
               }
             }
+
             // ═══════════════════════════════════════════════════════
-            // If from FBS campaign
+            // FBS CAMPAIGN ROUTING
+            // ═══════════════════════════════════════════════════════
             if (campaignId == 'fbs_launch') {
               if (joinedAt != null) {
                 final joinedDate = DateTime.parse(joinedAt);
                 final difference = DateTime.now().difference(joinedDate);
 
-                // New user: Show success screen first
                 if (difference.inMinutes < 5) {
                   debugPrint('🎉 New FBS user - showing success screen');
                   return FBSSuccessScreen(
@@ -322,7 +347,6 @@ class _OgaAppState extends State<OgaApp> {
                 }
               }
 
-              // Existing FBS user: Go to FBS campaign dashboard
               debugPrint('👤 Returning FBS user - going to FBS dashboard');
               return FBSCampaignDashboard(
                 sessionId: sessionId,
@@ -338,7 +362,6 @@ class _OgaAppState extends State<OgaApp> {
             );
           } catch (e) {
             debugPrint('⚠️ Error fetching profile: $e');
-            // Route to dashboard even on error
             return OGAAccountDashboard(
               sessionId: user.id,
               acquiredCharacterId: 'ryu',
@@ -395,7 +418,9 @@ class _OgaAppState extends State<OgaApp> {
   }
 }
 
-// --- Main Landing Page ---
+// ═══════════════════════════════════════════════════════════
+// MAIN LANDING PAGE
+// ═══════════════════════════════════════════════════════════
 
 class OgaLandingPage extends StatefulWidget {
   const OgaLandingPage({super.key});
