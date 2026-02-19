@@ -26,7 +26,7 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
   // ══════════════════════════════════════════════════════════
   // CHANGE THIS when you have a live URL
   // ══════════════════════════════════════════════════════════
-  static const String _baseUrl = 'https://oga.oneearthrising.com/join';
+  static const String _baseUrl = 'https://oga.oneearthrising.com/#/join';
 
   String? _inviteCode;
   bool _isLoading = true;
