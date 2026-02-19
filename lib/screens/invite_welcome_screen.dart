@@ -315,7 +315,7 @@ class _InviteWelcomeScreenState extends State<InviteWelcomeScreen>
 
   void _goToDashboard() {
     Navigator.of(context).pushNamedAndRemoveUntil(
-      '/dashboard',
+      '/invite-setup',
       (route) => false,
       arguments: {
         'sessionId': widget.sessionId,

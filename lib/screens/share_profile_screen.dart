@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/friend_service.dart';
 
 /// Share Profile / Recruit Agents screen.
@@ -23,17 +24,15 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
   static const Color surfaceCard = Color(0xFF1A1A1A);
   static const Color ironGrey = Color(0xFF2C2C2C);
 
-  // ══════════════════════════════════════════════════════════
-  // CHANGE THIS when you have a live URL
-  // ══════════════════════════════════════════════════════════
-  static const String _baseUrl = 'https://oga.oneearthrising.com/#/join';
+  // Base URL uses hash routing for Flutter web
+  static const String _baseUrl = 'https://oga.oneearthrising.com/#/invite';
 
   String? _inviteCode;
   bool _isLoading = true;
   bool _codeCopied = false;
   bool _linkCopied = false;
 
-  String get _inviteLink => '$_baseUrl?code=$_inviteCode';
+  String get _inviteLink => '$_baseUrl/$_inviteCode';
 
   @override
   void initState() {
@@ -102,11 +101,11 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
                       _buildInviteCodeRow(),
                       const SizedBox(height: 20),
 
-                      // Share invite link button
+                      // Share invite link button (opens native share sheet)
                       _buildShareButton(),
                       const SizedBox(height: 16),
 
-                      // Copy link button
+                      // Copy link button (clipboard only)
                       _buildCopyLinkButton(),
                       const SizedBox(height: 60),
                     ],
@@ -132,7 +131,6 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
       ),
       child: Row(
         children: [
-          // Star icon
           Container(
             width: 40,
             height: 40,
@@ -188,7 +186,6 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
       ),
       child: Column(
         children: [
-          // QR Code
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -212,8 +209,6 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
             ),
           ),
           const SizedBox(height: 18),
-
-          // Label
           Text(
             'SCAN TO JOIN',
             style: TextStyle(
@@ -298,7 +293,7 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // SHARE BUTTON
+  // SHARE BUTTON — Opens native share sheet
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildShareButton() {
@@ -330,6 +325,10 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
       ),
     );
   }
+
+  // ═══════════════════════════════════════════════════════════
+  // COPY LINK BUTTON — Clipboard only
+  // ═══════════════════════════════════════════════════════════
 
   Widget _buildCopyLinkButton() {
     return GestureDetector(
@@ -405,22 +404,18 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
   }
 
   void _shareInviteLink() {
-    // On web, clipboard is the primary share mechanism
-    // On mobile, you'd use share_plus package for native share sheet
-    final text =
-        'Join me on OGA Hub! '
+    // Uses share_plus to open native share sheet
+    // On mobile: shows Mail, Messages, WhatsApp, etc.
+    // On web: falls back to clipboard or browser share API
+    final shareText =
+        'Join me on OGA and get a free character!\n\n'
         'Use my invite code: $_inviteCode\n'
         '$_inviteLink';
 
-    Clipboard.setData(ClipboardData(text: text));
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Invite message copied to clipboard!'),
-        backgroundColor: neonGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        duration: const Duration(seconds: 2),
+    SharePlus.instance.share(
+      ShareParams(
+        text: shareText,
+        subject: 'Join OGA — One Character, Infinite Worlds',
       ),
     );
   }

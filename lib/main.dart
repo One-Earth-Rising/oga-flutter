@@ -20,6 +20,7 @@ import 'screens/invite_welcome_screen.dart'; // ← ADD
 import 'services/friend_service.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // ← ADD
 import 'package:oga_web_showcase/config/environment.dart'; // ← ADD
+import 'screens/invite_onboarding_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -82,6 +83,11 @@ class _OgaAppState extends State<OgaApp> {
         // Confirmation Buffer Route
         if (settings.name?.startsWith('/confirm') ?? false) {
           final baseUri = Uri.base;
+          if (uri.path == '/invite-setup') {
+            return MaterialPageRoute(
+              builder: (_) => const InviteOnboardingScreen(),
+            );
+          }
           if (baseUri.queryParameters.containsKey('code')) {
             return MaterialPageRoute(
               builder: (context) => FutureBuilder<Widget>(
