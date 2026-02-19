@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/friend_service.dart';
 import '../share_profile_screen.dart';
+import '../friend_profile_screen.dart';
 
 /// Friends tab with real Supabase data.
 /// Features: "Invited by" card, friend list, invite code search, add friend, pending requests.
@@ -224,109 +225,137 @@ class _FriendsTabState extends State<FriendsTab> {
   Widget _buildInvitedByCard() {
     final inviter = _invitedByProfile!;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: deepCharcoal,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ironGrey),
-      ),
-      child: Row(
-        children: [
-          // Inviter avatar
-          Container(
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              color: inviter.characterColor,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: inviter.characterColor.withValues(alpha: 0.2),
-                  blurRadius: 8,
-                ),
-              ],
+    return GestureDetector(
+      onTap: () {
+        // Convert InviterProfile to FriendProfile for navigation
+        final friendProfile = FriendProfile(
+          email: '', // Not available from public profile
+          name: inviter.displayName,
+          avatarUrl: inviter.avatarUrl,
+          starterCharacter: inviter.starterCharacter,
+          inviteCode: inviter.inviteCode,
+          createdAt: inviter.createdAt,
+        );
+        // Check if inviter is in friends list (has email)
+        final matchedFriend = _friends.where(
+          (f) => f.inviteCode == inviter.inviteCode,
+        );
+        if (matchedFriend.isNotEmpty) {
+          _openFriendProfile(matchedFriend.first);
+        } else {
+          _openFriendProfile(friendProfile);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: deepCharcoal,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: ironGrey),
+        ),
+        child: Row(
+          children: [
+            // Inviter avatar
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: inviter.characterColor,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: inviter.characterColor.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: inviter.avatarUrl != null
+                    ? Image.network(
+                        inviter.avatarUrl!,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _buildInviterFallbackAvatar(),
+                      )
+                    : _buildInviterFallbackAvatar(),
+              ),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: inviter.avatarUrl != null
-                  ? Image.network(
-                      inviter.avatarUrl!,
-                      width: 44,
-                      height: 44,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          _buildInviterFallbackAvatar(),
-                    )
-                  : _buildInviterFallbackAvatar(),
-            ),
-          ),
-          const SizedBox(width: 14),
-          // Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.person_add,
-                      color: neonGreen.withValues(alpha: 0.6),
-                      size: 13,
+            const SizedBox(width: 14),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.person_add,
+                        color: neonGreen.withValues(alpha: 0.6),
+                        size: 13,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'INVITED BY',
+                        style: TextStyle(
+                          color: neonGreen.withValues(alpha: 0.7),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    inviter.displayName.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
                     ),
-                    const SizedBox(width: 6),
+                  ),
+                  if (inviter.username.isNotEmpty) ...[
+                    const SizedBox(height: 1),
                     Text(
-                      'INVITED BY',
+                      '@${inviter.username}',
                       style: TextStyle(
-                        color: neonGreen.withValues(alpha: 0.7),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
+                        color: Colors.white.withValues(alpha: 0.3),
+                        fontSize: 12,
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  inviter.displayName.toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                if (inviter.username.isNotEmpty) ...[
-                  const SizedBox(height: 1),
-                  Text(
-                    '@${inviter.username}',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      fontSize: 12,
-                    ),
-                  ),
                 ],
-              ],
-            ),
-          ),
-          // Code badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: neonGreen.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: neonGreen.withValues(alpha: 0.15)),
-            ),
-            child: Text(
-              _invitedByCode!,
-              style: TextStyle(
-                color: neonGreen.withValues(alpha: 0.5),
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
               ),
             ),
-          ),
-        ],
+            // Code badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: neonGreen.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: neonGreen.withValues(alpha: 0.15)),
+              ),
+              child: Text(
+                _invitedByCode!,
+                style: TextStyle(
+                  color: neonGreen.withValues(alpha: 0.5),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.white.withValues(alpha: 0.2),
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -732,88 +761,101 @@ class _FriendsTabState extends State<FriendsTab> {
   }
 
   Widget _buildFriendRow(FriendProfile friend) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: deepCharcoal,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: ironGrey.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        children: [
-          _buildAvatar(friend, size: 40),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  friend.name.toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
+    return GestureDetector(
+      onTap: () => _openFriendProfile(friend),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: deepCharcoal,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: ironGrey.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            _buildAvatar(friend, size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    friend.name.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    friend.email,
+                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            // Character badge
+            if (friend.starterCharacter != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: friend.characterColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: friend.characterColor.withValues(alpha: 0.2),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  friend.email,
-                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                child: Text(
+                  friend.starterCharacter!.toUpperCase(),
+                  style: TextStyle(
+                    color: friend.characterColor.withValues(alpha: 0.7),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            const SizedBox(width: 8),
+            // Chevron indicator
+            Icon(
+              Icons.chevron_right,
+              color: Colors.white.withValues(alpha: 0.2),
+              size: 20,
+            ),
+            // More menu
+            PopupMenuButton<String>(
+              icon: const Icon(
+                Icons.more_horiz,
+                color: Colors.white24,
+                size: 18,
+              ),
+              color: deepCharcoal,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: ironGrey.withValues(alpha: 0.5)),
+              ),
+              onSelected: (value) async {
+                if (value == 'remove') {
+                  final confirmed = await _confirmRemove(friend.name);
+                  if (confirmed) {
+                    await FriendService.removeFriend(friend.email);
+                    _loadData();
+                  }
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'remove',
+                  child: Text(
+                    'Remove Friend',
+                    style: TextStyle(color: Colors.redAccent, fontSize: 13),
+                  ),
                 ),
               ],
             ),
-          ),
-          // Character badge
-          if (friend.starterCharacter != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: friend.characterColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: friend.characterColor.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Text(
-                friend.starterCharacter!.toUpperCase(),
-                style: TextStyle(
-                  color: friend.characterColor.withValues(alpha: 0.7),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          const SizedBox(width: 8),
-          // Remove button
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_horiz, color: Colors.white24, size: 18),
-            color: deepCharcoal,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: BorderSide(color: ironGrey.withValues(alpha: 0.5)),
-            ),
-            onSelected: (value) async {
-              if (value == 'remove') {
-                final confirmed = await _confirmRemove(friend.name);
-                if (confirmed) {
-                  await FriendService.removeFriend(friend.email);
-                  _loadData();
-                }
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'remove',
-                child: Text(
-                  'Remove Friend',
-                  style: TextStyle(color: Colors.redAccent, fontSize: 13),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -971,6 +1013,13 @@ class _FriendsTabState extends State<FriendsTab> {
           ],
         ),
       ),
+    );
+  }
+
+  void _openFriendProfile(FriendProfile friend) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => FriendProfileScreen(friend: friend)),
     );
   }
 
