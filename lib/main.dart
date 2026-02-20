@@ -452,6 +452,19 @@ class _OgaAppState extends State<OgaApp> {
                 );
               }
             }
+            // Method 3: URL fragment (from emailRedirectTo)
+            if (pendingInvite == null || pendingInvite.isEmpty) {
+              final fragment = Uri.base.fragment;
+              if (fragment.contains('invite=')) {
+                final fragmentUri = Uri.parse('https://x.com/$fragment');
+                pendingInvite = fragmentUri.queryParameters['invite'];
+                if (pendingInvite != null) {
+                  debugPrint(
+                    '🎟️ [existing session] Found invite in URL fragment: $pendingInvite',
+                  );
+                }
+              }
+            }
 
             // Process invite
             if (pendingInvite != null && pendingInvite.isNotEmpty) {
