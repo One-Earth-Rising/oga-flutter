@@ -377,7 +377,126 @@ class _OgaAppState extends State<OgaApp> {
           debugPrint('❌ Auth timeout - no user after 5 seconds');
         }
       }
+      // ═══════════════════════════════════════════════════════════
+      // PATCH FOR main.dart — _getLandingPage()
+      //
+      // Add this block AFTER the closing brace of:
+      //   if (uri.fragment.contains('access_token') || uri.queryParameters.containsKey('code')) { ... }
+      //
+      // And BEFORE the line:
+      //   // Check if URL is /fbs-success (direct navigation)
+      // ═══════════════════════════════════════════════════════════
 
+      // ═══════════════════════════════════════════════════════
+      // ALREADY AUTHENTICATED USER (session exists, no callback params)
+      // This catches users returning from buffer page → Supabase verify → clean URL
+      // ═══════════════════════════════════════════════════════
+      final existingUser = Supabase.instance.client.auth.currentUser;
+      if (existingUser != null) {
+        debugPrint('👤 Found existing session for: ${existingUser.email}');
+
+        try {
+          final response = await Supabase.instance.client
+              .from('profiles')
+              .select(
+                'starter_character, session_id, campaign_id, campaign_joined_at, invited_by',
+              )
+              .eq('email', existingUser.email!)
+              .maybeSingle();
+
+          final character = response?['starter_character'] ?? 'ryu';
+          final sessionId = response?['session_id'] ?? existingUser.id;
+          final campaignId = response?['campaign_id'];
+          final joinedAt = response?['campaign_joined_at'];
+
+          // ═══════════════════════════════════════════════════
+          // INVITE CHECK for existing session
+          // ═══════════════════════════════════════════════════
+          final alreadyLinked = response?['invited_by'] as String?;
+
+          if (alreadyLinked == null || alreadyLinked.isEmpty) {
+            String? pendingInvite;
+
+            // Method 1: shared_preferences
+            try {
+              pendingInvite = await PendingInvite.read();
+              if (pendingInvite != null && pendingInvite.isNotEmpty) {
+                debugPrint(
+                  '🎟️ [existing session] Found invite in shared_preferences: $pendingInvite',
+                );
+                await PendingInvite.clear();
+              }
+            } catch (e) {
+              debugPrint('⚠️ Error reading PendingInvite: $e');
+            }
+
+            // Method 2: user metadata
+            if (pendingInvite == null || pendingInvite.isEmpty) {
+              pendingInvite =
+                  existingUser.userMetadata?['invite_code'] as String?;
+              if (pendingInvite != null) {
+                debugPrint(
+                  '🎟️ [existing session] Found invite in user metadata: $pendingInvite',
+                );
+              }
+            }
+
+            // Process invite
+            if (pendingInvite != null && pendingInvite.isNotEmpty) {
+              await FriendService.setInvitedBy(pendingInvite);
+              debugPrint('✅ Set invited_by to $pendingInvite');
+
+              final inviterProfile = await FriendService.getPublicProfile(
+                pendingInvite,
+              );
+              final inviterName = inviterProfile?.displayName ?? 'a friend';
+
+              debugPrint(
+                '🎉 Routing to invite welcome screen (existing session)',
+              );
+              return InviteWelcomeScreen(
+                sessionId: sessionId,
+                characterId: character,
+                inviterName: inviterName,
+                inviteCode: pendingInvite,
+              );
+            }
+          }
+
+          // ═══════════════════════════════════════════════════
+          // CAMPAIGN ROUTING for existing session
+          // ═══════════════════════════════════════════════════
+          if (campaignId == 'fbs_launch') {
+            if (joinedAt != null) {
+              final joinedDate = DateTime.parse(joinedAt);
+              final difference = DateTime.now().difference(joinedDate);
+              if (difference.inMinutes < 5) {
+                return FBSSuccessScreen(
+                  sessionId: sessionId,
+                  characterName: character,
+                );
+              }
+            }
+            return FBSCampaignDashboard(
+              sessionId: sessionId,
+              acquiredCharacterId: character,
+            );
+          }
+
+          // Default: main dashboard
+          debugPrint('🎯 Routing to main dashboard (existing session)');
+          return OGAAccountDashboard(
+            sessionId: sessionId,
+            acquiredCharacterId: character,
+          );
+        } catch (e) {
+          debugPrint('⚠️ Error fetching profile for existing user: $e');
+          return OGAAccountDashboard(
+            sessionId: existingUser.id,
+            acquiredCharacterId: 'ryu',
+          );
+        }
+      }
       // Check if URL is /fbs-success (direct navigation)
       if (uri.path.contains('fbs-success')) {
         final session = uri.queryParameters['session'] ?? '';
