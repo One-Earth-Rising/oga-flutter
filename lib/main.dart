@@ -106,7 +106,7 @@ class _OgaAppState extends State<OgaApp> {
           if (baseUri.queryParameters.containsKey('code')) {
             return MaterialPageRoute(
               builder: (context) => FutureBuilder<Widget>(
-                future: _getLandingPage(),
+                future: _getLandingPage(inviteCode: inviteFromUrl),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Scaffold(
@@ -239,7 +239,7 @@ class _OgaAppState extends State<OgaApp> {
   // LANDING PAGE LOGIC
   // ═══════════════════════════════════════════════════════════
 
-  static Future<Widget> _getLandingPage() async {
+  static Future<Widget> _getLandingPage({String? inviteCode}) async {
     try {
       final uri = Uri.base;
 
@@ -284,7 +284,12 @@ class _OgaAppState extends State<OgaApp> {
             // ═══════════════════════════════════════════════════════
             // INVITE FLOW: Check if user signed up via invite
             // ═══════════════════════════════════════════════════════
-            String? pendingInvite;
+            String? pendingInvite = inviteCode;
+            if (pendingInvite != null && pendingInvite.isNotEmpty) {
+              debugPrint(
+                '🎟️ Found invite code passed directly: $pendingInvite',
+              );
+            }
 
             // Method 1: shared_preferences (survives page reload on web)
             try {
