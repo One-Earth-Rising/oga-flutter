@@ -588,9 +588,6 @@ class _InviteSignUpScreenState extends State<InviteSignUpScreen> {
   String _buildRedirectUrl() {
     final base = Uri.base;
     final port = (base.port != 80 && base.port != 443) ? ':${base.port}' : '';
-    final redirectUrl =
-        '${base.scheme}://${base.host}$port/#/confirm?invite=${widget.inviteCode}';
-    debugPrint('🔗 Redirect URL: $redirectUrl');
-    return redirectUrl;
+    return '${base.scheme}://${base.host}$port/#/confirm?invite=${widget.inviteCode}';
   }
 }
