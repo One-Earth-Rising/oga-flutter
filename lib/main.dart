@@ -22,8 +22,21 @@ import 'services/friend_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:oga_web_showcase/config/environment.dart';
 
+// Captured before Supabase SDK can clean the URL
+String? _capturedInviteCode;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Capture invite code from URL BEFORE Supabase cleans it
+  final launchUri = Uri.base;
+  final fragment = launchUri.fragment;
+  if (fragment.contains('invite=')) {
+    final fragmentUri = Uri.parse('https://x.com/$fragment');
+    _capturedInviteCode = fragmentUri.queryParameters['invite'];
+    debugPrint('🎟️ Captured invite code at launch: $_capturedInviteCode');
+  }
+
   await Supabase.initialize(
     url: EnvironmentConfig.supabaseUrl,
     anonKey: EnvironmentConfig.supabaseAnonKey,
@@ -284,7 +297,7 @@ class _OgaAppState extends State<OgaApp> {
             // ═══════════════════════════════════════════════════════
             // INVITE FLOW: Check if user signed up via invite
             // ═══════════════════════════════════════════════════════
-            String? pendingInvite = inviteCode;
+            String? pendingInvite = inviteCode ?? _capturedInviteCode;
             if (pendingInvite != null && pendingInvite.isNotEmpty) {
               debugPrint(
                 '🎟️ Found invite code passed directly: $pendingInvite',
@@ -432,7 +445,12 @@ class _OgaAppState extends State<OgaApp> {
           final alreadyLinked = response?['invited_by'] as String?;
 
           if (alreadyLinked == null || alreadyLinked.isEmpty) {
-            String? pendingInvite;
+            String? pendingInvite = _capturedInviteCode;
+            if (pendingInvite != null && pendingInvite.isNotEmpty) {
+              debugPrint(
+                '🎟️ [existing session] Found invite captured at launch: $pendingInvite',
+              );
+            }
 
             // Method 1: shared_preferences
             try {
