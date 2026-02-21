@@ -1,6 +1,6 @@
 {
-    "name": "oga_web_showcase",
-    "short_name": "oga_web_showcase",
+    "name": "OGA — Ownable Game Assets",
+"short_name": "OGA",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
