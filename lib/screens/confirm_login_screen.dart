@@ -95,128 +95,132 @@ class _ConfirmLoginScreenState extends State<ConfirmLoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 500),
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo from Supabase Storage
-              Image.network(
-                'https://mlpinkcxdsmxicipseux.supabase.co/storage/v1/object/public/campaign-assets/fbs_launch/oga_logo.png',
-                height: 80,
-                errorBuilder: (context, error, stackTrace) {
-                  // Fallback to text if logo fails to load
-                  return const Text(
-                    'OGA',
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Logo from Supabase Storage
+                  Image.network(
+                    'https://mlpinkcxdsmxicipseux.supabase.co/storage/v1/object/public/campaign-assets/fbs_launch/oga_logo.png',
+                    height: 80,
+                    errorBuilder: (context, error, stackTrace) {
+                      // Fallback to text if logo fails to load
+                      return const Text(
+                        'OGA',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 40),
+
+                  // Mail icon
+                  const Icon(
+                    Icons.mail_outline,
+                    size: 60,
+                    color: Color(0xFF00FF00),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // Title
+                  const Text(
+                    'Confirm Your Login',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 20,
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
                     ),
                     textAlign: TextAlign.center,
-                  );
-                },
-              ),
-              const SizedBox(height: 40),
+                  ),
+                  const SizedBox(height: 20),
 
-              // Mail icon
-              const Icon(
-                Icons.mail_outline,
-                size: 60,
-                color: Color(0xFF00FF00),
-              ),
-              const SizedBox(height: 40),
+                  // Description
+                  Text(
+                    _confirmationUrl != null
+                        ? 'Click the button below to complete your login securely.'
+                        : 'Invalid confirmation link. Please request a new magic link.',
+                    style: const TextStyle(color: Colors.white70, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 40),
 
-              // Title
-              const Text(
-                'Confirm Your Login',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-
-              // Description
-              Text(
-                _confirmationUrl != null
-                    ? 'Click the button below to complete your login securely.'
-                    : 'Invalid confirmation link. Please request a new magic link.',
-                style: const TextStyle(color: Colors.white70, fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 40),
-
-              // Confirm button
-              if (_confirmationUrl != null)
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isProcessing ? null : _handleConfirmation,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00FF00),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  // Confirm button
+                  if (_confirmationUrl != null)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _isProcessing ? null : _handleConfirmation,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF00FF00),
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: _isProcessing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.black,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'CONFIRM & CONTINUE',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
                       ),
                     ),
-                    child: _isProcessing
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.black,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text(
-                            'CONFIRM & CONTINUE',
+                  const SizedBox(height: 60),
+
+                  // Security note
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.security,
+                          color: Colors.white.withValues(alpha: 0.5),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'This page protects your login from email scanners',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1,
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 12,
                             ),
                           ),
-                  ),
-                ),
-              const SizedBox(height: 60),
-
-              // Security note
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.security,
-                      color: Colors.white.withValues(alpha: 0.5),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'This page protects your login from email scanners',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 12,
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
