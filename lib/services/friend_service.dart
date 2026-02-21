@@ -366,7 +366,8 @@ class FriendService {
           );
 
       // Get public URL
-      final publicUrl = _supabase.storage.from('avatars').getPublicUrl(path);
+      final publicUrl =
+          '${_supabase.storage.from('avatars').getPublicUrl(path)}?v=${DateTime.now().millisecondsSinceEpoch}';
 
       // Save to profile
       await _supabase
