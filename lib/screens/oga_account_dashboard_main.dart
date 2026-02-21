@@ -34,6 +34,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   String _currentTab = 'PROFILE';
   DateTime? _joinedDate;
   bool _isGridView = true; // Grid vs list toggle
+  final _pageController = PageController();
 
   // V2 Brand Colors (Heimdal Aesthetic)
   static const Color neonGreen = Color(0xFF39FF14);
@@ -62,6 +63,12 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   void initState() {
     super.initState();
     _loadUserData();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
@@ -180,19 +187,14 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   }
 
   Widget _buildBody(bool isMobile) {
-    switch (_currentTab) {
-      case 'FRIENDS':
-        return CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeroSection(isMobile)),
-            const FriendsTab(),
-          ],
-        );
-      case 'ABOUT':
-        return const CustomScrollView(slivers: [AboutTab()]);
-      case 'PROFILE':
-      default:
-        return CustomScrollView(
+    return PageView(
+      controller: _pageController,
+      onPageChanged: (index) {
+        setState(() => _currentTab = _tabs[index]);
+      },
+      children: [
+        // Tab 0: PROFILE
+        CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _buildHeroSection(isMobile)),
             SliverToBoxAdapter(child: _buildSectionHeader(isMobile)),
@@ -204,8 +206,18 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 60)),
           ],
-        );
-    }
+        ),
+        // Tab 1: FRIENDS
+        CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeroSection(isMobile)),
+            const FriendsTab(),
+          ],
+        ),
+        // Tab 2: ABOUT
+        const CustomScrollView(slivers: [AboutTab()]),
+      ],
+    );
   }
 
   // ─── APP BAR ──────────────────────────────────────────────
@@ -270,7 +282,14 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   Widget _buildNavTab(String label) {
     final isActive = _currentTab == label;
     return GestureDetector(
-      onTap: () => setState(() => _currentTab = label),
+      onTap: () {
+        final index = _tabs.indexOf(label);
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 2),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -535,7 +554,12 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       ),
       tileColor: isActive ? neonGreen.withValues(alpha: 0.05) : null,
       onTap: () {
-        setState(() => _currentTab = label);
+        final index = _tabs.indexOf(label);
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
         Navigator.pop(context);
       },
     );
