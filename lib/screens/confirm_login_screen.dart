@@ -23,31 +23,62 @@ class _ConfirmLoginScreenState extends State<ConfirmLoginScreen> {
   void _extractConfirmationUrl() {
     try {
       final uri = Uri.base;
-
       debugPrint('📍 Full URI: $uri');
       debugPrint('📍 Fragment: ${uri.fragment}');
 
-      // Try standard query params first
-      _confirmationUrl = uri.queryParameters['url'];
+      // NEW: Check for token_hash (scanner-proof method)
+      String? tokenHash;
+      String? type;
 
-      // If not found, parse from fragment
-      if (_confirmationUrl == null && uri.fragment.isNotEmpty) {
-        final fragment = uri.fragment;
+      if (uri.fragment.contains('?')) {
+        final queryString = uri.fragment.split('?').last;
+        final queryParams = Uri.splitQueryString(queryString);
 
-        if (fragment.contains('?')) {
-          final queryString = fragment.split('?').last;
-          final queryParams = Uri.splitQueryString(queryString);
+        // New token-based approach
+        tokenHash = queryParams['token_hash'];
+        type = queryParams['type'];
+
+        // Legacy: full URL approach (backwards compatible)
+        if (tokenHash == null) {
           _confirmationUrl = queryParams['url'];
+          if (_confirmationUrl != null) {
+            _confirmationUrl = Uri.decodeComponent(_confirmationUrl!);
+          }
         }
       }
 
-      // Decode the URL
-      if (_confirmationUrl != null) {
-        _confirmationUrl = Uri.decodeComponent(_confirmationUrl!);
+      // Also check standard query params
+      if (tokenHash == null && _confirmationUrl == null) {
+        tokenHash = uri.queryParameters['token_hash'];
+        type = uri.queryParameters['type'];
+
+        if (tokenHash == null) {
+          _confirmationUrl = uri.queryParameters['url'];
+          if (_confirmationUrl != null) {
+            _confirmationUrl = Uri.decodeComponent(_confirmationUrl!);
+          }
+        }
+      }
+
+      // Reconstruct verify URL from token parts
+      if (tokenHash != null && _confirmationUrl == null) {
+        final supabaseUrl = Supabase.instance.client.auth.currentSession != null
+            ? 'https://jmbzrbteizvuqwukojzu.supabase.co'
+            : 'https://jmbzrbteizvuqwukojzu.supabase.co';
+        final redirectTo = Uri.encodeComponent(
+          '${uri.scheme}://${uri.host}:${uri.port}/',
+        );
+
+        _confirmationUrl =
+            '$supabaseUrl/auth/v1/verify'
+            '?token=$tokenHash'
+            '&type=${type ?? 'signup'}'
+            '&redirect_to=$redirectTo';
+
+        debugPrint('🔐 Reconstructed verify URL from token_hash');
       }
 
       debugPrint('📧 Confirmation URL: $_confirmationUrl');
-
       setState(() {});
     } catch (e) {
       debugPrint('❌ Error extracting URL: $e');
