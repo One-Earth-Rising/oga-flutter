@@ -279,7 +279,7 @@ class _OgaAppState extends State<OgaApp> {
             final response = await Supabase.instance.client
                 .from('profiles')
                 .select(
-                  'starter_character, session_id, campaign_id, campaign_joined_at, invited_by',
+                  'starter_character, session_id, campaign_id, campaign_joined_at, invited_by, first_name',
                 )
                 .eq('email', user.email!)
                 .maybeSingle();
@@ -390,6 +390,21 @@ class _OgaAppState extends State<OgaApp> {
               );
             }
 
+            // ═══════════════════════════════════════════════════════
+            // NEW ONBOARDING CHECK (Sprint 8A)
+            // ═══════════════════════════════════════════════════════
+            final invitedBy = response?['invited_by']?.toString();
+            final firstName = response?['first_name']?.toString();
+            final starterChar = response?['starter_character']?.toString();
+
+            if (invitedBy != null &&
+                invitedBy.isNotEmpty &&
+                (firstName == null || firstName.isEmpty) &&
+                (starterChar == null || starterChar.isEmpty)) {
+              debugPrint('🚀 Routing to Onboarding (New Invited User)');
+              return const InviteOnboardingScreen();
+            }
+
             // Non-FBS users: Go to main dashboard
             debugPrint('🎯 Routing to main dashboard');
             return OGAAccountDashboard(
@@ -429,7 +444,7 @@ class _OgaAppState extends State<OgaApp> {
           final response = await Supabase.instance.client
               .from('profiles')
               .select(
-                'starter_character, session_id, campaign_id, campaign_joined_at, invited_by',
+                'starter_character, session_id, campaign_id, campaign_joined_at, invited_by, first_name',
               )
               .eq('email', existingUser.email!)
               .maybeSingle();
@@ -529,6 +544,21 @@ class _OgaAppState extends State<OgaApp> {
               sessionId: sessionId,
               acquiredCharacterId: character,
             );
+          }
+
+          // ═══════════════════════════════════════════════════════
+          // NEW ONBOARDING CHECK (Sprint 8A - Existing Session)
+          // ═══════════════════════════════════════════════════════
+          final invitedBy = response?['invited_by']?.toString();
+          final firstName = response?['first_name']?.toString();
+          final starterChar = response?['starter_character']?.toString();
+
+          if (invitedBy != null &&
+              invitedBy.isNotEmpty &&
+              (firstName == null || firstName.isEmpty) &&
+              (starterChar == null || starterChar.isEmpty)) {
+            debugPrint('🚀 Routing to Onboarding (Existing Session)');
+            return const InviteOnboardingScreen();
           }
 
           // Default: main dashboard
