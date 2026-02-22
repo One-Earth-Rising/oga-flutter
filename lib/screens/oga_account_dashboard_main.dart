@@ -197,11 +197,14 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
 
     final bool isMobile = MediaQuery.of(context).size.width < 900;
 
-    return Scaffold(
-      backgroundColor: voidBlack,
-      appBar: _buildAppBar(isMobile),
-      drawer: isMobile ? _buildMobileDrawer() : null,
-      body: _buildBody(isMobile),
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: voidBlack,
+        appBar: _buildAppBar(isMobile),
+        drawer: isMobile ? _buildMobileDrawer() : null,
+        body: _buildBody(isMobile),
+      ),
     );
   }
 
