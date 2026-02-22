@@ -22,20 +22,8 @@ import 'services/friend_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:oga_web_showcase/config/environment.dart';
 
-// Captured before Supabase SDK can clean the URL
-String? _capturedInviteCode;
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Capture invite code from URL BEFORE Supabase cleans it
-  final launchUri = Uri.base;
-  final fragment = launchUri.fragment;
-  if (fragment.contains('invite=')) {
-    final fragmentUri = Uri.parse('https://x.com/$fragment');
-    _capturedInviteCode = fragmentUri.queryParameters['invite'];
-    debugPrint('🎟️ Captured invite code at launch: $_capturedInviteCode');
-  }
 
   await Supabase.initialize(
     url: EnvironmentConfig.supabaseUrl,
@@ -295,48 +283,36 @@ class _OgaAppState extends State<OgaApp> {
             debugPrint('   Campaign: $campaignId');
 
             // ═══════════════════════════════════════════════════════
-            // INVITE FLOW: Check if user signed up via invite
+            // INVITE FLOW
+            // Primary: DB trigger set_invited_by_from_metadata()
+            //   handles new signups automatically.
+            // Fallback: Client-side detection for existing users
+            //   who click an invite link (trigger only fires on INSERT).
             // ═══════════════════════════════════════════════════════
-            String? pendingInvite = inviteCode ?? _capturedInviteCode;
-            if (pendingInvite != null && pendingInvite.isNotEmpty) {
-              debugPrint(
-                '🎟️ Found invite code passed directly: $pendingInvite',
-              );
-            }
+            String? pendingInvite = inviteCode;
 
-            // Method 1: shared_preferences (survives page reload on web)
-            try {
-              pendingInvite = await PendingInvite.read();
-              if (pendingInvite != null && pendingInvite.isNotEmpty) {
-                debugPrint(
-                  '🎟️ Found invite code in shared_preferences: $pendingInvite',
-                );
-                await PendingInvite.clear(); // One-time use
+            // Check shared_preferences (saved during InviteSignupScreen)
+            if (pendingInvite == null || pendingInvite.isEmpty) {
+              try {
+                pendingInvite = await PendingInvite.read();
+                if (pendingInvite != null && pendingInvite.isNotEmpty) {
+                  debugPrint(
+                    '🎟️ Found invite code in shared_preferences: $pendingInvite',
+                  );
+                  await PendingInvite.clear();
+                }
+              } catch (e) {
+                debugPrint('⚠️ Error reading PendingInvite: $e');
               }
-            } catch (e) {
-              debugPrint('⚠️ Error reading PendingInvite: $e');
             }
 
-            // Method 2: Supabase user metadata (works for first-time signups)
+            // Check user metadata (set via signInWithOtp data param)
             if (pendingInvite == null || pendingInvite.isEmpty) {
               pendingInvite = user.userMetadata?['invite_code'] as String?;
               if (pendingInvite != null) {
                 debugPrint(
                   '🎟️ Found invite code in user metadata: $pendingInvite',
                 );
-              }
-            }
-            // Method 3: URL fragment (from emailRedirectTo)
-            if (pendingInvite == null || pendingInvite.isEmpty) {
-              final fragment = uri.fragment;
-              if (fragment.contains('invite=')) {
-                final fragmentUri = Uri.parse('https://x.com/$fragment');
-                pendingInvite = fragmentUri.queryParameters['invite'];
-                if (pendingInvite != null) {
-                  debugPrint(
-                    '🎟️ Found invite code in URL fragment: $pendingInvite',
-                  );
-                }
               }
             }
             // If we have a pending invite, process it
@@ -460,27 +436,23 @@ class _OgaAppState extends State<OgaApp> {
           final alreadyLinked = response?['invited_by'] as String?;
 
           if (alreadyLinked == null || alreadyLinked.isEmpty) {
-            String? pendingInvite = _capturedInviteCode;
-            if (pendingInvite != null && pendingInvite.isNotEmpty) {
-              debugPrint(
-                '🎟️ [existing session] Found invite captured at launch: $pendingInvite',
-              );
-            }
+            // Fallback invite detection for existing users
+            String? pendingInvite;
 
-            // Method 1: shared_preferences
-            try {
-              pendingInvite = await PendingInvite.read();
-              if (pendingInvite != null && pendingInvite.isNotEmpty) {
-                debugPrint(
-                  '🎟️ [existing session] Found invite in shared_preferences: $pendingInvite',
-                );
-                await PendingInvite.clear();
+            if (pendingInvite == null || pendingInvite.isEmpty) {
+              try {
+                pendingInvite = await PendingInvite.read();
+                if (pendingInvite != null && pendingInvite.isNotEmpty) {
+                  debugPrint(
+                    '🎟️ [existing session] Found invite in shared_preferences: $pendingInvite',
+                  );
+                  await PendingInvite.clear();
+                }
+              } catch (e) {
+                debugPrint('⚠️ Error reading PendingInvite: $e');
               }
-            } catch (e) {
-              debugPrint('⚠️ Error reading PendingInvite: $e');
             }
 
-            // Method 2: user metadata
             if (pendingInvite == null || pendingInvite.isEmpty) {
               pendingInvite =
                   existingUser.userMetadata?['invite_code'] as String?;
@@ -488,19 +460,6 @@ class _OgaAppState extends State<OgaApp> {
                 debugPrint(
                   '🎟️ [existing session] Found invite in user metadata: $pendingInvite',
                 );
-              }
-            }
-            // Method 3: URL fragment (from emailRedirectTo)
-            if (pendingInvite == null || pendingInvite.isEmpty) {
-              final fragment = Uri.base.fragment;
-              if (fragment.contains('invite=')) {
-                final fragmentUri = Uri.parse('https://x.com/$fragment');
-                pendingInvite = fragmentUri.queryParameters['invite'];
-                if (pendingInvite != null) {
-                  debugPrint(
-                    '🎟️ [existing session] Found invite in URL fragment: $pendingInvite',
-                  );
-                }
               }
             }
 

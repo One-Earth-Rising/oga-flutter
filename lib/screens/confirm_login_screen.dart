@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:html' as html;
+import 'package:url_launcher/url_launcher.dart';
 
 class ConfirmLoginScreen extends StatefulWidget {
   const ConfirmLoginScreen({super.key});
@@ -105,7 +105,10 @@ class _ConfirmLoginScreenState extends State<ConfirmLoginScreen> {
       debugPrint('🔐 Redirecting to: $_confirmationUrl');
 
       // Redirect browser to Supabase verification URL
-      html.window.location.href = _confirmationUrl!;
+      await launchUrl(
+        Uri.parse(_confirmationUrl!),
+        webOnlyWindowName: '_self', // Navigates in same tab (not new window)
+      );
     } catch (e) {
       debugPrint('❌ Redirect error: $e');
 

@@ -127,6 +127,30 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     return 'Joined ${_months[_joinedDate!.month]} ${_joinedDate!.year}';
   }
 
+  /// Returns a display-safe name, never showing raw email.
+  String get _displayName {
+    final firstName = _userData?['first_name'] ?? '';
+    final lastName = _userData?['last_name'] ?? '';
+    final fullName = '$firstName $lastName'.trim();
+    if (fullName.isNotEmpty) return fullName;
+
+    final storedName = _userData?['full_name'] ?? '';
+    if (storedName.isNotEmpty && !storedName.contains('@')) return storedName;
+
+    return 'Player';
+  }
+
+  /// Returns a display-safe username.
+  String get _displayUsername {
+    final username = _userData?['username']?.toString() ?? '';
+    if (username.isNotEmpty) return username;
+
+    final name = _displayName;
+    if (name != 'Player') return name.toLowerCase().replaceAll(' ', '');
+
+    return 'player';
+  }
+
   void _openSettings() {
     final ownedChar = OGACharacter.fromId(_ownedCharacterId);
     SettingsModal.show(
@@ -138,12 +162,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   }
 
   void _openShareProfile() {
-    final firstName = _userData?['first_name'] ?? '';
-    final lastName = _userData?['last_name'] ?? '';
-    final fullName = '$firstName $lastName'.trim();
-    final displayName = fullName.isNotEmpty
-        ? fullName
-        : (_userData?['full_name'] ?? 'Player');
+    final displayName = _displayName;
 
     Navigator.push(
       context,
@@ -321,12 +340,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
 
   Widget _buildAvatarDropdown() {
     final owned = OGACharacter.fromId(_ownedCharacterId);
-    final firstName = _userData?['first_name'] ?? '';
-    final lastName = _userData?['last_name'] ?? '';
-    final fullName = '$firstName $lastName'.trim();
-    final userName = fullName.isNotEmpty
-        ? fullName
-        : (_userData?['full_name'] ?? 'Player');
+    final userName = _displayName;
     final email = supabase.auth.currentUser?.email ?? '';
 
     return PopupMenuButton<String>(
@@ -584,14 +598,8 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ─── HERO SECTION ─────────────────────────────────────────
 
   Widget _buildHeroSection(bool isMobile) {
-    final firstName = _userData?['first_name'] ?? '';
-    final lastName = _userData?['last_name'] ?? '';
-    final fullName = '$firstName $lastName'.trim();
-    final displayName = fullName.isNotEmpty
-        ? fullName
-        : (_userData?['full_name'] ?? 'PLAYER');
-    final username =
-        _userData?['username'] ?? displayName.toLowerCase().replaceAll(' ', '');
+    final displayName = _displayName;
+    final username = _displayUsername;
     final ownedChar = OGACharacter.fromId(_ownedCharacterId);
 
     return Stack(
