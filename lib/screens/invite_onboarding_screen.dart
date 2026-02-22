@@ -207,11 +207,13 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
               _buildProgressBar(),
               // Content
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 520),
-                    child: _buildCurrentStep(),
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: _buildCurrentStep(),
+                    ),
                   ),
                 ),
               ),
@@ -224,52 +226,54 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
 
   // ─── Progress Bar ─────────────────────────────────────────
   Widget _buildProgressBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: Column(
-          children: [
-            // Step indicators
-            Row(
-              children: List.generate(3, (i) {
-                final isActive = i <= _currentStep;
-                return Expanded(
-                  child: Container(
-                    height: 3,
-                    margin: EdgeInsets.only(right: i < 2 ? 8 : 0),
-                    decoration: BoxDecoration(
-                      color: isActive ? neonGreen : ironGrey,
-                      borderRadius: BorderRadius.circular(2),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            children: [
+              // Step indicators
+              Row(
+                children: List.generate(3, (i) {
+                  final isActive = i <= _currentStep;
+                  return Expanded(
+                    child: Container(
+                      height: 3,
+                      margin: EdgeInsets.only(right: i < 2 ? 8 : 0),
+                      decoration: BoxDecoration(
+                        color: isActive ? neonGreen : ironGrey,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              // Step label
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _stepLabel,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1,
                     ),
                   ),
-                );
-              }),
-            ),
-            const SizedBox(height: 8),
-            // Step label
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _stepLabel,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1,
+                  Text(
+                    '${_currentStep + 1} / 3',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 11,
+                    ),
                   ),
-                ),
-                Text(
-                  '${_currentStep + 1} / 3',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.3),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
