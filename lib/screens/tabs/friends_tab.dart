@@ -7,6 +7,12 @@ import '../friend_profile_screen.dart';
 
 /// Friends tab with real Supabase data.
 /// Features: "Invited by" card, friend list, invite code search, add friend, pending requests.
+///
+/// UPDATED: February 23, 2026
+/// - Fixed ADD button silent failure (now shows error messages)
+/// - Fixed Approve button not working (bidirectional lookup)
+/// - Added incoming vs outgoing pending request distinction
+/// - Added loading states for all async actions
 class FriendsTab extends StatefulWidget {
   const FriendsTab({super.key});
 
@@ -21,6 +27,7 @@ class _FriendsTabState extends State<FriendsTab> {
   static const Color ironGrey = Color(0xFF2C2C2C);
 
   final _searchController = TextEditingController();
+  final _codeController = TextEditingController();
 
   List<FriendProfile> _friends = [];
   List<FriendProfile> _pendingRequests = [];
@@ -37,6 +44,11 @@ class _FriendsTabState extends State<FriendsTab> {
   FriendProfile? _foundUser;
   String? _searchError;
   bool _requestSent = false;
+  String? _addError;
+  bool _isAdding = false;
+
+  // Pending action loading state (tracks which email is being processed)
+  String? _processingEmail;
 
   @override
   void initState() {
@@ -56,12 +68,14 @@ class _FriendsTabState extends State<FriendsTab> {
     // Load invited_by info
     await _loadInvitedBy();
 
-    setState(() {
-      _friends = results[0] as List<FriendProfile>;
-      _pendingRequests = results[1] as List<FriendProfile>;
-      _myInviteCode = results[2] as String?;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _friends = results[0] as List<FriendProfile>;
+        _pendingRequests = results[1] as List<FriendProfile>;
+        _myInviteCode = results[2] as String?;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadInvitedBy() async {
@@ -78,10 +92,12 @@ class _FriendsTabState extends State<FriendsTab> {
       final code = response?['invited_by'] as String?;
       if (code != null && code.isNotEmpty) {
         final profile = await FriendService.getPublicProfile(code);
-        setState(() {
-          _invitedByCode = code;
-          _invitedByProfile = profile;
-        });
+        if (mounted) {
+          setState(() {
+            _invitedByCode = code;
+            _invitedByProfile = profile;
+          });
+        }
       }
     } catch (e) {
       debugPrint('⚠️ Error loading invited_by: $e');
@@ -102,6 +118,7 @@ class _FriendsTabState extends State<FriendsTab> {
   @override
   void dispose() {
     _searchController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -225,11 +242,16 @@ class _FriendsTabState extends State<FriendsTab> {
   Widget _buildInvitedByCard() {
     final inviter = _invitedByProfile!;
 
+    // Check if this invite friendship is still pending
+    final isPending = _pendingRequests.any(
+      (p) => p.inviteCode == _invitedByCode,
+    );
+
     return GestureDetector(
       onTap: () {
         // Convert InviterProfile to FriendProfile for navigation
         final friendProfile = FriendProfile(
-          email: '', // Not available from public profile
+          email: '',
           name: inviter.displayName,
           avatarUrl: inviter.avatarUrl,
           starterCharacter: inviter.starterCharacter,
@@ -292,14 +314,18 @@ class _FriendsTabState extends State<FriendsTab> {
                     children: [
                       Icon(
                         Icons.person_add,
-                        color: neonGreen.withValues(alpha: 0.6),
+                        color: isPending
+                            ? Colors.amber.withValues(alpha: 0.6)
+                            : neonGreen.withValues(alpha: 0.6),
                         size: 13,
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'INVITED BY',
+                        isPending ? 'INVITED BY (PENDING)' : 'INVITED BY',
                         style: TextStyle(
-                          color: neonGreen.withValues(alpha: 0.7),
+                          color: isPending
+                              ? Colors.amber.withValues(alpha: 0.7)
+                              : neonGreen.withValues(alpha: 0.7),
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1.5,
@@ -517,10 +543,12 @@ class _FriendsTabState extends State<FriendsTab> {
                     border: Border.all(color: ironGrey),
                   ),
                   child: TextField(
+                    controller: _codeController,
                     onChanged: (_) => setState(() {
                       _foundUser = null;
                       _searchError = null;
                       _requestSent = false;
+                      _addError = null;
                     }),
                     onSubmitted: (_) => _searchByCode(),
                     style: const TextStyle(
@@ -543,7 +571,6 @@ class _FriendsTabState extends State<FriendsTab> {
                         vertical: 12,
                       ),
                     ),
-                    controller: _codeController,
                   ),
                 ),
               ),
@@ -574,11 +601,13 @@ class _FriendsTabState extends State<FriendsTab> {
             ],
           ),
 
-          // Search result
+          // Search result — found user card with ADD button
           if (_foundUser != null && !_requestSent) ...[
             const SizedBox(height: 14),
             _buildFoundUserCard(_foundUser!),
           ],
+
+          // Success state
           if (_requestSent) ...[
             const SizedBox(height: 14),
             Container(
@@ -600,6 +629,42 @@ class _FriendsTabState extends State<FriendsTab> {
               ),
             ),
           ],
+
+          // ADD error state
+          if (_addError != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.redAccent.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.redAccent,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _addError!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Search error state
           if (_searchError != null) ...[
             const SizedBox(height: 14),
             Text(
@@ -612,8 +677,6 @@ class _FriendsTabState extends State<FriendsTab> {
     );
   }
 
-  final _codeController = TextEditingController();
-
   Future<void> _searchByCode() async {
     final code = _codeController.text.trim();
     if (code.isEmpty) return;
@@ -623,23 +686,32 @@ class _FriendsTabState extends State<FriendsTab> {
       _foundUser = null;
       _searchError = null;
       _requestSent = false;
+      _addError = null;
     });
 
     final result = await FriendService.findByInviteCode(code);
 
-    setState(() {
-      _isSearchingCode = false;
-      if (result != null) {
-        final alreadyFriend = _friends.any((f) => f.email == result.email);
-        if (alreadyFriend) {
-          _searchError = 'You\'re already friends with ${result.name}!';
+    if (mounted) {
+      setState(() {
+        _isSearchingCode = false;
+        if (result != null) {
+          final alreadyFriend = _friends.any((f) => f.email == result.email);
+          final alreadyPending = _pendingRequests.any(
+            (p) => p.email == result.email,
+          );
+          if (alreadyFriend) {
+            _searchError = 'You\'re already friends with ${result.name}!';
+          } else if (alreadyPending) {
+            _searchError =
+                'You already have a pending request with ${result.name}';
+          } else {
+            _foundUser = result;
+          }
         } else {
-          _foundUser = result;
+          _searchError = 'No user found with code "$code"';
         }
-      } else {
-        _searchError = 'No user found with code "$code"';
-      }
-    });
+      });
+    }
   }
 
   Widget _buildFoundUserCard(FriendProfile user) {
@@ -678,28 +750,62 @@ class _FriendsTabState extends State<FriendsTab> {
               ],
             ),
           ),
+          // ── ADD BUTTON (FIXED) ──
           GestureDetector(
-            onTap: () async {
-              final success = await FriendService.sendFriendRequest(user.email);
-              if (success) {
-                setState(() => _requestSent = true);
-              }
-            },
+            onTap: _isAdding
+                ? null
+                : () async {
+                    setState(() {
+                      _isAdding = true;
+                      _addError = null;
+                    });
+
+                    final error = await FriendService.sendFriendRequest(
+                      user.email,
+                    );
+
+                    if (mounted) {
+                      setState(() {
+                        _isAdding = false;
+                        if (error == null) {
+                          // Success
+                          _requestSent = true;
+                          _foundUser = null;
+                          _addError = null;
+                          // Refresh friends list to show pending
+                          _loadData();
+                        } else {
+                          // Show error inline
+                          _addError = error;
+                          debugPrint('⚠️ ADD failed: $error');
+                        }
+                      });
+                    }
+                  },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: neonGreen,
+                color: _isAdding ? neonGreen.withValues(alpha: 0.5) : neonGreen,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text(
-                'ADD',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                ),
-              ),
+              child: _isAdding
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        color: Colors.black,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'ADD',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -860,14 +966,25 @@ class _FriendsTabState extends State<FriendsTab> {
     );
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // PENDING REQUESTS (FIXED — incoming vs outgoing)
+  // ═══════════════════════════════════════════════════════════
+
   Widget _buildPendingRow(FriendProfile friend) {
+    final isProcessing = _processingEmail == friend.email;
+    final isIncoming = friend.isIncomingRequest;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: deepCharcoal,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: neonGreen.withValues(alpha: 0.15)),
+        border: Border.all(
+          color: isIncoming
+              ? neonGreen.withValues(alpha: 0.15)
+              : Colors.amber.withValues(alpha: 0.15),
+        ),
       ),
       child: Row(
         children: [
@@ -887,7 +1004,7 @@ class _FriendsTabState extends State<FriendsTab> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Wants to be your friend',
+                  isIncoming ? 'Wants to be your friend' : 'Request pending...',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.35),
                     fontSize: 11,
@@ -896,45 +1013,129 @@ class _FriendsTabState extends State<FriendsTab> {
               ],
             ),
           ),
-          // Accept
-          GestureDetector(
-            onTap: () async {
-              await FriendService.acceptRequest(friend.email);
-              _loadData();
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+
+          // ── INCOMING: Show Approve + Decline buttons ──
+          if (isIncoming) ...[
+            // Accept
+            GestureDetector(
+              onTap: isProcessing
+                  ? null
+                  : () async {
+                      setState(() => _processingEmail = friend.email);
+                      debugPrint('🤝 Accepting request from ${friend.email}');
+
+                      final success = await FriendService.acceptRequest(
+                        friend.email,
+                      );
+                      debugPrint('🤝 Accept result: $success');
+
+                      if (mounted) {
+                        setState(() => _processingEmail = null);
+
+                        if (success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${friend.name} is now your friend!',
+                              ),
+                              backgroundColor: neonGreen,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          );
+                          _loadData();
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                'Failed to accept — please try again',
+                              ),
+                              backgroundColor: Colors.redAccent,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: isProcessing
+                      ? neonGreen.withValues(alpha: 0.5)
+                      : neonGreen,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: isProcessing
+                    ? const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          color: Colors.black,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'APPROVE',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Decline
+            GestureDetector(
+              onTap: isProcessing
+                  ? null
+                  : () async {
+                      setState(() => _processingEmail = friend.email);
+                      await FriendService.declineRequest(friend.email);
+                      if (mounted) {
+                        setState(() => _processingEmail = null);
+                        _loadData();
+                      }
+                    },
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: ironGrey),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.close, color: Colors.white38, size: 14),
+              ),
+            ),
+          ]
+          // ── OUTGOING: Show "PENDING" badge (no action needed) ──
+          else ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: neonGreen,
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: ironGrey),
               ),
               child: const Text(
-                'ACCEPT',
+                'PENDING',
                 style: TextStyle(
-                  color: Colors.black,
+                  color: Colors.white54,
                   fontSize: 10,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          // Decline
-          GestureDetector(
-            onTap: () async {
-              await FriendService.declineRequest(friend.email);
-              _loadData();
-            },
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                border: Border.all(color: ironGrey),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Icon(Icons.close, color: Colors.white38, size: 14),
-            ),
-          ),
+          ],
         ],
       ),
     );

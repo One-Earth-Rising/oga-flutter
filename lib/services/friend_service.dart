@@ -66,25 +66,57 @@ class FriendService {
     if (email == null) return [];
 
     try {
+      // Get ALL pending friendships where current user is involved
       final pending = await _supabase
           .from('friendships')
           .select()
-          .eq('receiver_email', email)
-          .eq('status', 'pending');
+          .eq('status', 'pending')
+          .or('requester_email.eq.$email,receiver_email.eq.$email');
 
-      final requesterEmails = pending
-          .map<String>((f) => f['requester_email'] as String)
-          .toList();
+      if (pending.isEmpty) return [];
 
-      if (requesterEmails.isEmpty) return [];
+      // Collect the "other" person's email for each pending request
+      final otherEmails = <String>[];
+      final directionMap =
+          <String, bool>{}; // email → isIncoming (they need to approve)
 
+      for (final f in pending) {
+        final requester = f['requester_email'] as String;
+        final receiver = f['receiver_email'] as String;
+
+        if (requester == email) {
+          // Current user sent this request (or invite trigger made them requester)
+          otherEmails.add(receiver);
+          directionMap[receiver] = false; // outgoing — waiting for them
+        } else {
+          // Current user received this request
+          otherEmails.add(requester);
+          directionMap[requester] = true; // incoming — we need to approve
+        }
+      }
+
+      if (otherEmails.isEmpty) return [];
+
+      // Fetch profiles for all pending people
       final profiles = await _supabase
           .from('profiles')
           .select()
-          .inFilter('email', requesterEmails);
+          .inFilter('email', otherEmails);
 
       return profiles.map<FriendProfile>((p) {
-        return FriendProfile.fromMap(p, isPending: true);
+        final profile = FriendProfile.fromMap(p);
+        final profileEmail = p['email'] as String;
+        return FriendProfile(
+          email: profile.email,
+          name: profile.name,
+          avatarUrl: profile.avatarUrl,
+          starterCharacter: profile.starterCharacter,
+          inviteCode: profile.inviteCode,
+          bio: profile.bio,
+          createdAt: profile.createdAt,
+          isPending: true,
+          isIncomingRequest: directionMap[profileEmail] ?? true,
+        );
       }).toList();
     } catch (e) {
       debugPrint('❌ Error fetching pending requests: $e');
@@ -204,9 +236,10 @@ class FriendService {
   // ═══════════════════════════════════════════════════════════
 
   /// Send a friend request to another user by email.
-  static Future<bool> sendFriendRequest(String friendEmail) async {
+  static Future<String?> sendFriendRequest(String friendEmail) async {
     final email = _currentEmail;
-    if (email == null || friendEmail == email) return false;
+    if (email == null) return 'Not logged in';
+    if (friendEmail == email) return 'Cannot add yourself';
 
     try {
       // Check if friendship already exists (either direction)
@@ -219,8 +252,13 @@ class FriendService {
           );
 
       if (existing.isNotEmpty) {
-        debugPrint('⚠️ Friendship already exists');
-        return false;
+        final status = existing.first['status'] as String?;
+        if (status == 'accepted') {
+          return 'Already friends!';
+        } else if (status == 'pending') {
+          return 'Friend request already pending';
+        }
+        return 'Connection already exists';
       }
 
       await _supabase.from('friendships').insert({
@@ -229,28 +267,59 @@ class FriendService {
         'status': 'pending',
       });
 
-      return true;
+      debugPrint('✅ Friend request sent to $friendEmail');
+      return null; // success
     } catch (e) {
       debugPrint('❌ Error sending friend request: $e');
-      return false;
+      // Parse common Supabase errors for user-friendly messages
+      final errorStr = e.toString();
+      if (errorStr.contains('violates row-level security')) {
+        return 'Permission denied — try refreshing the page';
+      } else if (errorStr.contains('duplicate key')) {
+        return 'Friend request already exists';
+      }
+      return 'Failed to send request. Please try again.';
     }
   }
 
   /// Accept a pending friend request.
-  static Future<bool> acceptRequest(String requesterEmail) async {
+  static Future<bool> acceptRequest(String otherEmail) async {
     final email = _currentEmail;
     if (email == null) return false;
 
     try {
+      // Find the pending friendship in either direction
+      final rows = await _supabase
+          .from('friendships')
+          .select()
+          .eq('status', 'pending')
+          .or(
+            'and(requester_email.eq.$otherEmail,receiver_email.eq.$email),'
+            'and(requester_email.eq.$email,receiver_email.eq.$otherEmail)',
+          );
+
+      if (rows.isEmpty) {
+        debugPrint(
+          '⚠️ No pending friendship found between $email and $otherEmail',
+        );
+        return false;
+      }
+
+      final friendship = rows.first;
+      final friendshipId = friendship['id'];
+
+      debugPrint(
+        '🔍 Found pending friendship id=$friendshipId: '
+        '${friendship['requester_email']} → ${friendship['receiver_email']}',
+      );
+
+      // Update by ID for precision (avoids direction ambiguity)
       await _supabase
           .from('friendships')
-          .update({
-            'status': 'accepted',
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('requester_email', requesterEmail)
-          .eq('receiver_email', email);
+          .update({'status': 'accepted'})
+          .eq('id', friendshipId);
 
+      debugPrint('✅ Accepted friendship with $otherEmail');
       return true;
     } catch (e) {
       debugPrint('❌ Error accepting request: $e');
@@ -259,17 +328,31 @@ class FriendService {
   }
 
   /// Decline a pending friend request.
-  static Future<bool> declineRequest(String requesterEmail) async {
+  static Future<bool> declineRequest(String otherEmail) async {
     final email = _currentEmail;
     if (email == null) return false;
 
     try {
-      await _supabase
+      // Find the pending friendship in either direction
+      final rows = await _supabase
           .from('friendships')
-          .delete()
-          .eq('requester_email', requesterEmail)
-          .eq('receiver_email', email);
+          .select()
+          .eq('status', 'pending')
+          .or(
+            'and(requester_email.eq.$otherEmail,receiver_email.eq.$email),'
+            'and(requester_email.eq.$email,receiver_email.eq.$otherEmail)',
+          );
 
+      if (rows.isEmpty) {
+        debugPrint('⚠️ No pending friendship found to decline');
+        return false;
+      }
+
+      final friendshipId = rows.first['id'];
+
+      await _supabase.from('friendships').delete().eq('id', friendshipId);
+
+      debugPrint('✅ Declined friendship with $otherEmail');
       return true;
     } catch (e) {
       debugPrint('❌ Error declining request: $e');
@@ -393,6 +476,7 @@ class FriendProfile {
   final String? bio;
   final DateTime? createdAt;
   final bool isPending;
+  final bool isIncomingRequest;
 
   const FriendProfile({
     required this.email,
@@ -403,11 +487,13 @@ class FriendProfile {
     this.bio,
     this.createdAt,
     this.isPending = false,
+    this.isIncomingRequest = true,
   });
 
   factory FriendProfile.fromMap(
     Map<String, dynamic> map, {
     bool isPending = false,
+    isIncomingRequest = true, // default, overridden by getPendingRequests()
   }) {
     return FriendProfile(
       email: map['email'] as String? ?? '',
