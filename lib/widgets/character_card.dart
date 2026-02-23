@@ -6,15 +6,13 @@ import '../models/oga_character.dart';
 class CharacterCard extends StatefulWidget {
   final OGACharacter character;
   final bool isOwned;
-  final double progress; // 0.0 - 1.0
-  final VoidCallback? onTap;
+  final double progress;
 
   const CharacterCard({
     super.key,
     required this.character,
     this.isOwned = false,
     this.progress = 0.0,
-    this.onTap,
   });
 
   @override
@@ -58,7 +56,6 @@ class _CharacterCardState extends State<CharacterCard>
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
-        onTap: widget.onTap,
         child: AnimatedBuilder(
           animation: _glowAnimation,
           builder: (context, child) {

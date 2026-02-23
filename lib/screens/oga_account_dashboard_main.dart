@@ -33,7 +33,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   String? _avatarUrl;
   String _currentTab = 'PROFILE';
   DateTime? _joinedDate;
-  bool _isGridView = true; // Grid vs list toggle
+  bool _isGridView = true;
   final _pageController = PageController();
 
   // V2 Brand Colors (Heimdal Aesthetic)
@@ -58,6 +58,9 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     'November',
     'December',
   ];
+
+  // ─── Character list (no doubling) ─────────────────────────
+  List<OGACharacter> get _characters => getAllCharactersSorted();
 
   @override
   void initState() {
@@ -84,9 +87,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         return;
       }
 
-      _joinedDate = user.createdAt != null
-          ? DateTime.tryParse(user.createdAt)
-          : null;
+      _joinedDate = DateTime.tryParse(user.createdAt);
 
       final response = await supabase
           .from('profiles')
@@ -151,25 +152,28 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     return 'player';
   }
 
+  // ─── Character access (uses model compat getters) ──────────
+
+  OGACharacter get _ownedCharacter => OGACharacter.fromId(_ownedCharacterId);
+
+  // ─── Navigation helpers ───────────────────────────────────
+
   void _openSettings() {
-    final ownedChar = OGACharacter.fromId(_ownedCharacterId);
     SettingsModal.show(
       context,
       userData: _userData,
-      avatarImagePath: ownedChar.imagePath,
-      onProfileUpdated: _loadUserData, // Refresh on save
+      avatarImagePath: _ownedCharacter.heroImage,
+      onProfileUpdated: _loadUserData,
     );
   }
 
   void _openShareProfile() {
-    final displayName = _displayName;
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ShareProfileScreen(
           inviteCode: _userData?['invite_code'] as String?,
-          displayName: displayName,
+          displayName: _displayName,
         ),
       ),
     );
@@ -185,6 +189,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       debugPrint('Logout error: $e');
     }
   }
+
+  // ═══════════════════════════════════════════════════════════
+  // BUILD
+  // ═══════════════════════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
@@ -242,7 +250,9 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  // ─── APP BAR ──────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  // APP BAR
+  // ═══════════════════════════════════════════════════════════
 
   PreferredSizeWidget _buildAppBar(bool isMobile) {
     return AppBar(
@@ -258,7 +268,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             Image.asset(
               'assets/logo.png',
               height: isMobile ? 22 : 28,
-              errorBuilder: (_, __, ___) => const Text(
+              errorBuilder: (_, _, _) => const Text(
                 'OGA',
                 style: TextStyle(
                   color: Colors.white,
@@ -339,10 +349,11 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  // ─── AVATAR DROPDOWN ──────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  // AVATAR DROPDOWN
+  // ═══════════════════════════════════════════════════════════
 
   Widget _buildAvatarDropdown() {
-    final owned = OGACharacter.fromId(_ownedCharacterId);
     final userName = _displayName;
     final email = supabase.auth.currentUser?.email ?? '';
 
@@ -356,13 +367,21 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       onSelected: (value) {
         switch (value) {
           case 'profile':
-            setState(() => _currentTab = 'PROFILE');
+            _pageController.animateToPage(
+              0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
             break;
           case 'settings':
             _openSettings();
             break;
           case 'about':
-            setState(() => _currentTab = 'ABOUT');
+            _pageController.animateToPage(
+              2,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
             break;
           case 'faq':
             Navigator.push(
@@ -452,10 +471,11 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   /// Builds a circular avatar using network URL if available,
   /// falling back to character asset image.
   Widget _buildAvatarCircle(double radius) {
-    final owned = OGACharacter.fromId(_ownedCharacterId);
+    final ownedChar = _ownedCharacter;
+    final color = ownedChar.cardColor;
     return CircleAvatar(
       radius: radius,
-      backgroundColor: owned.cardColor,
+      backgroundColor: color,
       child: ClipOval(
         child: _avatarUrl != null
             ? Image.network(
@@ -463,28 +483,27 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                 fit: BoxFit.cover,
                 width: radius * 2,
                 height: radius * 2,
-                errorBuilder: (_, __, ___) => Image.asset(
-                  owned.imagePath,
-                  fit: BoxFit.cover,
-                  width: radius * 2,
-                  height: radius * 2,
-                  errorBuilder: (_, __, ___) =>
-                      Icon(Icons.person, color: Colors.white, size: radius),
-                ),
+                errorBuilder: (_, _, _) => _assetAvatar(ownedChar, radius),
               )
-            : Image.asset(
-                owned.imagePath,
-                fit: BoxFit.cover,
-                width: radius * 2,
-                height: radius * 2,
-                errorBuilder: (_, __, ___) =>
-                    Icon(Icons.person, color: Colors.white, size: radius),
-              ),
+            : _assetAvatar(ownedChar, radius),
       ),
     );
   }
 
-  // ─── MOBILE DRAWER ────────────────────────────────────────
+  Widget _assetAvatar(OGACharacter char, double radius) {
+    return Image.asset(
+      char.heroImage,
+      fit: BoxFit.cover,
+      width: radius * 2,
+      height: radius * 2,
+      errorBuilder: (_, _, _) =>
+          Icon(Icons.person, color: Colors.white, size: radius),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // MOBILE DRAWER
+  // ═══════════════════════════════════════════════════════════
 
   Widget _buildMobileDrawer() {
     return Drawer(
@@ -497,7 +516,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               child: Image.asset(
                 'assets/logo.png',
                 height: 40,
-                errorBuilder: (_, __, ___) => const Text(
+                errorBuilder: (_, _, _) => const Text(
                   'OGA',
                   style: TextStyle(
                     color: Colors.white,
@@ -598,12 +617,16 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  // ─── HERO SECTION ─────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  // HERO SECTION
+  // ═══════════════════════════════════════════════════════════
 
   Widget _buildHeroSection(bool isMobile) {
     final displayName = _displayName;
     final username = _displayUsername;
-    final ownedChar = OGACharacter.fromId(_ownedCharacterId);
+    final ownedChar = _ownedCharacter;
+    final charColor = ownedChar.cardColor;
+    final glowColor = ownedChar.glowColor;
 
     return Stack(
       children: [
@@ -615,7 +638,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               image: const AssetImage('assets/heroes/hero.png'),
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
-              onError: (_, __) {},
+              onError: (_, _e) {},
             ),
           ),
           foregroundDecoration: BoxDecoration(
@@ -637,15 +660,15 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar (network or asset fallback)
+              // Avatar
               Container(
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
-                  color: ownedChar.cardColor,
+                  color: charColor,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      color: ownedChar.glowColor.withValues(alpha: 0.3),
+                      color: glowColor.withValues(alpha: 0.3),
                       blurRadius: 12,
                     ),
                   ],
@@ -658,9 +681,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                           height: 70,
                           width: 70,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _assetAvatar(ownedChar),
+                          errorBuilder: (_, _, _) =>
+                              _heroAssetAvatar(ownedChar),
                         )
-                      : _assetAvatar(ownedChar),
+                      : _heroAssetAvatar(ownedChar),
                 ),
               ),
               const SizedBox(height: 14),
@@ -718,13 +742,13 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  Widget _assetAvatar(OGACharacter char) {
+  Widget _heroAssetAvatar(OGACharacter char) {
     return Image.asset(
-      char.imagePath,
+      char.heroImage,
       height: 70,
       width: 70,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (_, _, _) => Container(
         height: 70,
         width: 70,
         color: deepCharcoal,
@@ -753,7 +777,9 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  // ─── SECTION HEADER + GRID (PROFILE tab) ──────────────────
+  // ═══════════════════════════════════════════════════════════
+  // SECTION HEADER + CHARACTER VIEWS
+  // ═══════════════════════════════════════════════════════════
 
   Widget _buildSectionHeader(bool isMobile) {
     return Padding(
@@ -783,7 +809,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           ),
           const SizedBox(width: 8),
           Text(
-            '${OGACharacter.allCharacters.length} CHARACTERS',
+            '${_characters.length} CHARACTERS',
             style: const TextStyle(
               color: Colors.white24,
               fontSize: 12,
@@ -841,8 +867,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
+  // ─── GRID VIEW ────────────────────────────────────────────
+
   Widget _buildCharacterGrid(bool isMobile) {
-    final chars = OGACharacter.allCharacters;
+    final chars = _characters;
     return SliverGrid(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: isMobile ? 2 : 5,
@@ -851,31 +879,30 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         childAspectRatio: 0.72,
       ),
       delegate: SliverChildBuilderDelegate((context, index) {
-        final ci = index % chars.length;
-        final ch = chars[ci];
-        final owned = index < chars.length && ch.id == _ownedCharacterId;
-        return CharacterCard(
-          character: ch,
-          isOwned: owned,
-          progress: owned ? 0.99 : 0.0,
-          onTap: () => _openDetail(ch, owned),
+        final ch = chars[index];
+        return GestureDetector(
+          onTap: () => _openDetail(ch),
+          child: CharacterCard(
+            character: ch,
+            isOwned: ch.isOwned,
+            progress: ch.progress,
+          ),
         );
-      }, childCount: chars.length * 2),
+      }, childCount: chars.length),
     );
   }
 
+  // ─── LIST VIEW ────────────────────────────────────────────
+
   Widget _buildCharacterList(bool isMobile) {
-    final chars = OGACharacter.allCharacters;
-    // For list view, show each character once (no duplication)
-    final allChars = [...chars, ...chars]; // match grid count
+    final chars = _characters;
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
-        final ci = index % chars.length;
-        final ch = chars[ci];
-        final owned = index < chars.length && ch.id == _ownedCharacterId;
+        final ch = chars[index];
+        final charColor = ch.cardColor;
 
         return GestureDetector(
-          onTap: () => _openDetail(ch, owned),
+          onTap: () => _openDetail(ch),
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(12),
@@ -883,7 +910,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               color: deepCharcoal,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: owned
+                color: ch.isOwned
                     ? ch.glowColor.withValues(alpha: 0.4)
                     : ironGrey.withValues(alpha: 0.5),
               ),
@@ -894,21 +921,23 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Image.asset(
-                    ch.imagePath,
+                    ch.thumbnailImage.isNotEmpty
+                        ? ch.thumbnailImage
+                        : ch.heroImage,
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       width: 56,
                       height: 56,
-                      color: ch.cardColor,
+                      color: charColor,
                       child: const Icon(Icons.person, color: Colors.white24),
                     ),
                   ),
                 ),
                 const SizedBox(width: 14),
 
-                // Name + franchise
+                // Name + IP
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -923,19 +952,45 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        ch.ip,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.35),
-                          fontSize: 12,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            ch.ip,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.35),
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (ch.gameVariations.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: neonGreen.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                '${ch.gameVariations.length} GAMES',
+                                style: TextStyle(
+                                  color: neonGreen.withValues(alpha: 0.7),
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
                 ),
 
                 // Progress ring or lock
-                if (owned) ...[
+                if (ch.isOwned) ...[
                   SizedBox(
                     width: 36,
                     height: 36,
@@ -943,14 +998,14 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                       alignment: Alignment.center,
                       children: [
                         CircularProgressIndicator(
-                          value: 0.99,
+                          value: ch.progress,
                           strokeWidth: 2.5,
                           color: neonGreen,
                           backgroundColor: ironGrey,
                         ),
-                        const Text(
-                          '99%',
-                          style: TextStyle(
+                        Text(
+                          '${(ch.progress * 100).toInt()}%',
+                          style: const TextStyle(
                             color: neonGreen,
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
@@ -977,18 +1032,20 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             ),
           ),
         );
-      }, childCount: allChars.length),
+      }, childCount: chars.length),
     );
   }
 
-  void _openDetail(OGACharacter ch, bool owned) {
+  // ─── DETAIL NAVIGATION ────────────────────────────────────
+
+  void _openDetail(OGACharacter ch) {
     Navigator.push(
       context,
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 300),
-        pageBuilder: (_, anim, __) =>
-            CharacterDetailScreen(character: ch, isOwned: owned),
-        transitionsBuilder: (_, anim, __, child) => FadeTransition(
+        pageBuilder: (_, anim, secondAnim) =>
+            CharacterDetailScreen(character: ch, isOwned: ch.isOwned),
+        transitionsBuilder: (_, anim, secondAnim, child) => FadeTransition(
           opacity: anim,
           child: SlideTransition(
             position: Tween<Offset>(
