@@ -18,6 +18,8 @@
 
 import 'package:flutter/material.dart';
 import '../models/oga_character.dart';
+import '../config/oga_storage.dart';
+import '../widgets/oga_image.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -272,8 +274,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   }
 
   Widget _buildCharacterImage() {
-    // TODO [CONTAINER]: Replace with image loaded from OGA container
-    // For now, use placeholder with character-specific color
     return Container(
       width: 280,
       height: 380,
@@ -288,32 +288,17 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Placeholder gradient
-          Container(
-            decoration: BoxDecoration(
+          // Character image from Supabase Storage
+          Positioned.fill(
+            child: OgaImage(
+              path: _currentHeroImage,
+              fit: BoxFit.cover,
               borderRadius: BorderRadius.circular(15),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  _getRarityColor().withValues(alpha: 0.3),
-                  _deepCharcoal,
-                ],
-              ),
+              accentColor: _getRarityColor(),
+              fallbackIcon: Icons.person,
+              fallbackIconSize: 64,
             ),
           ),
-          // Character initial as placeholder
-          Text(
-            ch.name[0].toUpperCase(),
-            style: TextStyle(
-              color: _pureWhite.withValues(alpha: 0.15),
-              fontSize: 120,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          // Image (when assets exist)
-          // TODO: Replace with Image.network or Image.asset
-          // Image.asset(_currentHeroImage, fit: BoxFit.cover),
 
           // Lock overlay for unowned
           if (!owned)
@@ -753,44 +738,17 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Game variation image placeholder
+                  // Game variation image
                   Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(11),
-                        ),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            _getRarityColor().withValues(alpha: 0.2),
-                            _deepCharcoal,
-                          ],
-                        ),
+                    child: OgaImage(
+                      path: variation.characterImage,
+                      fit: BoxFit.cover,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(11),
                       ),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // TODO: Replace with Image.asset(variation.characterImage)
-                            Icon(
-                              Icons.videogame_asset,
-                              color: _pureWhite.withValues(alpha: 0.3),
-                              size: 32,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              variation.engineName,
-                              style: TextStyle(
-                                color: _pureWhite.withValues(alpha: 0.3),
-                                fontSize: 8,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      accentColor: _getRarityColor(),
+                      fallbackIcon: Icons.videogame_asset,
+                      fallbackIconSize: 32,
                     ),
                   ),
                   // Game info
@@ -807,19 +765,33 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                       children: [
                         Row(
                           children: [
-                            // TODO: Replace with Image.asset(variation.gameIcon)
-                            Container(
-                              width: 16,
-                              height: 16,
-                              decoration: BoxDecoration(
-                                color: _ironGrey,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Icon(
-                                Icons.sports_esports,
-                                size: 10,
-                                color: _pureWhite.withValues(alpha: 0.5),
-                              ),
+                            // Game icon
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: variation.gameIcon.isNotEmpty
+                                  ? OgaImage(
+                                      path: variation.gameIcon,
+                                      width: 16,
+                                      height: 16,
+                                      fit: BoxFit.cover,
+                                      fallbackIcon: Icons.sports_esports,
+                                      fallbackIconSize: 10,
+                                    )
+                                  : Container(
+                                      width: 16,
+                                      height: 16,
+                                      decoration: BoxDecoration(
+                                        color: _ironGrey,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Icon(
+                                        Icons.sports_esports,
+                                        size: 10,
+                                        color: _pureWhite.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                      ),
+                                    ),
                             ),
                             const SizedBox(width: 6),
                             Expanded(
@@ -1213,13 +1185,16 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // TODO: Replace with Image.asset(reward.image)
-                Icon(
-                  Icons.card_giftcard,
-                  color: reward.isUnlocked
-                      ? _neonGreen
-                      : _pureWhite.withValues(alpha: 0.2),
-                  size: 22,
+                // Reward image from storage
+                OgaImage(
+                  path: reward.image,
+                  width: 52,
+                  height: 52,
+                  fit: BoxFit.contain,
+                  borderRadius: BorderRadius.circular(10),
+                  accentColor: reward.isUnlocked ? _neonGreen : _pureWhite,
+                  fallbackIcon: Icons.card_giftcard,
+                  fallbackIconSize: 22,
                 ),
                 if (!reward.isUnlocked)
                   Positioned(
@@ -1288,34 +1263,17 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             ),
             child: Column(
               children: [
-                // Reward image placeholder
+                // Reward image
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(11),
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          _getRarityColorForString(
-                            reward.rarity,
-                          ).withValues(alpha: 0.15),
-                          _deepCharcoal,
-                        ],
-                      ),
+                  child: OgaImage(
+                    path: reward.image,
+                    fit: BoxFit.contain,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(11),
                     ),
-                    child: Center(
-                      // TODO: Replace with Image.asset(reward.image)
-                      child: Icon(
-                        Icons.auto_awesome,
-                        color: reward.isUnlocked
-                            ? _neonGreen
-                            : _pureWhite.withValues(alpha: 0.2),
-                        size: 28,
-                      ),
-                    ),
+                    accentColor: _getRarityColorForString(reward.rarity),
+                    fallbackIcon: Icons.auto_awesome,
+                    fallbackIconSize: 28,
                   ),
                 ),
                 // Reward info
@@ -1414,27 +1372,15 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
-                      // Avatar placeholder
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _ironGrey,
-                          border: owner.isCurrent
-                              ? Border.all(color: _neonGreen, width: 1.5)
-                              : null,
-                        ),
-                        child: Center(
-                          child: Text(
-                            owner.username[1].toUpperCase(),
-                            style: TextStyle(
-                              color: _pureWhite.withValues(alpha: 0.6),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
+                      // Owner avatar (supports URL when available)
+                      OgaAvatarImage(
+                        url: owner.avatarUrl,
+                        size: 32,
+                        fallbackLetter: owner.username.length > 1
+                            ? owner.username[1]
+                            : '?',
+                        borderColor: owner.isCurrent ? _neonGreen : _ironGrey,
+                        borderWidth: owner.isCurrent ? 1.5 : 0,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -1526,23 +1472,17 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Screenshot placeholder
+                // Screenshot image
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(11),
-                      ),
-                      color: _deepCharcoal,
+                  child: OgaImage(
+                    path: media.imageUrl,
+                    fit: BoxFit.cover,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(11),
                     ),
-                    child: Center(
-                      // TODO: Replace with Image.asset(media.imageUrl)
-                      child: Icon(
-                        Icons.image,
-                        color: _pureWhite.withValues(alpha: 0.15),
-                        size: 40,
-                      ),
-                    ),
+                    accentColor: _neonGreen,
+                    fallbackIcon: Icons.image,
+                    fallbackIconSize: 40,
                   ),
                 ),
                 Padding(

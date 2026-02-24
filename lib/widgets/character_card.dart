@@ -60,9 +60,20 @@ class _CharacterCardState extends State<CharacterCard>
           animation: _glowAnimation,
           builder: (context, child) {
             return AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              transform: Matrix4.identity()..scale(_isHovered ? 1.03 : 1.0),
+              // 1. Bumped duration for a more premium feel
+              duration: const Duration(milliseconds: 300),
+
+              // 2. Smoother, more organic deceleration
+              curve: Curves.easeOutCubic,
+
+              // 3. Added alignment so it zooms from the center
+              alignment: Alignment.center,
+
+              transform: Matrix4.diagonal3Values(
+                _isHovered ? 1.03 : 1.0,
+                _isHovered ? 1.03 : 1.0,
+                1.0,
+              ),
               decoration: BoxDecoration(
                 color: deepCharcoal,
                 borderRadius: BorderRadius.circular(12),
@@ -163,7 +174,7 @@ class _CharacterCardState extends State<CharacterCard>
           ),
 
         // Game count badge
-        if (widget.character.availableGames.isNotEmpty)
+        if (widget.character.gameVariations.isNotEmpty)
           Positioned(bottom: 8, left: 8, child: _buildGameBadge()),
 
         // Menu icon (owned only)
@@ -189,7 +200,7 @@ class _CharacterCardState extends State<CharacterCard>
   }
 
   Widget _buildGameBadge() {
-    final gameCount = widget.character.availableGames.length;
+    final gameCount = widget.character.gameVariations.length;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
