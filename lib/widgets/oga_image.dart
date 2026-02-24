@@ -86,7 +86,7 @@ class OgaImage extends StatelessWidget {
             ),
           );
         },
-        errorBuilder: (_, __, ___) {
+        errorBuilder: (_, _, _) {
           return Container(
             width: width,
             height: height,
@@ -147,7 +147,7 @@ class OgaAvatarImage extends StatelessWidget {
                 width: size,
                 height: size,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildFallback(),
+                errorBuilder: (_, _, _) => _buildFallback(),
               )
             : _buildFallback(),
       ),

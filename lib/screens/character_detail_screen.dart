@@ -685,6 +685,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   // GAME VARIATIONS (MULTIGAMEVERSE)
   // ═══════════════════════════════════════════════════════════
 
+  // ═══════════════════════════════════════════════════════════
+  // GAME VARIATIONS (MULTIGAMEVERSE) — Sprint 9A: Tap-to-Expand
+  // ═══════════════════════════════════════════════════════════
+
   Widget _buildGameVariations() {
     if (ch.gameVariations.isEmpty) {
       return Text(
@@ -693,141 +697,484 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       );
     }
 
-    return SizedBox(
-      height: 200,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: ch.gameVariations.length,
-        itemBuilder: (context, index) {
-          final variation = ch.gameVariations[index];
-          final isSelected = _selectedVariationIndex == index;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Horizontal Carousel ─────────────────────────
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: ch.gameVariations.length,
+            itemBuilder: (context, index) {
+              final variation = ch.gameVariations[index];
+              final isSelected = _selectedVariationIndex == index;
 
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedVariationIndex = isSelected
-                    ? -1
-                    : index; // Toggle selection
-              });
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 140,
-              margin: EdgeInsets.only(
-                right: index < ch.gameVariations.length - 1 ? 12 : 0,
-              ),
-              decoration: BoxDecoration(
-                color: _voidBlack,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected
-                      ? _neonGreen
-                      : _ironGrey.withValues(alpha: 0.5),
-                  width: isSelected ? 2 : 1,
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: _neonGreen.withValues(alpha: 0.2),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Game variation image
-                  Expanded(
-                    child: OgaImage(
-                      path: variation.characterImage,
-                      fit: BoxFit.cover,
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(11),
-                      ),
-                      accentColor: _getRarityColor(),
-                      fallbackIcon: Icons.videogame_asset,
-                      fallbackIconSize: 32,
-                    ),
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedVariationIndex = isSelected ? -1 : index;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  width: 140,
+                  margin: EdgeInsets.only(
+                    right: index < ch.gameVariations.length - 1 ? 12 : 0,
                   ),
-                  // Game info
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: _deepCharcoal,
-                      borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(11),
-                      ),
+                  decoration: BoxDecoration(
+                    color: _voidBlack,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? _neonGreen
+                          : _ironGrey.withValues(alpha: 0.5),
+                      width: isSelected ? 2 : 1,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            // Game icon
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: variation.gameIcon.isNotEmpty
-                                  ? OgaImage(
-                                      path: variation.gameIcon,
-                                      width: 16,
-                                      height: 16,
-                                      fit: BoxFit.cover,
-                                      fallbackIcon: Icons.sports_esports,
-                                      fallbackIconSize: 10,
-                                    )
-                                  : Container(
-                                      width: 16,
-                                      height: 16,
-                                      decoration: BoxDecoration(
-                                        color: _ironGrey,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Icon(
-                                        Icons.sports_esports,
-                                        size: 10,
-                                        color: _pureWhite.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                      ),
-                                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: _neonGreen.withValues(alpha: 0.2),
+                              blurRadius: 12,
+                              spreadRadius: 2,
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                variation.gameName.toUpperCase(),
-                                style: const TextStyle(
-                                  color: _pureWhite,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
+                          ]
+                        : null,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Game variation image
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: OgaImage(
+                                path: variation.characterImage,
+                                fit: BoxFit.cover,
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(11),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                accentColor: _getRarityColor(),
+                                fallbackIcon: Icons.videogame_asset,
+                                fallbackIconSize: 32,
                               ),
+                            ),
+                            // Selected indicator arrow
+                            if (isSelected)
+                              Positioned(
+                                bottom: 4,
+                                right: 4,
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    color: _neonGreen,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Icon(
+                                    Icons.expand_more,
+                                    color: _voidBlack,
+                                    size: 14,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      // Game info
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? _neonGreen.withValues(alpha: 0.05)
+                              : _deepCharcoal,
+                          borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(11),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                // Game icon
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: variation.gameIcon.isNotEmpty
+                                      ? OgaImage(
+                                          path: variation.gameIcon,
+                                          width: 16,
+                                          height: 16,
+                                          fit: BoxFit.cover,
+                                          fallbackIcon: Icons.sports_esports,
+                                          fallbackIconSize: 10,
+                                        )
+                                      : Container(
+                                          width: 16,
+                                          height: 16,
+                                          decoration: BoxDecoration(
+                                            color: _ironGrey,
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            Icons.sports_esports,
+                                            size: 10,
+                                            color: _pureWhite.withValues(
+                                              alpha: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    variation.gameName.toUpperCase(),
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? _neonGreen
+                                          : _pureWhite,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              variation.description,
+                              style: TextStyle(
+                                color: _pureWhite.withValues(alpha: 0.4),
+                                fontSize: 9,
+                                height: 1.3,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          variation.description,
-                          style: TextStyle(
-                            color: _pureWhite.withValues(alpha: 0.4),
-                            fontSize: 9,
-                            height: 1.3,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+
+        // ── Expanded Detail Panel ───────────────────────
+        AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child:
+              _selectedVariationIndex >= 0 &&
+                  _selectedVariationIndex < ch.gameVariations.length
+              ? _buildExpandedVariationDetail(
+                  ch.gameVariations[_selectedVariationIndex],
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  /// Expanded detail panel for the selected game variation.
+  /// Shows below the carousel with a slide-in animation.
+  Widget _buildExpandedVariationDetail(GameVariation variation) {
+    return Container(
+      key: ValueKey('variation_${variation.gameId}'),
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _voidBlack,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _neonGreen.withValues(alpha: 0.25), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: _neonGreen.withValues(alpha: 0.06),
+            blurRadius: 20,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header row: game name + engine badge + close ──
+          Row(
+            children: [
+              // Game icon
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: variation.gameIcon.isNotEmpty
+                    ? OgaImage(
+                        path: variation.gameIcon,
+                        width: 24,
+                        height: 24,
+                        fit: BoxFit.cover,
+                        fallbackIcon: Icons.sports_esports,
+                        fallbackIconSize: 14,
+                      )
+                    : Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: _ironGrey,
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                      ],
+                        child: Icon(
+                          Icons.sports_esports,
+                          size: 14,
+                          color: _pureWhite.withValues(alpha: 0.5),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 10),
+              // Game name
+              Expanded(
+                child: Text(
+                  variation.gameName.toUpperCase(),
+                  style: const TextStyle(
+                    color: _pureWhite,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              // Engine badge
+              if (variation.engineName.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _deepCharcoal,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: _ironGrey.withValues(alpha: 0.5)),
+                  ),
+                  child: Text(
+                    variation.engineName.toUpperCase(),
+                    style: TextStyle(
+                      color: _pureWhite.withValues(alpha: 0.5),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                ],
+                ),
+              const SizedBox(width: 8),
+              // Close button
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedVariationIndex = -1;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: _ironGrey.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    Icons.close,
+                    color: _pureWhite.withValues(alpha: 0.5),
+                    size: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Character render + info ─────────────────────
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Side-by-side on wider panels, stacked on narrow
+              final isWide = constraints.maxWidth > 360;
+
+              if (isWide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Character image
+                    _buildVariationRender(variation),
+                    const SizedBox(width: 16),
+                    // Info column
+                    Expanded(child: _buildVariationInfo(variation)),
+                  ],
+                );
+              } else {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(child: _buildVariationRender(variation)),
+                    const SizedBox(height: 14),
+                    _buildVariationInfo(variation),
+                  ],
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Large render of the character in this game variation.
+  Widget _buildVariationRender(GameVariation variation) {
+    return Container(
+      width: 160,
+      height: 200,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: _deepCharcoal,
+        border: Border.all(color: _neonGreen.withValues(alpha: 0.15), width: 1),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: OgaImage(
+              path: variation.characterImage,
+              fit: BoxFit.cover,
+              borderRadius: BorderRadius.circular(11),
+              accentColor: _getRarityColor(),
+              fallbackIcon: Icons.videogame_asset,
+              fallbackIconSize: 48,
+            ),
+          ),
+          // Game ID badge at top-left
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: _voidBlack.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                variation.gameName.toUpperCase(),
+                style: const TextStyle(
+                  color: _neonGreen,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
-          );
-        },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Text info panel for the expanded variation.
+  Widget _buildVariationInfo(GameVariation variation) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Character name in this game
+        Text(
+          '${ch.name.toUpperCase()} IN ${variation.gameName.toUpperCase()}',
+          style: TextStyle(
+            color: _neonGreen,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Description
+        if (variation.description.isNotEmpty)
+          Text(
+            variation.description,
+            style: TextStyle(
+              color: _pureWhite.withValues(alpha: 0.7),
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+        const SizedBox(height: 14),
+
+        // Engine + platform info row
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (variation.engineName.isNotEmpty)
+              _buildInfoChip(Icons.memory, variation.engineName),
+            _buildInfoChip(Icons.videogame_asset, variation.gameName),
+            _buildInfoChip(Icons.category, ch.ip),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // "VIEW IN GAME" CTA (placeholder for future deep-link)
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              // TODO: Deep-link to this game variation or show more info
+            },
+            icon: const Icon(Icons.open_in_new, size: 14),
+            label: const Text(
+              'VIEW IN GAME',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1,
+                fontSize: 11,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _neonGreen,
+              side: BorderSide(color: _neonGreen.withValues(alpha: 0.4)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Small info chip for engine/platform details.
+  Widget _buildInfoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: _deepCharcoal,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _ironGrey.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: _pureWhite.withValues(alpha: 0.4)),
+          const SizedBox(width: 6),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: _pureWhite.withValues(alpha: 0.6),
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
       ),
     );
   }
