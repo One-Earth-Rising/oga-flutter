@@ -48,6 +48,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   int _selectedVariationIndex = -1; // -1 = default hero
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
+  late PageController _heroPageController;
 
   OGACharacter get ch => widget.character;
   bool get owned => widget.isOwned;
@@ -62,21 +63,14 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     _glowAnimation = Tween<double>(begin: 0.3, end: 0.8).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
+    _heroPageController = PageController(initialPage: 0);
   }
 
   @override
   void dispose() {
+    _heroPageController.dispose();
     _glowController.dispose();
     super.dispose();
-  }
-
-  // Current display image (swaps when tapping a game variation)
-  String get _currentHeroImage {
-    if (_selectedVariationIndex >= 0 &&
-        _selectedVariationIndex < ch.gameVariations.length) {
-      return ch.gameVariations[_selectedVariationIndex].characterImage;
-    }
-    return ch.heroImage;
   }
 
   String get _currentGameLabel {
@@ -92,9 +86,17 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 900;
 
-    return Scaffold(
-      backgroundColor: _voidBlack,
-      body: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: _voidBlack,
+        body: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
+      ),
     );
   }
 
@@ -178,7 +180,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                         ],
                       )
                     : null,
-                child: _buildCharacterImage(),
+                child: _buildHeroPageView(),
               ),
             );
           },
@@ -273,7 +275,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     );
   }
 
-  Widget _buildCharacterImage() {
+  Widget _buildHeroPageView() {
+    // Pages: [original hero, variation 0, variation 1, ...]
+    final totalPages = 1 + ch.gameVariations.length;
+
     return Container(
       width: 280,
       height: 380,
@@ -286,17 +291,32 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
         ),
       ),
       child: Stack(
-        alignment: Alignment.center,
         children: [
-          // Character image from Supabase Storage
-          Positioned.fill(
-            child: OgaImage(
-              path: _currentHeroImage,
-              fit: BoxFit.cover,
-              borderRadius: BorderRadius.circular(15),
-              accentColor: _getRarityColor(),
-              fallbackIcon: Icons.person,
-              fallbackIconSize: 64,
+          // Swipeable hero images
+          ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: PageView.builder(
+              controller: _heroPageController,
+              itemCount: totalPages,
+              onPageChanged: (page) {
+                setState(() {
+                  // Page 0 = original (-1), page 1+ = variation index
+                  _selectedVariationIndex = page - 1;
+                });
+              },
+              itemBuilder: (context, page) {
+                final imagePath = page == 0
+                    ? ch.heroImage
+                    : ch.gameVariations[page - 1].characterImage;
+
+                return OgaImage(
+                  path: imagePath,
+                  fit: BoxFit.cover,
+                  accentColor: _getRarityColor(),
+                  fallbackIcon: Icons.person,
+                  fallbackIconSize: 64,
+                );
+              },
             ),
           ),
 
@@ -330,6 +350,94 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 ),
               ),
             ),
+
+          // Page indicator dots
+          if (totalPages > 1)
+            Positioned(
+              bottom: 12,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(totalPages, (i) {
+                  final isActive = i == (_selectedVariationIndex + 1);
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: isActive ? 16 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? _neonGreen
+                          : _pureWhite.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  );
+                }),
+              ),
+            ),
+
+          // Swipe hint arrows (left/right)
+          if (ch.gameVariations.isNotEmpty) ...[
+            // Left arrow (when not on first page)
+            if (_selectedVariationIndex >= 0)
+              Positioned(
+                left: 8,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      _heroPageController.previousPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: _voidBlack.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.chevron_left,
+                        color: _pureWhite.withValues(alpha: 0.7),
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            // Right arrow (when not on last page)
+            if (_selectedVariationIndex < ch.gameVariations.length - 1)
+              Positioned(
+                right: 8,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      _heroPageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: _voidBlack.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.chevron_right,
+                        color: _pureWhite.withValues(alpha: 0.7),
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -715,6 +823,15 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   setState(() {
                     _selectedVariationIndex = isSelected ? -1 : index;
                   });
+                  // Sync hero PageView: index -1 = page 0, index N = page N+1
+                  final targetPage = isSelected ? 0 : index + 1;
+                  if (_heroPageController.hasClients) {
+                    _heroPageController.animateToPage(
+                      targetPage,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -978,6 +1095,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   setState(() {
                     _selectedVariationIndex = -1;
                   });
+                  if (_heroPageController.hasClients) {
+                    _heroPageController.animateToPage(
+                      0,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
                 },
                 child: Container(
                   padding: const EdgeInsets.all(4),
@@ -1422,25 +1546,25 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           return Stack(
             clipBehavior: Clip.none,
             children: [
-              // Background track line
+              // Layer 1: Background track line
               Positioned(
-                top: 20,
+                top: 24,
                 left: 0,
                 right: 0,
                 child: Container(
-                  height: 4,
+                  height: 3,
                   decoration: BoxDecoration(
                     color: _ironGrey.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              // Progress fill line
+              // Layer 2: Progress fill line (behind nodes)
               Positioned(
-                top: 20,
+                top: 24,
                 left: 0,
                 child: Container(
-                  height: 4,
+                  height: 3,
                   width: trackWidth * pass.progressPercent,
                   decoration: BoxDecoration(
                     color: _neonGreen,
@@ -1454,10 +1578,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   ),
                 ),
               ),
-              // Milestone nodes
+              // Layer 3: Milestone nodes (on top of everything)
               ...List.generate(nodeCount, (index) {
                 final reward = pass.rewards[index];
-                // Position nodes evenly across the track
                 final position = nodeCount == 1
                     ? trackWidth / 2
                     : (trackWidth - 40) * (index / (nodeCount - 1)) + 20;
@@ -1485,15 +1608,16 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                             ),
                           ),
                           const SizedBox(height: 4),
-                          // Node circle
+                          // Node circle — solid background so line doesn't show through
                           Container(
                             width: 28,
                             height: 28,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
+                              // Solid background to mask the progress line
                               color: isReached
                                   ? _neonGreen.withValues(alpha: 0.2)
-                                  : _voidBlack,
+                                  : _deepCharcoal,
                               border: Border.all(
                                 color: isReached
                                     ? _neonGreen

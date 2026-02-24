@@ -21,6 +21,10 @@ import 'screens/invite_onboarding_screen.dart';
 import 'services/friend_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:oga_web_showcase/config/environment.dart';
+import 'screens/invite_onboarding_screen.dart';
+import 'screens/character_detail_screen.dart';
+import 'models/oga_character.dart';
+import 'services/friend_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -80,6 +84,19 @@ class _OgaAppState extends State<OgaApp> {
       ),
       onGenerateRoute: (settings) {
         final uri = Uri.parse(settings.name ?? '');
+        // /#/character/ryu → CharacterDetailScreen
+        // /#/character/ryu → CharacterDetailScreen
+        if (uri.path.startsWith('/character/')) {
+          final characterId = uri.path.replaceFirst('/character/', '');
+          final character = OGACharacter.fromId(characterId);
+          return MaterialPageRoute(
+            settings: RouteSettings(name: '/character/$characterId'),
+            builder: (_) => CharacterDetailScreen(
+              character: character,
+              isOwned: character.isOwned,
+            ),
+          );
+        }
 
         // ═══════════════════════════════════════════════════════
         // INVITE ONBOARDING (profile setup after invite signup)
