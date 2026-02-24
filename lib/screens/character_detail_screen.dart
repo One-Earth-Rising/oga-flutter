@@ -18,7 +18,6 @@
 
 import 'package:flutter/material.dart';
 import '../models/oga_character.dart';
-import '../config/oga_storage.dart';
 import '../widgets/oga_image.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
@@ -788,10 +787,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       ],
     );
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // GAME VARIATIONS (MULTIGAMEVERSE)
-  // ═══════════════════════════════════════════════════════════
 
   // ═══════════════════════════════════════════════════════════
   // GAME VARIATIONS (MULTIGAMEVERSE) — Sprint 9A: Tap-to-Expand
@@ -1616,7 +1611,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                               shape: BoxShape.circle,
                               // Solid background to mask the progress line
                               color: isReached
-                                  ? _neonGreen.withValues(alpha: 0.2)
+                                  ? const Color(0xFF1A3A14)
                                   : _deepCharcoal,
                               border: Border.all(
                                 color: isReached
@@ -2530,148 +2525,157 @@ class _GameplayLightboxState extends State<_GameplayLightbox> {
   Widget build(BuildContext context) {
     final media = widget.media;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // ── Swipeable image pages ─────────────────────
-          PageView.builder(
-            controller: _pageController,
-            itemCount: media.length,
-            onPageChanged: (index) {
-              setState(() => _currentIndex = index);
-            },
-            itemBuilder: (context, index) {
-              final item = media[index];
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: InteractiveViewer(
-                    minScale: 1.0,
-                    maxScale: 3.0,
-                    child: OgaImage(
-                      path: item.imageUrl,
-                      fit: BoxFit.contain,
-                      accentColor: _neonGreen,
-                      fallbackIcon: Icons.image,
-                      fallbackIconSize: 64,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // ── Top bar: close + counter ──────────────────
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            left: 16,
-            right: 16,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Close button
-                GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _deepCharcoal.withValues(alpha: 0.8),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _ironGrey.withValues(alpha: 0.5),
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // ── Swipeable image pages ─────────────────────
+            PageView.builder(
+              controller: _pageController,
+              itemCount: media.length,
+              onPageChanged: (index) {
+                setState(() => _currentIndex = index);
+              },
+              itemBuilder: (context, index) {
+                final item = media[index];
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: InteractiveViewer(
+                      minScale: 1.0,
+                      maxScale: 3.0,
+                      child: OgaImage(
+                        path: item.imageUrl,
+                        fit: BoxFit.contain,
+                        accentColor: _neonGreen,
+                        fallbackIcon: Icons.image,
+                        fallbackIconSize: 64,
                       ),
                     ),
-                    child: const Icon(Icons.close, color: _pureWhite, size: 20),
                   ),
-                ),
-                // Image counter
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _deepCharcoal.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _ironGrey.withValues(alpha: 0.4)),
-                  ),
-                  child: Text(
-                    '${_currentIndex + 1} OF ${media.length}',
-                    style: const TextStyle(
-                      color: _pureWhite,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ),
-              ],
+                );
+              },
             ),
-          ),
 
-          // ── Bottom caption bar ────────────────────────
-          Positioned(
-            bottom: MediaQuery.of(context).padding.bottom + 16,
-            left: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _deepCharcoal.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _ironGrey.withValues(alpha: 0.4)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // ── Top bar: close + counter ──────────────────
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 16,
+              right: 16,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    media[_currentIndex].gameName.toUpperCase(),
-                    style: const TextStyle(
-                      color: _neonGreen,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
+                  // Close button
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _deepCharcoal.withValues(alpha: 0.8),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _ironGrey.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: _pureWhite,
+                        size: 20,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    media[_currentIndex].caption,
-                    style: TextStyle(
-                      color: _pureWhite.withValues(alpha: 0.8),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                  // Image counter
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _deepCharcoal.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _ironGrey.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Text(
+                      '${_currentIndex + 1} OF ${media.length}',
+                      style: const TextStyle(
+                        color: _pureWhite,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
                     ),
                   ),
-                  // Page dots
-                  if (media.length > 1) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(media.length, (i) {
-                        final isActive = i == _currentIndex;
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          width: isActive ? 20 : 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? _neonGreen
-                                : _ironGrey.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        );
-                      }),
-                    ),
-                  ],
                 ],
               ),
             ),
-          ),
-        ],
+
+            // ── Bottom caption bar ────────────────────────
+            Positioned(
+              bottom: MediaQuery.of(context).padding.bottom + 16,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _deepCharcoal.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _ironGrey.withValues(alpha: 0.4)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      media[_currentIndex].gameName.toUpperCase(),
+                      style: const TextStyle(
+                        color: _neonGreen,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      media[_currentIndex].caption,
+                      style: TextStyle(
+                        color: _pureWhite.withValues(alpha: 0.8),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    // Page dots
+                    if (media.length > 1) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(media.length, (i) {
+                          final isActive = i == _currentIndex;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: isActive ? 20 : 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? _neonGreen
+                                  : _ironGrey.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

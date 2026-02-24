@@ -89,11 +89,22 @@ class _OgaAppState extends State<OgaApp> {
         if (uri.path.startsWith('/character/')) {
           final characterId = uri.path.replaceFirst('/character/', '');
           final character = OGACharacter.fromId(characterId);
-          return MaterialPageRoute(
+          return PageRouteBuilder(
             settings: RouteSettings(name: '/character/$characterId'),
-            builder: (_) => CharacterDetailScreen(
+            transitionDuration: const Duration(milliseconds: 300),
+            pageBuilder: (_, anim, secondAnim) => CharacterDetailScreen(
               character: character,
               isOwned: character.isOwned,
+            ),
+            transitionsBuilder: (_, anim, secondAnim, child) => FadeTransition(
+              opacity: anim,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.05),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+                child: child,
+              ),
             ),
           );
         }

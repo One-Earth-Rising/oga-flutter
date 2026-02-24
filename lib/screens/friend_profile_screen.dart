@@ -620,12 +620,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   // ═══════════════════════════════════════════════════════════
 
   void _openCharacterDetail(OGACharacter ch, bool owned) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CharacterDetailScreen(character: ch, isOwned: owned),
-      ),
-    );
+    Navigator.pushNamed(context, '/character/${ch.id}');
   }
 
   // ═══════════════════════════════════════════════════════════
