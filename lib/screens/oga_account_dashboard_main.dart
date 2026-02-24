@@ -9,6 +9,7 @@ import 'tabs/about_tab.dart';
 import 'faq_page.dart';
 import 'contact_modal.dart';
 import 'share_profile_screen.dart';
+import '../config/oga_storage.dart';
 
 class OGAAccountDashboard extends StatefulWidget {
   final String? sessionId;
@@ -918,12 +919,16 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             child: Row(
               children: [
                 // Character image
+                // Character image
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    ch.thumbnailImage.isNotEmpty
-                        ? ch.thumbnailImage
-                        : ch.heroImage,
+                  child: Image.network(
+                    // <--- Now a network image
+                    OgaStorage.resolve(
+                      ch.thumbnailImage.isNotEmpty
+                          ? ch.thumbnailImage
+                          : ch.heroImage,
+                    ), // <--- Wrapped in resolve()
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
