@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/oga_character.dart';
+import '../config/oga_storage.dart';
 
 /// Heimdal-aesthetic character card with IP-colored background,
 /// animated glow for owned characters, and progress ring.
@@ -145,8 +146,10 @@ class _CharacterCardState extends State<CharacterCard>
 
         // Character image
         Positioned.fill(
-          child: Image.asset(
-            widget.character.imagePath,
+          child: Image.network(
+            OgaStorage.resolve(
+              widget.character.imagePath,
+            ), // <--- Wrapped here!
             fit: BoxFit.cover,
             alignment: Alignment.topCenter,
             errorBuilder: (context, error, stackTrace) => Center(
