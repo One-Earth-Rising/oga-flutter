@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/oga_character.dart';
 import '../services/friend_service.dart';
 import 'character_detail_screen.dart';
+import '../config/oga_storage.dart';
+import '../widgets/character_card.dart';
 
 /// Authenticated view of a friend's profile and character library.
 /// Navigated to by tapping a friend row in the Friends tab.
@@ -143,7 +145,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           width: double.infinity,
           decoration: BoxDecoration(
             image: DecorationImage(
-              image: AssetImage(starterChar.imagePath),
+              image: NetworkImage(OgaStorage.resolve(starterChar.imagePath)),
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
               onError: (_, __) {},
@@ -191,8 +193,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                           height: 72,
                           width: 72,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              _buildFallbackAvatar(72),
+                          errorBuilder: (_, _, _) => _buildFallbackAvatar(72),
                         )
                       : _buildFallbackAvatar(72),
                 ),
@@ -456,132 +457,18 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         childAspectRatio: 0.72,
       ),
       delegate: SliverChildBuilderDelegate((context, index) {
-        final ci = index % chars.length;
-        final ch = chars[ci];
-        final owned = index < chars.length && ch.id == ownedId;
+        final ch = chars[index];
+        final owned = ch.id == ownedId; // Only their starter is owned
 
         return GestureDetector(
           onTap: () => _openCharacterDetail(ch, owned),
-          child: _buildCharacterCard(ch, owned),
+          child: CharacterCard(
+            character: ch,
+            isOwned: owned,
+            progress: owned ? 1.0 : 0.0, // Shows 100% if they own it
+          ),
         );
-      }, childCount: chars.length * 2),
-    );
-  }
-
-  Widget _buildCharacterCard(OGACharacter ch, bool owned) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: owned
-              ? ch.glowColor.withValues(alpha: 0.5)
-              : ironGrey.withValues(alpha: 0.3),
-          width: owned ? 2 : 1,
-        ),
-        boxShadow: owned
-            ? [
-                BoxShadow(
-                  color: ch.glowColor.withValues(alpha: 0.15),
-                  blurRadius: 12,
-                ),
-              ]
-            : null,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(11),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Character image
-            Image.asset(
-              ch.imagePath,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                color: ch.cardColor,
-                child: const Icon(
-                  Icons.person,
-                  color: Colors.white24,
-                  size: 40,
-                ),
-              ),
-            ),
-            // Gradient overlay
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    voidBlack.withValues(alpha: 0.8),
-                  ],
-                  stops: const [0.5, 1.0],
-                ),
-              ),
-            ),
-            // Name + status
-            Positioned(
-              left: 10,
-              right: 10,
-              bottom: 10,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    ch.name.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (owned)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: neonGreen.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      child: Text(
-                        'OWNS THIS',
-                        style: TextStyle(
-                          color: neonGreen.withValues(alpha: 0.8),
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    )
-                  else
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.lock_outline,
-                          color: Colors.white.withValues(alpha: 0.3),
-                          size: 11,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'LOCKED',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      }, childCount: chars.length), // Fixed the * 2 doubling bug!
     );
   }
 
@@ -592,13 +479,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   Widget _buildCharacterList() {
     final chars = OGACharacter.allCharacters;
     final ownedId = friend.starterCharacter;
-    final allChars = [...chars, ...chars];
 
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
-        final ci = index % chars.length;
-        final ch = chars[ci];
-        final owned = index < chars.length && ch.id == ownedId;
+        final ch = chars[index];
+        final owned = ch.id == ownedId;
+        final charColor = ch.cardColor;
 
         return GestureDetector(
           onTap: () => _openCharacterDetail(ch, owned),
@@ -618,15 +504,19 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    ch.imagePath,
+                  child: Image.network(
+                    OgaStorage.resolve(
+                      ch.thumbnailImage.isNotEmpty
+                          ? ch.thumbnailImage
+                          : ch.heroImage,
+                    ),
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       width: 56,
                       height: 56,
-                      color: ch.cardColor,
+                      color: charColor,
                       child: const Icon(Icons.person, color: Colors.white24),
                     ),
                   ),
@@ -646,12 +536,38 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        ch.ip,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.35),
-                          fontSize: 12,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            ch.ip,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.35),
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (ch.gameVariations.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: neonGreen.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                '${ch.gameVariations.length} GAMES',
+                                style: TextStyle(
+                                  color: neonGreen.withValues(alpha: 0.7),
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -695,7 +611,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             ),
           ),
         );
-      }, childCount: allChars.length),
+      }, childCount: chars.length), // Fixed the allChars doubling bug here too!
     );
   }
 

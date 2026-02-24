@@ -492,8 +492,8 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   }
 
   Widget _assetAvatar(OGACharacter char, double radius) {
-    return Image.asset(
-      char.heroImage,
+    return Image.network(
+      OgaStorage.resolve(char.heroImage), // <--- Wrapped in resolve()
       fit: BoxFit.cover,
       width: radius * 2,
       height: radius * 2,
@@ -744,8 +744,8 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   }
 
   Widget _heroAssetAvatar(OGACharacter char) {
-    return Image.asset(
-      char.heroImage,
+    return Image.network(
+      OgaStorage.resolve(char.heroImage), // <--- Wrapped in resolve()
       height: 70,
       width: 70,
       fit: BoxFit.cover,
