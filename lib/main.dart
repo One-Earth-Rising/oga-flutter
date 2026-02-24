@@ -17,17 +17,17 @@ import 'screens/oga_signin_screen.dart';
 import 'screens/invite_landing_screen.dart';
 import 'screens/invite_signup_screen.dart';
 import 'screens/invite_welcome_screen.dart';
-import 'screens/invite_onboarding_screen.dart';
 import 'services/friend_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:oga_web_showcase/config/environment.dart';
 import 'screens/invite_onboarding_screen.dart';
 import 'screens/character_detail_screen.dart';
 import 'models/oga_character.dart';
-import 'services/friend_service.dart';
+import 'package:flutter/services.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemNavigator.selectMultiEntryHistory();
 
   await Supabase.initialize(
     url: EnvironmentConfig.supabaseUrl,
