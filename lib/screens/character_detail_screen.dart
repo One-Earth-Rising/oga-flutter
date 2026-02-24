@@ -1187,7 +1187,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     final pass = ch.portalPass;
 
     if (pass == null) {
-      // No Portal Pass — show purchase CTA
+      // No Portal Pass — show purchase CTA (unchanged)
       return _buildSectionCard(
         title: 'PORTAL PASS',
         child: Container(
@@ -1226,9 +1226,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () {
-                    // TODO: Navigate to Portal Pass store
-                  },
+                  onPressed: () {},
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _neonGreen,
                     side: BorderSide(color: _neonGreen.withValues(alpha: 0.5)),
@@ -1253,7 +1251,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       );
     }
 
-    // Has Portal Pass — show progress + tasks
+    // Has Portal Pass — interactive version
     return _buildSectionCard(
       title: 'PORTAL PASS',
       subtitle: 'LVL ${pass.currentLevel}/${pass.maxLevel}',
@@ -1265,7 +1263,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           // Pass name + description
           Text(
             pass.name.toUpperCase(),
-            style: TextStyle(
+            style: const TextStyle(
               color: _neonGreen,
               fontSize: 16,
               fontWeight: FontWeight.w900,
@@ -1315,10 +1313,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               ),
             ),
 
-          // Tasks
-          if (pass.tasks.isNotEmpty) ...[
+          // ── Reward Milestones (interactive nodes) ──────
+          if (pass.rewards.isNotEmpty) ...[
             Text(
-              'ACTIVE TASKS',
+              'MILESTONE REWARDS',
               style: TextStyle(
                 color: _pureWhite.withValues(alpha: 0.6),
                 fontSize: 11,
@@ -1326,34 +1324,47 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 letterSpacing: 1,
               ),
             ),
-            const SizedBox(height: 10),
-            ...pass.tasks.map((task) => _buildTaskItem(task)),
+            const SizedBox(height: 12),
+            _buildMilestoneTrack(pass),
+            const SizedBox(height: 20),
           ],
 
-          // Rewards preview
-          if (pass.rewards.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Text(
-              'PASS REWARDS',
-              style: TextStyle(
-                color: _pureWhite.withValues(alpha: 0.6),
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1,
-              ),
+          // ── Active Tasks (expandable) ─────────────────
+          if (pass.tasks.isNotEmpty) ...[
+            Row(
+              children: [
+                Text(
+                  'ACTIVE TASKS',
+                  style: TextStyle(
+                    color: _pureWhite.withValues(alpha: 0.6),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _neonGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${pass.tasks.where((t) => t.isCompleted).length}/${pass.tasks.length}',
+                    style: TextStyle(
+                      color: _neonGreen,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
-            SizedBox(
-              height: 80,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: pass.rewards.length,
-                itemBuilder: (context, index) {
-                  final reward = pass.rewards[index];
-                  return _buildPassRewardChip(reward);
-                },
-              ),
-            ),
+            ...pass.tasks.map((task) => _buildInteractiveTaskItem(task)),
           ],
         ],
       ),
@@ -1368,7 +1379,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           children: [
             Text(
               'LEVEL $current',
-              style: TextStyle(
+              style: const TextStyle(
                 color: _neonGreen,
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
@@ -1391,187 +1402,429 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             value: percent,
             minHeight: 8,
             backgroundColor: _ironGrey,
-            valueColor: AlwaysStoppedAnimation(_neonGreen),
+            valueColor: const AlwaysStoppedAnimation(_neonGreen),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildTaskItem(PortalPassTask task) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _voidBlack.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: task.isCompleted
-              ? _neonGreen.withValues(alpha: 0.3)
-              : _ironGrey.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Completion indicator
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: task.isCompleted
-                  ? _neonGreen.withValues(alpha: 0.15)
-                  : _ironGrey.withValues(alpha: 0.2),
-              border: Border.all(
-                color: task.isCompleted ? _neonGreen : _ironGrey,
-                width: 1.5,
-              ),
-            ),
-            child: task.isCompleted
-                ? Icon(Icons.check, color: _neonGreen, size: 16)
-                : null,
-          ),
-          const SizedBox(width: 12),
-          // Task info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  style: TextStyle(
-                    color: task.isCompleted
-                        ? _pureWhite.withValues(alpha: 0.5)
-                        : _pureWhite,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    decoration: task.isCompleted
-                        ? TextDecoration.lineThrough
-                        : null,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      task.targetGame.toUpperCase(),
-                      style: TextStyle(
-                        color: _neonGreen.withValues(alpha: 0.6),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '+${task.xpReward} XP',
-                      style: TextStyle(
-                        color: _pureWhite.withValues(alpha: 0.3),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Progress
-          if (!task.isCompleted)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${task.currentProgress}/${task.targetProgress}',
-                  style: const TextStyle(
-                    color: _pureWhite,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                SizedBox(
-                  width: 50,
-                  child: ClipRRect(
+  /// Horizontal milestone track with nodes connected by a progress line.
+  Widget _buildMilestoneTrack(PortalPass pass) {
+    return SizedBox(
+      height: 100,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final trackWidth = constraints.maxWidth;
+          final nodeCount = pass.rewards.length;
+          if (nodeCount == 0) return const SizedBox.shrink();
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Background track line
+              Positioned(
+                top: 20,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: _ironGrey.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2),
-                    child: LinearProgressIndicator(
-                      value: task.progressPercent,
-                      minHeight: 3,
-                      backgroundColor: _ironGrey,
-                      valueColor: AlwaysStoppedAnimation(_neonGreen),
-                    ),
                   ),
                 ),
-              ],
-            ),
-        ],
+              ),
+              // Progress fill line
+              Positioned(
+                top: 20,
+                left: 0,
+                child: Container(
+                  height: 4,
+                  width: trackWidth * pass.progressPercent,
+                  decoration: BoxDecoration(
+                    color: _neonGreen,
+                    borderRadius: BorderRadius.circular(2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _neonGreen.withValues(alpha: 0.4),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Milestone nodes
+              ...List.generate(nodeCount, (index) {
+                final reward = pass.rewards[index];
+                // Position nodes evenly across the track
+                final position = nodeCount == 1
+                    ? trackWidth / 2
+                    : (trackWidth - 40) * (index / (nodeCount - 1)) + 20;
+                final nodeLevel = reward.levelRequired;
+                final isReached = pass.currentLevel >= nodeLevel;
+
+                return Positioned(
+                  left: position - 20,
+                  top: 0,
+                  child: GestureDetector(
+                    onTap: () => _showRewardDetail(context, reward, isReached),
+                    child: SizedBox(
+                      width: 40,
+                      child: Column(
+                        children: [
+                          // Level label
+                          Text(
+                            'LVL $nodeLevel',
+                            style: TextStyle(
+                              color: isReached
+                                  ? _neonGreen
+                                  : _pureWhite.withValues(alpha: 0.3),
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Node circle
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isReached
+                                  ? _neonGreen.withValues(alpha: 0.2)
+                                  : _voidBlack,
+                              border: Border.all(
+                                color: isReached
+                                    ? _neonGreen
+                                    : _ironGrey.withValues(alpha: 0.5),
+                                width: 2,
+                              ),
+                              boxShadow: isReached
+                                  ? [
+                                      BoxShadow(
+                                        color: _neonGreen.withValues(
+                                          alpha: 0.3,
+                                        ),
+                                        blurRadius: 8,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Center(
+                              child: isReached
+                                  ? const Icon(
+                                      Icons.check,
+                                      color: _neonGreen,
+                                      size: 14,
+                                    )
+                                  : Icon(
+                                      Icons.lock_outline,
+                                      color: _ironGrey.withValues(alpha: 0.6),
+                                      size: 12,
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          // Reward name
+                          Text(
+                            reward.name,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isReached
+                                  ? _pureWhite.withValues(alpha: 0.8)
+                                  : _pureWhite.withValues(alpha: 0.3),
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildPassRewardChip(PortalPassReward reward) {
-    return Container(
-      width: 70,
-      margin: const EdgeInsets.only(right: 10),
-      child: Column(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
+  /// Shows a bottom sheet with reward details when a milestone node is tapped.
+  void _showRewardDetail(
+    BuildContext context,
+    PortalPassReward reward,
+    bool isUnlocked,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: _deepCharcoal,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            border: Border.all(
+              color: isUnlocked ? _neonGreen.withValues(alpha: 0.3) : _ironGrey,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _ironGrey,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Reward image
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: isUnlocked
+                      ? _neonGreen.withValues(alpha: 0.1)
+                      : _voidBlack,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isUnlocked
+                        ? _neonGreen.withValues(alpha: 0.4)
+                        : _ironGrey,
+                  ),
+                ),
+                child: OgaImage(
+                  path: reward.image,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.contain,
+                  borderRadius: BorderRadius.circular(14),
+                  accentColor: isUnlocked ? _neonGreen : _pureWhite,
+                  fallbackIcon: Icons.card_giftcard,
+                  fallbackIconSize: 32,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Reward name
+              Text(
+                reward.name.toUpperCase(),
+                style: const TextStyle(
+                  color: _pureWhite,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Status badge
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: isUnlocked
+                      ? _neonGreen.withValues(alpha: 0.15)
+                      : _ironGrey.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isUnlocked
+                      ? 'UNLOCKED'
+                      : 'UNLOCKS AT LEVEL ${reward.levelRequired}',
+                  style: TextStyle(
+                    color: isUnlocked
+                        ? _neonGreen
+                        : _pureWhite.withValues(alpha: 0.5),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Interactive task item with expandable detail on tap.
+  Widget _buildInteractiveTaskItem(PortalPassTask task) {
+    return StatefulBuilder(
+      builder: (context, setLocalState) {
+        return GestureDetector(
+          onTap: () {
+            // For now, tasks show a simple detail snackbar.
+            // Future: expand inline with sub-tasks or tips.
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                backgroundColor: _deepCharcoal,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(
+                    color: task.isCompleted
+                        ? _neonGreen.withValues(alpha: 0.3)
+                        : _ironGrey,
+                  ),
+                ),
+                duration: const Duration(seconds: 2),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task.title,
+                      style: const TextStyle(
+                        color: _pureWhite,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      task.isCompleted
+                          ? 'Completed! +${task.xpReward} XP earned'
+                          : '${task.currentProgress}/${task.targetProgress} — ${task.xpReward} XP reward',
+                      style: TextStyle(
+                        color: task.isCompleted
+                            ? _neonGreen
+                            : _pureWhite.withValues(alpha: 0.6),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: reward.isUnlocked
-                  ? _neonGreen.withValues(alpha: 0.1)
-                  : _voidBlack,
+              color: _voidBlack.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: reward.isUnlocked
-                    ? _neonGreen.withValues(alpha: 0.4)
+                color: task.isCompleted
+                    ? _neonGreen.withValues(alpha: 0.3)
                     : _ironGrey.withValues(alpha: 0.3),
               ),
             ),
-            child: Stack(
-              alignment: Alignment.center,
+            child: Row(
               children: [
-                // Reward image from storage
-                OgaImage(
-                  path: reward.image,
-                  width: 52,
-                  height: 52,
-                  fit: BoxFit.contain,
-                  borderRadius: BorderRadius.circular(10),
-                  accentColor: reward.isUnlocked ? _neonGreen : _pureWhite,
-                  fallbackIcon: Icons.card_giftcard,
-                  fallbackIconSize: 22,
-                ),
-                if (!reward.isUnlocked)
-                  Positioned(
-                    bottom: 2,
-                    child: Text(
-                      'LVL ${reward.levelRequired}',
-                      style: TextStyle(
-                        color: _pureWhite.withValues(alpha: 0.4),
-                        fontSize: 7,
-                        fontWeight: FontWeight.w800,
-                      ),
+                // Completion indicator
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: task.isCompleted
+                        ? _neonGreen.withValues(alpha: 0.15)
+                        : _ironGrey.withValues(alpha: 0.2),
+                    border: Border.all(
+                      color: task.isCompleted ? _neonGreen : _ironGrey,
+                      width: 1.5,
                     ),
+                  ),
+                  child: task.isCompleted
+                      ? const Icon(Icons.check, color: _neonGreen, size: 16)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                // Task info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        task.title,
+                        style: TextStyle(
+                          color: task.isCompleted
+                              ? _pureWhite.withValues(alpha: 0.5)
+                              : _pureWhite,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          decoration: task.isCompleted
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            task.targetGame.toUpperCase(),
+                            style: TextStyle(
+                              color: _neonGreen.withValues(alpha: 0.6),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '+${task.xpReward} XP',
+                            style: TextStyle(
+                              color: _pureWhite.withValues(alpha: 0.3),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Progress or tap hint
+                if (!task.isCompleted)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${task.currentProgress}/${task.targetProgress}',
+                        style: const TextStyle(
+                          color: _pureWhite,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        width: 50,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: LinearProgressIndicator(
+                            value: task.progressPercent,
+                            minHeight: 3,
+                            backgroundColor: _ironGrey,
+                            valueColor: const AlwaysStoppedAnimation(
+                              _neonGreen,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Icon(
+                    Icons.chevron_right,
+                    color: _pureWhite.withValues(alpha: 0.2),
+                    size: 18,
                   ),
               ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            reward.name,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: _pureWhite.withValues(alpha: 0.6),
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1680,70 +1933,113 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       children: owners.asMap().entries.map((entry) {
         final index = entry.key;
         final owner = entry.value;
-        // First item gets special styling (future use)
+        final isLast = index == owners.length - 1;
 
-        return Container(
-          margin: EdgeInsets.only(bottom: index < owners.length - 1 ? 0 : 0),
+        return IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Timeline indicator
-              Column(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: owner.isCurrent ? _neonGreen : _ironGrey,
-                      border: Border.all(
+              // ── Timeline rail ─────────────────────────
+              SizedBox(
+                width: 32,
+                child: Column(
+                  children: [
+                    // Node
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
                         color: owner.isCurrent
-                            ? _neonGreen
-                            : _ironGrey.withValues(alpha: 0.5),
-                        width: 2,
+                            ? _neonGreen.withValues(alpha: 0.2)
+                            : _voidBlack,
+                        border: Border.all(
+                          color: owner.isCurrent
+                              ? _neonGreen
+                              : _ironGrey.withValues(alpha: 0.5),
+                          width: owner.isCurrent ? 2.5 : 1.5,
+                        ),
+                        boxShadow: owner.isCurrent
+                            ? [
+                                BoxShadow(
+                                  color: _neonGreen.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                ),
+                              ]
+                            : null,
                       ),
+                      child: owner.isCurrent
+                          ? Center(
+                              child: Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _neonGreen,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                    // Connector line
+                    if (!isLast)
+                      Expanded(
+                        child: Container(
+                          width: 2,
+                          color: _ironGrey.withValues(alpha: 0.25),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // ── Owner card ────────────────────────────
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(bottom: isLast ? 0 : 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: owner.isCurrent
+                        ? _neonGreen.withValues(alpha: 0.04)
+                        : _voidBlack.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: owner.isCurrent
+                          ? _neonGreen.withValues(alpha: 0.2)
+                          : _ironGrey.withValues(alpha: 0.15),
                     ),
                   ),
-                  if (index < owners.length - 1)
-                    Container(
-                      width: 2,
-                      height: 44,
-                      color: _ironGrey.withValues(alpha: 0.3),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              // Owner info
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
-                      // Owner avatar (supports URL when available)
+                      // Avatar
                       OgaAvatarImage(
                         url: owner.avatarUrl,
-                        size: 32,
+                        size: 36,
                         fallbackLetter: owner.username.length > 1
                             ? owner.username[1]
                             : '?',
                         borderColor: owner.isCurrent ? _neonGreen : _ironGrey,
                         borderWidth: owner.isCurrent ? 1.5 : 0,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
+                      // Info
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  owner.username,
-                                  style: TextStyle(
-                                    color: owner.isCurrent
-                                        ? _pureWhite
-                                        : _pureWhite.withValues(alpha: 0.6),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
+                                Flexible(
+                                  child: Text(
+                                    owner.username,
+                                    style: TextStyle(
+                                      color: owner.isCurrent
+                                          ? _pureWhite
+                                          : _pureWhite.withValues(alpha: 0.6),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 if (owner.isCurrent) ...[
@@ -1757,7 +2053,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                                       color: _neonGreen.withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(3),
                                     ),
-                                    child: Text(
+                                    child: const Text(
                                       'CURRENT',
                                       style: TextStyle(
                                         color: _neonGreen,
@@ -1770,15 +2066,30 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                                 ],
                               ],
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              owner.isCurrent
-                                  ? 'Since ${_formatDate(owner.ownedFrom)}'
-                                  : '${_formatDate(owner.ownedFrom)} — ${_formatDate(owner.ownedUntil!)}',
-                              style: TextStyle(
-                                color: _pureWhite.withValues(alpha: 0.3),
-                                fontSize: 10,
-                              ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                // Event icon
+                                Icon(
+                                  owner.isCurrent
+                                      ? Icons.verified
+                                      : Icons.swap_horiz,
+                                  size: 12,
+                                  color: owner.isCurrent
+                                      ? _neonGreen.withValues(alpha: 0.5)
+                                      : _pureWhite.withValues(alpha: 0.25),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  owner.isCurrent
+                                      ? 'Acquired ${_formatDate(owner.ownedFrom)}'
+                                      : '${_formatDate(owner.ownedFrom)} — ${_formatDate(owner.ownedUntil!)}',
+                                  style: TextStyle(
+                                    color: _pureWhite.withValues(alpha: 0.3),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -1806,62 +2117,133 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
         itemCount: ch.gameplayMedia.length,
         itemBuilder: (context, index) {
           final media = ch.gameplayMedia[index];
-          return Container(
-            width: 240,
-            margin: EdgeInsets.only(
-              right: index < ch.gameplayMedia.length - 1 ? 12 : 0,
-            ),
-            decoration: BoxDecoration(
-              color: _voidBlack,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _ironGrey.withValues(alpha: 0.3)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Screenshot image
-                Expanded(
-                  child: OgaImage(
-                    path: media.imageUrl,
-                    fit: BoxFit.cover,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(11),
+          return GestureDetector(
+            onTap: () => _openLightbox(context, index),
+            child: Container(
+              width: 240,
+              margin: EdgeInsets.only(
+                right: index < ch.gameplayMedia.length - 1 ? 12 : 0,
+              ),
+              decoration: BoxDecoration(
+                color: _voidBlack,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _ironGrey.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Screenshot image with play/zoom hint
+                  Expanded(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        OgaImage(
+                          path: media.imageUrl,
+                          fit: BoxFit.cover,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(11),
+                          ),
+                          accentColor: _neonGreen,
+                          fallbackIcon: Icons.image,
+                          fallbackIconSize: 40,
+                        ),
+                        // Zoom hint overlay
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: _voidBlack.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Icon(
+                              Icons.fullscreen,
+                              color: _pureWhite.withValues(alpha: 0.7),
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                        // Image counter badge
+                        Positioned(
+                          bottom: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _voidBlack.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '${index + 1}/${ch.gameplayMedia.length}',
+                              style: TextStyle(
+                                color: _pureWhite.withValues(alpha: 0.7),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    accentColor: _neonGreen,
-                    fallbackIcon: Icons.image,
-                    fallbackIconSize: 40,
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        media.gameName.toUpperCase(),
-                        style: TextStyle(
-                          color: _neonGreen,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          media.gameName.toUpperCase(),
+                          style: TextStyle(
+                            color: _neonGreen,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        media.caption,
-                        style: TextStyle(
-                          color: _pureWhite.withValues(alpha: 0.6),
-                          fontSize: 11,
+                        const SizedBox(height: 2),
+                        Text(
+                          media.caption,
+                          style: TextStyle(
+                            color: _pureWhite.withValues(alpha: 0.6),
+                            fontSize: 11,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
+        },
+      ),
+    );
+  }
+
+  /// Opens a full-screen lightbox overlay with PageView swipe navigation.
+  void _openLightbox(BuildContext context, int initialIndex) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: _voidBlack.withValues(alpha: 0.95),
+        barrierDismissible: true,
+        transitionDuration: const Duration(milliseconds: 250),
+        reverseTransitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return _GameplayLightbox(
+            media: ch.gameplayMedia,
+            initialIndex: initialIndex,
+            animation: animation,
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
         },
       ),
     );
@@ -1979,5 +2361,194 @@ class AnimatedBuilder extends AnimatedWidget {
   @override
   Widget build(BuildContext context) {
     return builder(context, child);
+  }
+}
+
+class _GameplayLightbox extends StatefulWidget {
+  final List<GameplayMedia> media;
+  final int initialIndex;
+  final Animation<double> animation;
+
+  const _GameplayLightbox({
+    required this.media,
+    required this.initialIndex,
+    required this.animation,
+  });
+
+  @override
+  State<_GameplayLightbox> createState() => _GameplayLightboxState();
+}
+
+class _GameplayLightboxState extends State<_GameplayLightbox> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  static const Color _voidBlack = Color(0xFF000000);
+  static const Color _deepCharcoal = Color(0xFF121212);
+  static const Color _neonGreen = Color(0xFF39FF14);
+  static const Color _ironGrey = Color(0xFF2C2C2C);
+  static const Color _pureWhite = Color(0xFFFFFFFF);
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = widget.media;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ── Swipeable image pages ─────────────────────
+          PageView.builder(
+            controller: _pageController,
+            itemCount: media.length,
+            onPageChanged: (index) {
+              setState(() => _currentIndex = index);
+            },
+            itemBuilder: (context, index) {
+              final item = media[index];
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: InteractiveViewer(
+                    minScale: 1.0,
+                    maxScale: 3.0,
+                    child: OgaImage(
+                      path: item.imageUrl,
+                      fit: BoxFit.contain,
+                      accentColor: _neonGreen,
+                      fallbackIcon: Icons.image,
+                      fallbackIconSize: 64,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // ── Top bar: close + counter ──────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 16,
+            right: 16,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Close button
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _deepCharcoal.withValues(alpha: 0.8),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _ironGrey.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: const Icon(Icons.close, color: _pureWhite, size: 20),
+                  ),
+                ),
+                // Image counter
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _deepCharcoal.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _ironGrey.withValues(alpha: 0.4)),
+                  ),
+                  child: Text(
+                    '${_currentIndex + 1} OF ${media.length}',
+                    style: const TextStyle(
+                      color: _pureWhite,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Bottom caption bar ────────────────────────
+          Positioned(
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _deepCharcoal.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _ironGrey.withValues(alpha: 0.4)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    media[_currentIndex].gameName.toUpperCase(),
+                    style: const TextStyle(
+                      color: _neonGreen,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    media[_currentIndex].caption,
+                    style: TextStyle(
+                      color: _pureWhite.withValues(alpha: 0.8),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  // Page dots
+                  if (media.length > 1) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(media.length, (i) {
+                        final isActive = i == _currentIndex;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          width: isActive ? 20 : 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? _neonGreen
+                                : _ironGrey.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
