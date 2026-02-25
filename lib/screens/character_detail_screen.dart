@@ -2563,7 +2563,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     }
 
     final shareUrl =
-        'https://oga.oneearthrising.com/#/invite/$_userInviteCode/${ch.id}';
+        'https://oga.oneearthrising.com/invite/$_userInviteCode/${ch.id}';
 
     await Clipboard.setData(ClipboardData(text: shareUrl));
 

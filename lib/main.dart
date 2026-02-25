@@ -284,16 +284,33 @@ class _OgaAppState extends State<OgaApp> {
       // Must run first — otherwise auth/session checks redirect
       // to dashboard or landing page, ignoring the invite URL.
       // ═══════════════════════════════════════════════════════
+      // Check for invite link in fragment (hash routing: /#/invite/...)
       final fragment = uri.fragment; // e.g. "/invite/OGA-83E9/ryu"
       if (fragment.startsWith('/invite/')) {
         final fragmentUri = Uri.parse(fragment);
-        final segments =
-            fragmentUri.pathSegments; // ['invite', 'OGA-83E9', 'ryu']
+        final segments = fragmentUri.pathSegments;
         if (segments.length >= 2) {
           final invCode = segments[1];
           final characterId = segments.length >= 3 ? segments[2] : null;
           debugPrint(
-            '🎟️ Invite link detected: code=$invCode, character=$characterId',
+            '🎟️ Invite link detected (hash): code=$invCode, character=$characterId',
+          );
+          return InviteLandingScreen(
+            inviteCode: invCode,
+            characterId: characterId,
+          );
+        }
+      }
+
+      // Check for invite link in path (non-hash routing: /invite/...)
+      // Used by OG share URLs so social crawlers can read the path
+      if (uri.path.startsWith('/invite/')) {
+        final segments = uri.pathSegments; // ['invite', 'OGA-83E9', 'ryu']
+        if (segments.length >= 2) {
+          final invCode = segments[1];
+          final characterId = segments.length >= 3 ? segments[2] : null;
+          debugPrint(
+            '🎟️ Invite link detected (path): code=$invCode, character=$characterId',
           );
           return InviteLandingScreen(
             inviteCode: invCode,

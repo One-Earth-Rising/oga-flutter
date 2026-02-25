@@ -43,7 +43,7 @@ const CHARACTERS = {
     description: 'A disciplined martial artist seeking true strength. Master of Ansatsuken with powerful strikes and precise technique.',
     ip: 'Street Fighter',
     rarity: 'Legendary',
-    image: '/assets/heroes/ryu_hero.png',
+    image: 'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/ryu.png',
   },
   vegeta: {
     name: 'Vegeta',
@@ -51,7 +51,7 @@ const CHARACTERS = {
     description: 'The Prince of all Saiyans. Royal pride with devastating power, constantly pushing beyond his limits.',
     ip: 'Dragon Ball Z',
     rarity: 'Legendary',
-    image: '/assets/heroes/vegeta_hero.png',
+    image: 'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/vegeta.png',
   },
   guggimon: {
     name: 'Guggimon',
@@ -59,7 +59,7 @@ const CHARACTERS = {
     description: 'A fashion-obsessed horror bunny from the metaverse. Iconic, unpredictable, and always dripping in style.',
     ip: 'Superplastic',
     rarity: 'Epic',
-    image: '/assets/heroes/guggimon_hero.png',
+    image: 'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/guggimon.png',
   },
 };
 
@@ -68,7 +68,7 @@ const BRAND = {
   siteName: 'OGA — Ownable Game Assets',
   defaultTitle: 'Join OGA — One Character. Infinite Worlds.',
   defaultDescription: 'Collect, trade, and play with unique heroes across multiple games. Your characters persist forever.',
-  defaultImage: '/assets/og-default.png',  // Fallback OG image
+  defaultImage: 'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-filles/og-default.mp4',  // Fallback OG image
   themeColor: '#39FF14',
   baseUrl: 'https://oga.oneearthrising.com',
 };

@@ -501,14 +501,14 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
           onTap: () => _openGuestDetail(ch, owned),
           child: _buildGuestCard(ch, owned),
         );
-      }, childCount: chars.length * 2),
+      }, childCount: chars.length),
     );
   }
 
   Widget _buildCharacterList() {
     final chars = OGACharacter.allCharacters;
     final ownedId = _inviter?.starterCharacter;
-    final allChars = [...chars, ...chars];
+    final allChars = chars;
 
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
