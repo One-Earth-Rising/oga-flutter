@@ -107,8 +107,6 @@ function buildOgHtml({ title, description, image, url, characterName }) {
   <!-- Theme -->
   <meta name="theme-color" content="${BRAND.themeColor}">
 
-  <!-- Redirect real browsers that somehow got here -->
-  <meta http-equiv="refresh" content="0;url=${url}">
 </head>
 <body style="background:#000;color:#fff;font-family:Helvetica,Arial,sans-serif;text-align:center;padding:40px;">
   <h1 style="color:#39FF14;">${characterName ? `Check out ${characterName}` : 'You\'ve been invited to OGA'}</h1>
@@ -149,7 +147,7 @@ export default async function handler(request, context) {
       title: `${character.name} — ${character.title} | OGA`,
       description: `${character.description} View ${character.name} in the OGA Multigameverse and see them across ${character.ip} and more.`,
       image: character.image,
-      url: `${BRAND.baseUrl}/#/invite/${inviteCode}/${characterId}`,
+      url: `${BRAND.baseUrl}/invite/${inviteCode}/${characterId}`,
       characterName: character.name,
     };
   } else {
@@ -158,7 +156,7 @@ export default async function handler(request, context) {
       title: BRAND.defaultTitle,
       description: BRAND.defaultDescription,
       image: BRAND.defaultImage,
-      url: `${BRAND.baseUrl}/#/invite/${inviteCode}`,
+      url: `${BRAND.baseUrl}/invite/${inviteCode}`,
       characterName: null,
     };
   }
