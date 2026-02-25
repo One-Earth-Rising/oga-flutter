@@ -1044,23 +1044,6 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ─── DETAIL NAVIGATION ────────────────────────────────────
 
   void _openDetail(OGACharacter ch) {
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 300),
-        pageBuilder: (_, anim, secondAnim) =>
-            CharacterDetailScreen(character: ch, isOwned: ch.isOwned),
-        transitionsBuilder: (_, anim, secondAnim, child) => FadeTransition(
-          opacity: anim,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.05),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
-            child: child,
-          ),
-        ),
-      ),
-    );
+    Navigator.pushNamed(context, '/character/${ch.id}');
   }
 }
