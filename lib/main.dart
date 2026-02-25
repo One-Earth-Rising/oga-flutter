@@ -285,7 +285,8 @@ class _OgaAppState extends State<OgaApp> {
       // to dashboard or landing page, ignoring the invite URL.
       // ═══════════════════════════════════════════════════════
       final fragment = uri.fragment; // e.g. "/invite/OGA-83E9/ryu"
-      if (fragment.startsWith('/invite/')) {
+      if (fragment.startsWith('/invite/') &&
+          Supabase.instance.client.auth.currentUser == null) {
         final fragmentUri = Uri.parse(fragment);
         final segments =
             fragmentUri.pathSegments; // ['invite', 'OGA-83E9', 'ryu']

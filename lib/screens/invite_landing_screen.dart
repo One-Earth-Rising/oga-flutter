@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/oga_character.dart';
 import '../services/friend_service.dart';
-import 'invite_character_detail.dart';
+import 'character_detail_screen.dart';
 import 'invite_signup_screen.dart';
 
 /// Public invite landing page — no auth required.
@@ -888,12 +888,8 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => InviteCharacterDetail(
-          character: ch,
-          isOwnedByInviter: owned,
-          inviter: _inviter!,
-          onSignUp: _navigateToSignUp,
-        ),
+        builder: (_) =>
+            CharacterDetailScreen(character: ch, isOwned: owned, isGuest: true),
       ),
     );
   }
