@@ -161,11 +161,17 @@ class _OgaAppState extends State<OgaApp> {
         // INVITE ROUTES
         // ═══════════════════════════════════════════════════════
 
-        // /#/invite/OGA-XXXX
+        // /#/invite/OGA-XXXX or /#/invite/OGA-XXXX/ryu
         if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'invite') {
           final inviteCode = uri.pathSegments[1];
+          final characterId = uri.pathSegments.length >= 3
+              ? uri.pathSegments[2]
+              : null;
           return MaterialPageRoute(
-            builder: (_) => InviteLandingScreen(inviteCode: inviteCode),
+            builder: (_) => InviteLandingScreen(
+              inviteCode: inviteCode,
+              characterId: characterId,
+            ),
           );
         }
 

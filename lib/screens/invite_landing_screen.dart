@@ -9,8 +9,12 @@ import 'invite_signup_screen.dart';
 /// Route: /#/invite/<INVITE_CODE>
 class InviteLandingScreen extends StatefulWidget {
   final String inviteCode;
-
-  const InviteLandingScreen({super.key, required this.inviteCode});
+  final String? characterId;
+  const InviteLandingScreen({
+    super.key,
+    required this.inviteCode,
+    this.characterId,
+  });
 
   @override
   State<InviteLandingScreen> createState() => _InviteLandingScreenState();
@@ -41,6 +45,26 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
       _notFound = profile == null;
       _isLoading = false;
     });
+    // Auto-open specific character if characterId was in the URL
+    if (profile != null && widget.characterId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _autoOpenCharacter(widget.characterId!);
+      });
+    }
+  }
+
+  /// Auto-navigates to a specific character's detail screen (guest mode).
+  /// Triggered when URL includes character ID: /#/invite/OGA-XXXX/ryu
+  void _autoOpenCharacter(String characterId) {
+    try {
+      final ch = OGACharacter.fromId(characterId);
+      final ownedId = _inviter?.starterCharacter;
+      final owned = ch.id == ownedId;
+      _openGuestDetail(ch, owned);
+    } catch (e) {
+      debugPrint('⚠️ Character not found: $characterId');
+      // Stay on library view — character ID was invalid
+    }
   }
 
   @override

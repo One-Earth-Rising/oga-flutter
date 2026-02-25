@@ -19,6 +19,8 @@
 import 'package:flutter/material.dart';
 import '../models/oga_character.dart';
 import '../widgets/oga_image.dart';
+import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -30,11 +32,12 @@ const Color _pureWhite = Color(0xFFFFFFFF);
 class CharacterDetailScreen extends StatefulWidget {
   final OGACharacter character;
   final bool isOwned;
-
+  final bool isGuest;
   const CharacterDetailScreen({
     super.key,
     required this.character,
     this.isOwned = false,
+    this.isGuest = false,
   });
 
   @override
@@ -51,6 +54,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
   OGACharacter get ch => widget.character;
   bool get owned => widget.isOwned;
+  bool get isGuest => widget.isGuest;
+  // Cached invite code for share URL generation
+  String? _userInviteCode;
+  bool _isFetchingInviteCode = false;
 
   @override
   void initState() {
@@ -127,6 +134,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           pinned: true,
           backgroundColor: _voidBlack,
           leading: _buildBackButton(),
+          actions: [
+            if (!isGuest)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _buildShareButton(),
+              ),
+          ],
           flexibleSpace: FlexibleSpaceBar(
             background: _buildHeroSection(isDesktop: false),
           ),
@@ -456,7 +470,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             children: [
               _buildBackButton(),
               const Spacer(),
-              if (owned) _buildShareButton(),
+              if (!isGuest) _buildShareButton(),
             ],
           ),
         ),
@@ -2389,9 +2403,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
   Widget _buildShareButton() {
     return IconButton(
-      onPressed: () {
-        // TODO: Share this character
-      },
+      onPressed: _shareCharacter,
       icon: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -2402,6 +2414,100 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
         child: const Icon(Icons.share, color: _pureWhite, size: 18),
       ),
     );
+  }
+
+  // Fetches user's invite code (cached) and copies character share URL to clipboard.
+  Future<void> _shareCharacter() async {
+    // Fetch invite code if not cached
+    if (_userInviteCode == null && !_isFetchingInviteCode) {
+      _isFetchingInviteCode = true;
+      try {
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user != null) {
+          final response = await Supabase.instance.client
+              .from('profiles')
+              .select('invite_code')
+              .eq('email', user.email!)
+              .maybeSingle();
+          _userInviteCode = response?['invite_code'] as String?;
+          debugPrint('🔗 Fetched invite code: $_userInviteCode');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error fetching invite code: $e');
+      } finally {
+        _isFetchingInviteCode = false;
+      }
+    }
+
+    if (_userInviteCode == null || _userInviteCode!.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: _deepCharcoal,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: _ironGrey),
+            ),
+            content: const Text(
+              'Unable to generate share link. Try again.',
+              style: TextStyle(color: _pureWhite),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    final shareUrl =
+        'https://oga.oneearthrising.com/#/invite/$_userInviteCode/${ch.id}';
+
+    await Clipboard.setData(ClipboardData(text: shareUrl));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: _deepCharcoal,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: _neonGreen.withValues(alpha: 0.3)),
+          ),
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: _neonGreen, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'LINK COPIED!',
+                      style: TextStyle(
+                        color: _neonGreen,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Share ${ch.name} with friends',
+                      style: TextStyle(
+                        color: _pureWhite.withValues(alpha: 0.6),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildBadge(String text, Color color) {
