@@ -1,6 +1,6 @@
 [build]
-  command = "rm -rf flutter-sdk && git clone https://github.com/flutter/flutter.git --depth 1 -b stable flutter-sdk && export PATH=$PWD/flutter-sdk/bin:$PATH && flutter --version && flutter config --no-analytics && flutter pub get && flutter build web --release"
   publish = "build/web"
+  command = "flutter build web"
 
 [build.environment]
   FLUTTER_SKIP_ANALYTICS = "true"
