@@ -33,11 +33,13 @@ class CharacterDetailScreen extends StatefulWidget {
   final OGACharacter character;
   final bool isOwned;
   final bool isGuest;
+  final String? inviterName;
   const CharacterDetailScreen({
     super.key,
     required this.character,
     this.isOwned = false,
     this.isGuest = false,
+    this.inviterName,
   });
 
   @override
@@ -485,6 +487,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── VIEWING INVITER'S CHARACTER BANNER ─────────
+          if (widget.inviterName != null) _buildInviterBanner(),
+
           // ── CHARACTER LOCKED CTA (unowned) ──────────────
           if (!owned) _buildLockedCTA(),
 
@@ -661,7 +666,105 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       ),
     );
   }
+  // ═══════════════════════════════════════════════════════════
+  // INVITER CONTEXT BANNER
+  // ═══════════════════════════════════════════════════════════
 
+  Widget _buildInviterBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: _deepCharcoal,
+        border: Border.all(color: _ironGrey, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _neonGreen.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.person_outline, color: _neonGreen, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'VIEWING ${widget.inviterName!.toUpperCase()}\'S CHARACTER',
+                      style: const TextStyle(
+                        color: _pureWhite,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Want this character? Request a trade.',
+                      style: TextStyle(
+                        color: _pureWhite.withValues(alpha: 0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // TODO: Open trade request flow
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: _deepCharcoal,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(
+                        color: _neonGreen.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    content: const Text(
+                      'Trading coming soon! Stay tuned.',
+                      style: TextStyle(color: _pureWhite),
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.swap_horiz, size: 18),
+              label: const Text(
+                'REQUEST TRADE',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1,
+                  fontSize: 13,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _neonGreen,
+                foregroundColor: _voidBlack,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   // ═══════════════════════════════════════════════════════════
   // SECTION CARD WRAPPER
   // ═══════════════════════════════════════════════════════════

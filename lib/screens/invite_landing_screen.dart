@@ -3,6 +3,7 @@ import '../models/oga_character.dart';
 import '../services/friend_service.dart';
 import 'character_detail_screen.dart';
 import 'invite_signup_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Public invite landing page — no auth required.
 /// Loads inviter's profile and shows their library in a guest-friendly view.
@@ -885,11 +886,16 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
   // ═══════════════════════════════════════════════════════════
 
   void _openGuestDetail(OGACharacter ch, bool owned) {
+    final isAuthenticated = Supabase.instance.client.auth.currentUser != null;
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            CharacterDetailScreen(character: ch, isOwned: owned, isGuest: true),
+        builder: (_) => CharacterDetailScreen(
+          character: ch,
+          isOwned: owned,
+          isGuest: !isAuthenticated,
+          inviterName: _inviter?.displayName,
+        ),
       ),
     );
   }
