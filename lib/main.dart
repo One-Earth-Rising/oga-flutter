@@ -278,6 +278,32 @@ class _OgaAppState extends State<OgaApp> {
     try {
       final uri = Uri.base;
 
+      // ═══════════════════════════════════════════════════════
+      // INVITE LINK DETECTION (before auth checks)
+      // Catches: /#/invite/OGA-XXXX or /#/invite/OGA-XXXX/ryu
+      // Must run first — otherwise auth/session checks redirect
+      // to dashboard or landing page, ignoring the invite URL.
+      // ═══════════════════════════════════════════════════════
+      final fragment = uri.fragment; // e.g. "/invite/OGA-83E9/ryu"
+      if (fragment.startsWith('/invite/')) {
+        final fragmentUri = Uri.parse(fragment);
+        final segments =
+            fragmentUri.pathSegments; // ['invite', 'OGA-83E9', 'ryu']
+        if (segments.length >= 2) {
+          final invCode = segments[1];
+          final characterId = segments.length >= 3 ? segments[2] : null;
+          debugPrint(
+            '🎟️ Invite link detected: code=$invCode, character=$characterId',
+          );
+          return InviteLandingScreen(
+            inviteCode: invCode,
+            characterId: characterId,
+          );
+        }
+      }
+
+      // Check if this is an auth callback (has access_token or code)
+
       // Check if this is an auth callback (has access_token or code)
       if (uri.fragment.contains('access_token') ||
           uri.queryParameters.containsKey('code')) {
