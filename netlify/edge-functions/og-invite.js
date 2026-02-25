@@ -68,7 +68,7 @@ const BRAND = {
   siteName: 'OGA — Ownable Game Assets',
   defaultTitle: 'Join OGA — One Character. Infinite Worlds.',
   defaultDescription: 'Collect, trade, and play with unique heroes across multiple games. Your characters persist forever.',
-  defaultImage: 'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-filles/og-default.mp4',  // Fallback OG image
+  defaultImage: 'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-filles/og-link.png',  // Fallback OG image
   themeColor: '#39FF14',
   baseUrl: 'https://oga.oneearthrising.com',
 };
