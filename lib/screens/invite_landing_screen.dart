@@ -4,6 +4,7 @@ import '../services/friend_service.dart';
 import 'character_detail_screen.dart';
 import 'invite_signup_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/oga_image.dart';
 
 /// Public invite landing page — no auth required.
 /// Loads inviter's profile and shows their library in a guest-friendly view.
@@ -32,6 +33,8 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
   bool _isLoading = true;
   bool _notFound = false;
   bool _isGridView = true;
+  bool get _isAuthenticated =>
+      Supabase.instance.client.auth.currentUser != null;
 
   @override
   void initState() {
@@ -89,8 +92,9 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
               SliverToBoxAdapter(child: _buildTopBar()),
               // Hero
               SliverToBoxAdapter(child: _buildHero()),
-              // Invite banner
-              SliverToBoxAdapter(child: _buildInviteBanner()),
+              // Invite banner (guests only)
+              if (!_isAuthenticated)
+                SliverToBoxAdapter(child: _buildInviteBanner()),
               // Library header
               SliverToBoxAdapter(child: _buildLibraryHeader()),
               // Character grid/list
@@ -104,8 +108,9 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
               const SliverToBoxAdapter(child: SizedBox(height: 120)),
             ],
           ),
-          // Fixed bottom CTA
-          Positioned(left: 0, right: 0, bottom: 0, child: _buildBottomCTA()),
+          // Fixed bottom CTA (guests only)
+          if (!_isAuthenticated)
+            Positioned(left: 0, right: 0, bottom: 0, child: _buildBottomCTA()),
         ],
       ),
     );
@@ -141,17 +146,21 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
             ),
           ),
           const Spacer(),
-          // Sign up button
+          // Sign up / back button
           GestureDetector(
-            onTap: _navigateToSignUp,
+            onTap: _isAuthenticated
+                ? () => Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil('/dashboard', (route) => false)
+                : _navigateToSignUp,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: neonGreen,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text(
-                'SIGN UP FREE',
+              child: Text(
+                _isAuthenticated ? 'MY LIBRARY' : 'SIGN UP FREE',
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: 11,
@@ -222,13 +231,15 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.mail_outline,
+                      _isAuthenticated ? Icons.visibility : Icons.mail_outline,
                       color: neonGreen.withValues(alpha: 0.8),
                       size: 13,
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'YOU\'VE BEEN INVITED',
+                      _isAuthenticated
+                          ? 'VIEWING LIBRARY'
+                          : 'YOU\'VE BEEN INVITED',
                       style: TextStyle(
                         color: neonGreen.withValues(alpha: 0.9),
                         fontSize: 10,
@@ -294,17 +305,14 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
 
   Widget _buildFallbackAvatar(InviterProfile inviter) {
     final char = OGACharacter.fromId(inviter.starterCharacter);
-    return Image.asset(
-      char.imagePath,
-      height: 60,
+    return OgaImage(
+      path: char.heroImage,
       width: 60,
+      height: 60,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        height: 60,
-        width: 60,
-        color: deepCharcoal,
-        child: const Icon(Icons.person, color: Colors.white38, size: 28),
-      ),
+      accentColor: neonGreen,
+      fallbackIcon: Icons.person,
+      fallbackIconSize: 28,
     );
   }
 
@@ -526,17 +534,14 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    ch.imagePath,
+                  child: OgaImage(
+                    path: ch.heroImage,
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 56,
-                      height: 56,
-                      color: ch.cardColor,
-                      child: const Icon(Icons.person, color: Colors.white24),
-                    ),
+                    accentColor: ch.glowColor,
+                    fallbackIcon: Icons.person,
+                    fallbackIconSize: 24,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -633,17 +638,12 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
           fit: StackFit.expand,
           children: [
             // Character image
-            Image.asset(
-              ch.imagePath,
+            OgaImage(
+              path: ch.heroImage,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                color: ch.cardColor,
-                child: const Icon(
-                  Icons.person,
-                  color: Colors.white24,
-                  size: 40,
-                ),
-              ),
+              accentColor: ch.glowColor,
+              fallbackIcon: Icons.person,
+              fallbackIconSize: 40,
             ),
             // Gradient overlay
             Container(
