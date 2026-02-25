@@ -1,6 +1,6 @@
 [build]
+  command = "rm -rf flutter-sdk && git clone https://github.com/flutter/flutter.git --depth 1 -b stable flutter-sdk && export PATH=$PWD/flutter-sdk/bin:$PATH && flutter --version && flutter config --no-analytics && flutter pub get && flutter build web --release"
   publish = "build/web"
-  command = "flutter build web"
 
 [build.environment]
   FLUTTER_SKIP_ANALYTICS = "true"
@@ -44,17 +44,7 @@
 [context.deploy-preview]
   environment = { ENVIRONMENT = "development" }
 
-  # ═══════════════════════════════════════════════════════════════════
-# netlify.toml — OGA Web Showcase
-# ═══════════════════════════════════════════════════════════════════
-# Edge function intercepts crawlers for dynamic OG tags.
-# Real users pass through to _redirects → index.html → Flutter SPA.
-
-[build]
-  publish = "build/web"
-  command = "flutter build web"
-
-# Edge function: serve OG meta tags to social crawlers
+ # Edge function: serve OG meta tags to social crawlers
 [[edge_functions]]
   path = "/invite/*"
   function = "og-invite"
