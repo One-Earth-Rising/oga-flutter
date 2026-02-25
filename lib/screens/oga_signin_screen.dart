@@ -4,7 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Main OGA Sign-In Screen (for returning users)
 /// Sends magic link and redirects to confirm screen
 class OGASignInScreen extends StatefulWidget {
-  const OGASignInScreen({super.key});
+  final String? errorMessage;
+  const OGASignInScreen({super.key, this.errorMessage});
 
   @override
   State<OGASignInScreen> createState() => _OGASignInScreenState();
@@ -15,6 +16,12 @@ class _OGASignInScreenState extends State<OGASignInScreen> {
   final supabase = Supabase.instance.client;
   bool _isLoading = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _errorMessage = widget.errorMessage;
+  }
 
   @override
   void dispose() {

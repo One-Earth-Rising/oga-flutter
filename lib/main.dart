@@ -473,6 +473,12 @@ class _OgaAppState extends State<OgaApp> {
           }
         } else {
           debugPrint('❌ Auth timeout - no user after 5 seconds');
+          // PKCE exchange failed — don't dump user on chatbot.
+          // Route to sign-in so they can request a fresh magic link.
+          return const OGASignInScreen(
+            errorMessage:
+                'Your sign-in link expired or was opened in a different browser. Please request a new one.',
+          );
         }
       }
       // ═══════════════════════════════════════════════════════════
