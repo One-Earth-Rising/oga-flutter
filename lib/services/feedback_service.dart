@@ -1,11 +1,54 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for submitting and retrieving user feedback.
+/// Handles screenshot uploads to Supabase Storage.
 class FeedbackService {
   static final _supabase = Supabase.instance.client;
 
   static String? get _currentEmail => _supabase.auth.currentUser?.email;
+
+  /// Upload a screenshot PNG to Supabase Storage.
+  /// Returns the public URL on success, null on failure.
+  ///
+  /// Screenshots are stored in the `feedback-screenshots` bucket
+  /// with path: `<user_email>/<timestamp>.png`
+  /// File is uploaded as public so the URL can be viewed by admins
+  /// reviewing feedback in the Supabase dashboard.
+  static Future<String?> uploadScreenshot(Uint8List bytes) async {
+    final email = _currentEmail;
+    if (email == null) return null;
+
+    try {
+      // Sanitize email for path (replace @ and . with -)
+      final safeEmail = email.replaceAll('@', '-at-').replaceAll('.', '-');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final path = '$safeEmail/$timestamp.png';
+
+      await _supabase.storage
+          .from('feedback-screenshots')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/png',
+              upsert: false,
+            ),
+          );
+
+      // Get the public URL for the uploaded screenshot
+      final publicUrl = _supabase.storage
+          .from('feedback-screenshots')
+          .getPublicUrl(path);
+
+      debugPrint('📸 Screenshot uploaded: $path (${bytes.length} bytes)');
+      return publicUrl;
+    } catch (e) {
+      debugPrint('❌ Screenshot upload error: $e');
+      return null;
+    }
+  }
 
   /// Submit feedback to Supabase.
   /// Returns true on success, false on failure.
@@ -65,6 +108,7 @@ class FeedbackEntry {
   final String category;
   final String message;
   final String? pageContext;
+  final String? screenshotUrl;
   final String status;
   final DateTime createdAt;
 
@@ -73,6 +117,7 @@ class FeedbackEntry {
     required this.category,
     required this.message,
     this.pageContext,
+    this.screenshotUrl,
     required this.status,
     required this.createdAt,
   });
@@ -83,6 +128,7 @@ class FeedbackEntry {
       category: map['category'] as String? ?? 'other',
       message: map['message'] as String? ?? '',
       pageContext: map['page_context'] as String?,
+      screenshotUrl: map['screenshot_url'] as String?,
       status: map['status'] as String? ?? 'new',
       createdAt:
           DateTime.tryParse(map['created_at']?.toString() ?? '') ??
@@ -103,6 +149,9 @@ class FeedbackEntry {
         return '📝 Other';
     }
   }
+
+  /// Whether this feedback has an attached screenshot
+  bool get hasScreenshot => screenshotUrl != null && screenshotUrl!.isNotEmpty;
 
   /// Status color
   Color get statusColor {

@@ -1,21 +1,48 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import '../services/feedback_service.dart';
 import '../services/analytics_service.dart';
 
-/// Beta feedback form modal.
+/// Beta feedback form modal with auto-screenshot capture.
 /// Accessible from: settings sidebar, dashboard FAB, avatar dropdown.
 /// Stores to Supabase feedback table.
+///
+/// Screenshot behavior:
+///   When the modal is invoked, it captures the current screen BEFORE
+///   the dialog/sheet opens, so the screenshot shows the actual context
+///   the user was viewing. The image is uploaded to Supabase Storage
+///   on submit and the URL is attached to the feedback row.
 class FeedbackModal extends StatefulWidget {
-  final String? pageContext; // Which screen the user is on
+  final String? pageContext;
+  final Uint8List? screenshotBytes; // Pre-captured screenshot
 
-  const FeedbackModal({super.key, this.pageContext});
+  const FeedbackModal({super.key, this.pageContext, this.screenshotBytes});
 
-  /// Show the feedback modal.
-  static Future<void> show(BuildContext context, {String? pageContext}) {
+  /// Show the feedback modal with auto-screenshot.
+  ///
+  /// Captures the screen first, then opens the modal.
+  /// If capture fails, the modal opens without a screenshot (non-blocking).
+  static Future<void> show(BuildContext context, {String? pageContext}) async {
+    // ── Step 1: Capture screenshot BEFORE modal opens ──
+    Uint8List? screenshotBytes;
+    try {
+      screenshotBytes = await _captureScreen(context);
+      if (screenshotBytes != null) {
+        debugPrint('📸 Screenshot captured: ${screenshotBytes.length} bytes');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Screenshot capture failed (non-blocking): $e');
+    }
+
+    if (!context.mounted) return;
+
+    // ── Step 2: Show modal with captured bytes ──
     final isMobile = MediaQuery.of(context).size.width < 900;
 
     if (isMobile) {
-      return showModalBottomSheet(
+      await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
@@ -28,22 +55,62 @@ class FeedbackModal extends StatefulWidget {
               color: Color(0xFF1A1A1A),
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
-            child: FeedbackModal(pageContext: pageContext),
+            child: FeedbackModal(
+              pageContext: pageContext,
+              screenshotBytes: screenshotBytes,
+            ),
           ),
         ),
       );
+      return;
     }
 
-    return showDialog(
+    await showDialog(
       context: context,
       barrierColor: Colors.black54,
       builder: (_) => Center(
         child: Material(
           color: Colors.transparent,
-          child: FeedbackModal(pageContext: pageContext),
+          child: FeedbackModal(
+            pageContext: pageContext,
+            screenshotBytes: screenshotBytes,
+          ),
         ),
       ),
     );
+  }
+
+  /// Capture the current screen by walking up to the nearest RepaintBoundary.
+  /// Works on Flutter web (CanvasKit renderer) and mobile.
+  /// Returns null on failure — never blocks the feedback flow.
+  static Future<Uint8List?> _captureScreen(BuildContext context) async {
+    try {
+      // Walk up the element tree to find RepaintBoundary render objects.
+      // The Navigator creates RepaintBoundaries for each route, so we
+      // keep walking to get the outermost (full-screen) boundary.
+      RenderRepaintBoundary? boundary;
+      context.visitAncestorElements((element) {
+        final ro = element.renderObject;
+        if (ro is RenderRepaintBoundary) {
+          boundary = ro;
+          // Keep visiting to find the outermost boundary
+        }
+        return true;
+      });
+
+      if (boundary == null) {
+        debugPrint('⚠️ No RepaintBoundary found in ancestor tree');
+        return null;
+      }
+
+      // Capture at 1x pixel ratio to keep file size reasonable (~100-300KB)
+      final image = await boundary!.toImage(pixelRatio: 1.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('⚠️ Screen capture error: $e');
+      return null;
+    }
   }
 
   @override
@@ -60,6 +127,7 @@ class _FeedbackModalState extends State<FeedbackModal> {
   String _category = 'bug';
   bool _isSubmitting = false;
   bool _isSubmitted = false;
+  bool _includeScreenshot = true; // User can opt out
 
   final _categories = [
     {'id': 'bug', 'label': 'BUG REPORT', 'icon': Icons.bug_report_outlined},
@@ -67,6 +135,8 @@ class _FeedbackModalState extends State<FeedbackModal> {
     {'id': 'ux', 'label': 'UX / DESIGN', 'icon': Icons.brush_outlined},
     {'id': 'other', 'label': 'OTHER', 'icon': Icons.chat_bubble_outline},
   ];
+
+  bool get _hasScreenshot => widget.screenshotBytes != null;
 
   @override
   void dispose() {
@@ -84,7 +154,7 @@ class _FeedbackModalState extends State<FeedbackModal> {
 
     return Container(
       width: 480,
-      constraints: const BoxConstraints(maxHeight: 560),
+      constraints: const BoxConstraints(maxHeight: 620),
       decoration: BoxDecoration(
         color: surfaceCard,
         borderRadius: BorderRadius.circular(16),
@@ -242,7 +312,11 @@ class _FeedbackModalState extends State<FeedbackModal> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // ── Screenshot toggle ────────────────────────────
+          if (_hasScreenshot) _buildScreenshotToggle(),
+          if (_hasScreenshot) const SizedBox(height: 16),
 
           // Submit button
           GestureDetector(
@@ -273,6 +347,93 @@ class _FeedbackModalState extends State<FeedbackModal> {
                           letterSpacing: 0.5,
                         ),
                       ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Screenshot preview thumbnail + toggle to include/exclude.
+  Widget _buildScreenshotToggle() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: deepCharcoal,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _includeScreenshot
+              ? neonGreen.withValues(alpha: 0.25)
+              : ironGrey.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Thumbnail preview
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Image.memory(
+              widget.screenshotBytes!,
+              width: 48,
+              height: 32,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Label
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SCREENSHOT ATTACHED',
+                  style: TextStyle(
+                    color: _includeScreenshot ? Colors.white70 : Colors.white30,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _includeScreenshot
+                      ? 'Auto-captured for context'
+                      : 'Screenshot excluded',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Toggle
+          GestureDetector(
+            onTap: () =>
+                setState(() => _includeScreenshot = !_includeScreenshot),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _includeScreenshot
+                    ? neonGreen.withValues(alpha: 0.1)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: _includeScreenshot
+                      ? neonGreen.withValues(alpha: 0.3)
+                      : ironGrey,
+                ),
+              ),
+              child: Text(
+                _includeScreenshot ? 'INCLUDED' : 'EXCLUDED',
+                style: TextStyle(
+                  color: _includeScreenshot ? neonGreen : Colors.white30,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           ),
@@ -348,10 +509,24 @@ class _FeedbackModalState extends State<FeedbackModal> {
   Future<void> _handleSubmit() async {
     setState(() => _isSubmitting = true);
 
+    // ── Upload screenshot if included ──
+    String? screenshotUrl;
+    if (_includeScreenshot && widget.screenshotBytes != null) {
+      screenshotUrl = await FeedbackService.uploadScreenshot(
+        widget.screenshotBytes!,
+      );
+      if (screenshotUrl != null) {
+        debugPrint('📸 Screenshot uploaded: $screenshotUrl');
+      } else {
+        debugPrint('⚠️ Screenshot upload failed (submitting without it)');
+      }
+    }
+
     final success = await FeedbackService.submit(
       category: _category,
       message: _messageCtrl.text.trim(),
       pageContext: widget.pageContext,
+      screenshotUrl: screenshotUrl,
     );
 
     // Track the feedback event
