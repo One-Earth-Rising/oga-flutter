@@ -1,21 +1,64 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import '../services/feedback_service.dart';
 import '../services/analytics_service.dart';
 
-/// Beta feedback form modal.
+/// Beta feedback form modal with auto-screenshot capture.
 /// Accessible from: settings sidebar, dashboard FAB, avatar dropdown.
 /// Stores to Supabase feedback table.
+///
+/// Screenshot setup:
+///   Wrap your main content with `FeedbackModal.wrapForScreenshot(child: ...)`
+///   to enable auto-capture. The modal captures the wrapped content BEFORE
+///   the dialog opens, so screenshots show the user's actual context.
 class FeedbackModal extends StatefulWidget {
-  final String? pageContext; // Which screen the user is on
+  final String? pageContext;
+  final Uint8List? screenshotBytes;
 
-  const FeedbackModal({super.key, this.pageContext});
+  const FeedbackModal({super.key, this.pageContext, this.screenshotBytes});
 
-  /// Show the feedback modal.
-  static Future<void> show(BuildContext context, {String? pageContext}) {
+  // ── Screenshot capture infrastructure ─────────────────────
+  /// Global key for the RepaintBoundary wrapper.
+  /// Used by _captureScreen() to reliably capture the current view.
+  static final GlobalKey _repaintKey = GlobalKey();
+
+  /// Wrap your main content with this to enable screenshot capture.
+  /// Place this around the Scaffold body or the main content area.
+  ///
+  /// Example in dashboard:
+  /// ```dart
+  /// body: FeedbackModal.wrapForScreenshot(child: _buildBody(isMobile)),
+  /// ```
+  static Widget wrapForScreenshot({required Widget child}) {
+    return RepaintBoundary(key: _repaintKey, child: child);
+  }
+
+  /// Show the feedback modal with auto-screenshot.
+  static Future<void> show(BuildContext context, {String? pageContext}) async {
+    // ── Step 1: Capture screenshot BEFORE modal opens ──
+    Uint8List? screenshotBytes;
+    try {
+      screenshotBytes = await _captureScreen();
+      if (screenshotBytes != null) {
+        debugPrint('📸 Screenshot captured: ${screenshotBytes.length} bytes');
+      } else {
+        debugPrint(
+          '⚠️ Screenshot capture returned null (RepaintBoundary may not be set up)',
+        );
+      }
+    } catch (e) {
+      debugPrint('⚠️ Screenshot capture failed (non-blocking): $e');
+    }
+
+    if (!context.mounted) return;
+
+    // ── Step 2: Show modal with captured bytes ──
     final isMobile = MediaQuery.of(context).size.width < 900;
 
     if (isMobile) {
-      return showModalBottomSheet(
+      await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
@@ -28,22 +71,58 @@ class FeedbackModal extends StatefulWidget {
               color: Color(0xFF1A1A1A),
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
-            child: FeedbackModal(pageContext: pageContext),
+            child: FeedbackModal(
+              pageContext: pageContext,
+              screenshotBytes: screenshotBytes,
+            ),
           ),
         ),
       );
+      return;
     }
 
-    return showDialog(
+    await showDialog(
       context: context,
       barrierColor: Colors.black54,
       builder: (_) => Center(
         child: Material(
           color: Colors.transparent,
-          child: FeedbackModal(pageContext: pageContext),
+          child: FeedbackModal(
+            pageContext: pageContext,
+            screenshotBytes: screenshotBytes,
+          ),
         ),
       ),
     );
+  }
+
+  /// Capture the current screen using the GlobalKey RepaintBoundary.
+  /// Returns null if the wrapper isn't set up or capture fails.
+  static Future<Uint8List?> _captureScreen() async {
+    try {
+      final context = _repaintKey.currentContext;
+      if (context == null) {
+        debugPrint(
+          '⚠️ RepaintBoundary key has no context — '
+          'wrap your content with FeedbackModal.wrapForScreenshot()',
+        );
+        return null;
+      }
+
+      final boundary = context.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        debugPrint('⚠️ Could not find RenderRepaintBoundary');
+        return null;
+      }
+
+      // Capture at 1x pixel ratio to keep file size reasonable (~100-300KB)
+      final image = await boundary.toImage(pixelRatio: 1.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('⚠️ Screen capture error: $e');
+      return null;
+    }
   }
 
   @override
@@ -60,6 +139,7 @@ class _FeedbackModalState extends State<FeedbackModal> {
   String _category = 'bug';
   bool _isSubmitting = false;
   bool _isSubmitted = false;
+  bool _includeScreenshot = true;
 
   final _categories = [
     {'id': 'bug', 'label': 'BUG REPORT', 'icon': Icons.bug_report_outlined},
@@ -67,6 +147,15 @@ class _FeedbackModalState extends State<FeedbackModal> {
     {'id': 'ux', 'label': 'UX / DESIGN', 'icon': Icons.brush_outlined},
     {'id': 'other', 'label': 'OTHER', 'icon': Icons.chat_bubble_outline},
   ];
+
+  bool get _hasScreenshot => widget.screenshotBytes != null;
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild when text changes so submit button updates
+    _messageCtrl.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -84,7 +173,7 @@ class _FeedbackModalState extends State<FeedbackModal> {
 
     return Container(
       width: 480,
-      constraints: const BoxConstraints(maxHeight: 560),
+      constraints: const BoxConstraints(maxHeight: 680),
       decoration: BoxDecoration(
         color: surfaceCard,
         borderRadius: BorderRadius.circular(16),
@@ -242,7 +331,11 @@ class _FeedbackModalState extends State<FeedbackModal> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // ── Screenshot status row ────────────────────────
+          _buildScreenshotRow(),
+          const SizedBox(height: 16),
 
           // Submit button
           GestureDetector(
@@ -274,6 +367,140 @@ class _FeedbackModalState extends State<FeedbackModal> {
                         ),
                       ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Screenshot status row — shows thumbnail + toggle when captured,
+  /// or a "no screenshot" message when capture wasn't available.
+  Widget _buildScreenshotRow() {
+    if (_hasScreenshot) {
+      return Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: deepCharcoal,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: _includeScreenshot
+                ? neonGreen.withValues(alpha: 0.25)
+                : ironGrey.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            // Thumbnail preview
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.memory(
+                widget.screenshotBytes!,
+                width: 48,
+                height: 32,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Label
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.camera_alt_outlined,
+                        size: 12,
+                        color: _includeScreenshot
+                            ? neonGreen.withValues(alpha: 0.6)
+                            : Colors.white24,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _includeScreenshot
+                            ? 'SCREENSHOT ATTACHED'
+                            : 'SCREENSHOT EXCLUDED',
+                        style: TextStyle(
+                          color: _includeScreenshot
+                              ? Colors.white70
+                              : Colors.white30,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _includeScreenshot
+                        ? 'A screenshot of your current view will be submitted'
+                        : 'Screenshot will not be included',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Toggle
+            GestureDetector(
+              onTap: () =>
+                  setState(() => _includeScreenshot = !_includeScreenshot),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _includeScreenshot
+                      ? neonGreen.withValues(alpha: 0.1)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: _includeScreenshot
+                        ? neonGreen.withValues(alpha: 0.3)
+                        : ironGrey,
+                  ),
+                ),
+                child: Text(
+                  _includeScreenshot ? 'INCLUDED' : 'EXCLUDED',
+                  style: TextStyle(
+                    color: _includeScreenshot ? neonGreen : Colors.white30,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // No screenshot available
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: deepCharcoal,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ironGrey.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.camera_alt_outlined,
+            size: 12,
+            color: Colors.white.withValues(alpha: 0.15),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'No screenshot captured',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.15),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -342,16 +569,29 @@ class _FeedbackModalState extends State<FeedbackModal> {
     );
   }
 
-  bool get _canSubmit =>
-      _messageCtrl.text.trim().length >= 10 && !_isSubmitting;
+  bool get _canSubmit => _messageCtrl.text.trim().length >= 5 && !_isSubmitting;
 
   Future<void> _handleSubmit() async {
     setState(() => _isSubmitting = true);
+
+    // ── Upload screenshot if included ──
+    String? screenshotUrl;
+    if (_includeScreenshot && widget.screenshotBytes != null) {
+      screenshotUrl = await FeedbackService.uploadScreenshot(
+        widget.screenshotBytes!,
+      );
+      if (screenshotUrl != null) {
+        debugPrint('📸 Screenshot uploaded: $screenshotUrl');
+      } else {
+        debugPrint('⚠️ Screenshot upload failed (submitting without it)');
+      }
+    }
 
     final success = await FeedbackService.submit(
       category: _category,
       message: _messageCtrl.text.trim(),
       pageContext: widget.pageContext,
+      screenshotUrl: screenshotUrl,
     );
 
     // Track the feedback event
