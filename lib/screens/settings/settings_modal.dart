@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/friend_service.dart';
+import '../../screens/feedback_modal.dart';
 
 // For web file picking
 // ignore: avoid_web_libraries_in_flutter
@@ -265,7 +266,7 @@ class _SettingsModalState extends State<SettingsModal> {
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(
-                          color: neonGreen,
+                          color: Color.fromARGB(255, 57, 255, 20),
                           strokeWidth: 2,
                         ),
                       ),

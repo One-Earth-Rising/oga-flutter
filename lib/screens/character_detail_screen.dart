@@ -21,6 +21,8 @@ import '../models/oga_character.dart';
 import '../widgets/oga_image.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/invite_service.dart';
+import '../services/analytics_service.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -2521,6 +2523,30 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
   // Fetches user's invite code (cached) and copies character share URL to clipboard.
   Future<void> _shareCharacter() async {
+    // === INVITE QUOTA CHECK (Sprint 11A) ===
+    final quota = await InviteService.getInviteQuota();
+    if (!quota.canSend) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'INVITE LIMIT REACHED (${quota.displayText})',
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              ),
+            ),
+            backgroundColor: const Color(0xFFF59E0B),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
+      return;
+    }
     // Fetch invite code if not cached
     if (_userInviteCode == null && !_isFetchingInviteCode) {
       _isFetchingInviteCode = true;
@@ -2566,6 +2592,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
         'https://oga.oneearthrising.com/invite/$_userInviteCode/${ch.id}';
 
     await Clipboard.setData(ClipboardData(text: shareUrl));
+
+    // === TRACK SHARE (Sprint 11A) ===
+    InviteService.recordShare(
+      inviteCode: _userInviteCode!,
+      characterId: widget.character.id,
+    );
+    AnalyticsService.trackShare(widget.character.id, _userInviteCode!);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2711,7 +2744,6 @@ class _GameplayLightboxState extends State<_GameplayLightbox> {
   late PageController _pageController;
   late int _currentIndex;
 
-  static const Color _voidBlack = Color(0xFF000000);
   static const Color _deepCharcoal = Color(0xFF121212);
   static const Color _neonGreen = Color(0xFF39FF14);
   static const Color _ironGrey = Color(0xFF2C2C2C);

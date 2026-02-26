@@ -5,6 +5,8 @@ import 'character_detail_screen.dart';
 import 'invite_signup_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/oga_image.dart';
+import '../services/invite_service.dart';
+import '../services/analytics_service.dart';
 
 /// Public invite landing page — no auth required.
 /// Loads inviter's profile and shows their library in a guest-friendly view.
@@ -49,11 +51,25 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
       _notFound = profile == null;
       _isLoading = false;
     });
-    // Auto-open specific character if characterId was in the URL
-    if (profile != null && widget.characterId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _autoOpenCharacter(widget.characterId!);
-      });
+
+    if (profile != null) {
+      // === TRACK INVITE CLICK (Sprint 11A) ===
+      // Fires for ALL invite visits (library + character-specific)
+      InviteService.recordClick(
+        inviteCode: widget.inviteCode,
+        characterId: widget.characterId,
+      );
+      AnalyticsService.trackInviteLanding(
+        widget.inviteCode,
+        characterId: widget.characterId,
+      );
+
+      // Auto-open specific character if characterId was in the URL
+      if (widget.characterId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _autoOpenCharacter(widget.characterId!);
+        });
+      }
     }
   }
 
@@ -161,7 +177,7 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
               ),
               child: Text(
                 _isAuthenticated ? 'MY LIBRARY' : 'SIGN UP FREE',
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.black,
                   fontSize: 11,
                   fontWeight: FontWeight.w900,

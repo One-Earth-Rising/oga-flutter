@@ -24,6 +24,8 @@ import 'screens/invite_onboarding_screen.dart';
 import 'screens/character_detail_screen.dart';
 import 'models/oga_character.dart';
 import 'package:flutter/services.dart';
+import 'services/invite_service.dart';
+import 'services/analytics_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -84,7 +86,6 @@ class _OgaAppState extends State<OgaApp> {
       ),
       onGenerateRoute: (settings) {
         final uri = Uri.parse(settings.name ?? '');
-        // /#/character/ryu → CharacterDetailScreen
         // /#/character/ryu → CharacterDetailScreen
         if (uri.path.startsWith('/character/')) {
           final characterId = uri.path.replaceFirst('/character/', '');
@@ -320,8 +321,6 @@ class _OgaAppState extends State<OgaApp> {
       }
 
       // Check if this is an auth callback (has access_token or code)
-
-      // Check if this is an auth callback (has access_token or code)
       if (uri.fragment.contains('access_token') ||
           uri.queryParameters.containsKey('code')) {
         debugPrint('🔐 Handling auth callback...');
@@ -400,6 +399,14 @@ class _OgaAppState extends State<OgaApp> {
                 // Store the invite code — DB trigger auto-creates friendship
                 await FriendService.setInvitedBy(pendingInvite);
                 debugPrint('✅ Set invited_by to $pendingInvite');
+                InviteService.recordConversion(
+                  inviteCode: pendingInvite,
+                  inviteeEmail: user.email!,
+                );
+                AnalyticsService.track(
+                  AnalyticsService.eventSignUp,
+                  metadata: {'invite_code': pendingInvite},
+                );
 
                 // Look up inviter name for welcome screen
                 final inviterProfile = await FriendService.getPublicProfile(
@@ -460,6 +467,7 @@ class _OgaAppState extends State<OgaApp> {
 
             // Non-FBS users: Go to main dashboard
             debugPrint('🎯 Routing to main dashboard');
+            AnalyticsService.trackDashboardView();
             return OGAAccountDashboard(
               sessionId: sessionId,
               acquiredCharacterId: character,
@@ -550,6 +558,14 @@ class _OgaAppState extends State<OgaApp> {
             if (pendingInvite != null && pendingInvite.isNotEmpty) {
               await FriendService.setInvitedBy(pendingInvite);
               debugPrint('✅ Set invited_by to $pendingInvite');
+              InviteService.recordConversion(
+                inviteCode: pendingInvite,
+                inviteeEmail: existingUser.email!,
+              );
+              AnalyticsService.track(
+                AnalyticsService.eventSignUp,
+                metadata: {'invite_code': pendingInvite},
+              );
 
               final inviterProfile = await FriendService.getPublicProfile(
                 pendingInvite,
@@ -605,6 +621,7 @@ class _OgaAppState extends State<OgaApp> {
 
           // Default: main dashboard
           debugPrint('🎯 Routing to main dashboard (existing session)');
+          AnalyticsService.trackDashboardView();
           return OGAAccountDashboard(
             sessionId: sessionId,
             acquiredCharacterId: character,
