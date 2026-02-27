@@ -552,34 +552,30 @@ class _OGALogoPainter extends CustomPainter {
     );
 
     // ── G (offset +145) ──
+    // Single continuous path tracing the full G outline including
+    // the right-side opening and inward tongue. Winding rule
+    // naturally creates the hollow interior.
     canvas.save();
     canvas.translate(145, 0);
-    final gOuter = Path()
-      ..moveTo(25, 0)
-      ..lineTo(105, 0)
-      ..lineTo(130, 25)
-      ..lineTo(130, 75)
-      ..lineTo(105, 100)
-      ..lineTo(25, 100)
-      ..lineTo(0, 75)
-      ..lineTo(0, 25)
-      ..close();
-
-    final gCutout = Path()
-      ..moveTo(25, 25)
-      ..lineTo(105, 25)
-      ..lineTo(105, 45)
-      ..lineTo(70, 45)
-      ..lineTo(70, 65)
-      ..lineTo(105, 65)
-      ..lineTo(105, 75)
-      ..lineTo(25, 75)
-      ..close();
-
-    canvas.drawPath(
-      Path.combine(PathOperation.difference, gOuter, gCutout),
-      paint,
-    );
+    final gPath = Path()
+      // Start at inner top-right, trace clockwise
+      ..moveTo(25, 25) // inner top-left
+      ..lineTo(130, 25) // inner top-right (flush with outer chamfer)
+      ..lineTo(105, 0) // outer top-right chamfer
+      ..lineTo(25, 0) // outer top-left
+      ..lineTo(0, 25) // outer top-left chamfer
+      ..lineTo(0, 75) // outer left side
+      ..lineTo(25, 100) // outer bottom-left chamfer
+      ..lineTo(105, 100) // outer bottom
+      ..lineTo(130, 75) // outer bottom-right chamfer
+      ..lineTo(130, 50) // right side down to tongue opening
+      ..lineTo(70, 50) // tongue extends left
+      ..lineTo(70, 65) // tongue drops down
+      ..lineTo(105, 65) // tongue goes right to inner wall
+      ..lineTo(105, 75) // inner bottom-right
+      ..lineTo(25, 75) // inner bottom
+      ..close(); // back to (25,25) — inner top-left
+    canvas.drawPath(gPath, paint);
     canvas.restore();
 
     // ── A (offset +290) ──
