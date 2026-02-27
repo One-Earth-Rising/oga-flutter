@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 /// Full-screen splash / landing screen for unauthenticated visitors.
@@ -435,20 +436,71 @@ class _OGASplashScreenState extends State<OGASplashScreen>
                 ),
                 SizedBox(height: isMobile ? 8 : 16),
 
-                // ── OGA Geometric Logo ──
-                // CSS: filter: drop-shadow(0 0 5px #fff)
-                //   drop-shadow(0 0 20px neon) drop-shadow(0 0 60px neon)
+                // ── OGA Logo (actual PNG with glow) ──
                 Opacity(
                   opacity: _logoOpacity * _flickerOpacity,
                   child: Transform.scale(
                     scale: _logoScale,
                     child: SizedBox(
                       width: logoWidth,
-                      height: logoWidth * 0.30,
-                      child: CustomPaint(
-                        painter: _OGALogoPainter(
-                          glowIntensity: _logoOpacity.clamp(0.0, 1.0),
-                        ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Glow layer 1: large outer green glow
+                          ImageFiltered(
+                            imageFilter: ui.ImageFilter.blur(
+                              sigmaX: 60,
+                              sigmaY: 60,
+                            ),
+                            child: ColorFiltered(
+                              colorFilter: const ColorFilter.mode(
+                                Color(0xFF39FF14),
+                                BlendMode.srcATop,
+                              ),
+                              child: Image.asset(
+                                'assets/images/oga_logo.png',
+                                width: logoWidth,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                          // Glow layer 2: medium green glow
+                          ImageFiltered(
+                            imageFilter: ui.ImageFilter.blur(
+                              sigmaX: 25,
+                              sigmaY: 25,
+                            ),
+                            child: ColorFiltered(
+                              colorFilter: const ColorFilter.mode(
+                                Color(0xFF39FF14),
+                                BlendMode.srcATop,
+                              ),
+                              child: Image.asset(
+                                'assets/images/oga_logo.png',
+                                width: logoWidth,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                          // Glow layer 3: tight white inner glow
+                          ImageFiltered(
+                            imageFilter: ui.ImageFilter.blur(
+                              sigmaX: 8,
+                              sigmaY: 8,
+                            ),
+                            child: Image.asset(
+                              'assets/images/oga_logo.png',
+                              width: logoWidth,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          // Crisp logo on top
+                          Image.asset(
+                            'assets/images/oga_logo.png',
+                            width: logoWidth,
+                            fit: BoxFit.contain,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -473,145 +525,6 @@ class _OGASplashScreenState extends State<OGASplashScreen>
       ),
     );
   }
-}
-
-// ═══════════════════════════════════════════════════════
-// OGA GEOMETRIC LOGO PAINTER
-// Draws the blocky OGA letterforms with layered
-// neon green glow + white fill
-// ═══════════════════════════════════════════════════════
-
-class _OGALogoPainter extends CustomPainter {
-  final double glowIntensity;
-  _OGALogoPainter({required this.glowIntensity});
-
-  static const double _vbW = 420;
-  static const double _vbH = 100;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.width <= 0 || size.height <= 0) return;
-
-    final scaleVal = _min(size.width / _vbW, size.height / _vbH);
-    final offsetX = (size.width - _vbW * scaleVal) / 2;
-    final offsetY = (size.height - _vbH * scaleVal) / 2;
-
-    canvas.save();
-    canvas.translate(offsetX, offsetY);
-    canvas.scale(scaleVal);
-
-    // Glow layers (largest blur first)
-    _paintLayer(canvas, const Color(0xFF39FF14), 0.06 * glowIntensity, 80);
-    _paintLayer(canvas, const Color(0xFF39FF14), 0.10 * glowIntensity, 50);
-    _paintLayer(canvas, const Color(0xFF39FF14), 0.15 * glowIntensity, 30);
-    _paintLayer(canvas, const Color(0xFF39FF14), 0.25 * glowIntensity, 15);
-    _paintLayer(canvas, Colors.white, 0.20 * glowIntensity, 8);
-    _paintLayer(canvas, Colors.white, 0.10 * glowIntensity, 20);
-
-    // Solid white fill (topmost)
-    final fillPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    _drawLetters(canvas, fillPaint);
-
-    canvas.restore();
-  }
-
-  void _paintLayer(Canvas canvas, Color color, double alpha, double blur) {
-    if (alpha <= 0) return;
-    final paint = Paint()
-      ..color = color.withValues(alpha: alpha.clamp(0.0, 1.0))
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur)
-      ..style = PaintingStyle.fill;
-    _drawLetters(canvas, paint);
-  }
-
-  void _drawLetters(Canvas canvas, Paint paint) {
-    // ── O ──
-    final oOuter = Path()
-      ..moveTo(25, 0)
-      ..lineTo(105, 0)
-      ..lineTo(130, 25)
-      ..lineTo(130, 75)
-      ..lineTo(105, 100)
-      ..lineTo(25, 100)
-      ..lineTo(0, 75)
-      ..lineTo(0, 25)
-      ..close();
-
-    final oInner = Path()
-      ..moveTo(25, 25)
-      ..lineTo(105, 25)
-      ..lineTo(105, 75)
-      ..lineTo(25, 75)
-      ..close();
-
-    canvas.drawPath(
-      Path.combine(PathOperation.difference, oOuter, oInner),
-      paint,
-    );
-
-    // ── G (offset +145) ──
-    // Single continuous path tracing the full G outline including
-    // the right-side opening and inward tongue. Winding rule
-    // naturally creates the hollow interior.
-    canvas.save();
-    canvas.translate(145, 0);
-    final gPath = Path()
-      // Start at inner top-right, trace clockwise
-      ..moveTo(25, 25) // inner top-left
-      ..lineTo(130, 25) // inner top-right (flush with outer chamfer)
-      ..lineTo(105, 0) // outer top-right chamfer
-      ..lineTo(25, 0) // outer top-left
-      ..lineTo(0, 25) // outer top-left chamfer
-      ..lineTo(0, 75) // outer left side
-      ..lineTo(25, 100) // outer bottom-left chamfer
-      ..lineTo(105, 100) // outer bottom
-      ..lineTo(130, 75) // outer bottom-right chamfer
-      ..lineTo(130, 50) // right side down to tongue opening
-      ..lineTo(70, 50) // tongue extends left
-      ..lineTo(70, 65) // tongue drops down
-      ..lineTo(105, 65) // tongue goes right to inner wall
-      ..lineTo(105, 75) // inner bottom-right
-      ..lineTo(25, 75) // inner bottom
-      ..close(); // back to (25,25) — inner top-left
-    canvas.drawPath(gPath, paint);
-    canvas.restore();
-
-    // ── A (offset +290) ──
-    canvas.save();
-    canvas.translate(290, 0);
-    final aOuter = Path()
-      ..moveTo(0, 100)
-      ..lineTo(0, 25)
-      ..lineTo(25, 0)
-      ..lineTo(105, 0)
-      ..lineTo(130, 25)
-      ..lineTo(130, 100)
-      ..lineTo(105, 100)
-      ..lineTo(105, 65)
-      ..lineTo(25, 65)
-      ..lineTo(25, 100)
-      ..close();
-
-    final aInner = Path()
-      ..moveTo(25, 25)
-      ..lineTo(105, 25)
-      ..lineTo(105, 45)
-      ..lineTo(25, 45)
-      ..close();
-
-    canvas.drawPath(
-      Path.combine(PathOperation.difference, aOuter, aInner),
-      paint,
-    );
-    canvas.restore();
-  }
-
-  double _min(double a, double b) => a < b ? a : b;
-
-  @override
-  bool shouldRepaint(_OGALogoPainter old) => old.glowIntensity != glowIntensity;
 }
 
 // ═══════════════════════════════════════════════════════

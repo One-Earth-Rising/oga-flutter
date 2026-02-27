@@ -72,6 +72,7 @@ flutter:
     - assets/mickey.png
     - assets/games/
     - assets/campaigns/fbs_launch/  # ADD THIS
+    - assets/images/oga_logo.png
    
 
   # The following line ensures that the Material Icons font is
