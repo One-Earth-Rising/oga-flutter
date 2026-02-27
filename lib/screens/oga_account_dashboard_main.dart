@@ -183,15 +183,8 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  void _handleLogout() async {
-    try {
-      await supabase.auth.signOut();
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-      }
-    } catch (e) {
-      debugPrint('Logout error: $e');
-    }
+  void _handleLogout() {
+    Navigator.of(context).pushNamedAndRemoveUntil('/logout', (route) => false);
   }
 
   // ═══════════════════════════════════════════════════════════

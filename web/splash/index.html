@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OGA - Comm Link</title>
+    <!-- Modern geometry font for the neon part -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syncopate:wght@400;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+    <div id="crt-container">
+        <!-- Optional Scanlines Effect -->
+        <div class="scanlines"></div>
+
+        <!-- Scene 1: DOS CLI -->
+        <div id="dos-screen" class="active">
+            <div id="dos-text"></div>
+        </div>
+
+        <!-- Scene 2: Neon Sign -->
+        <div id="neon-screen">
+            <!-- Canvas generating TV static -->
+            <canvas id="static-canvas"></canvas>
+
+            <div id="neon-content">
+                <div class="neon-text welcome-text">WELCOME TO</div>
+                <div class="oga-logo">
+                    <!-- Drop your exact actual OGA logo file here (OGA Logo.png or oga-logo.svg) -->
+                    <img src="./OGA Logo.png" alt="OGA" class="oga-img"
+                        onerror="this.onerror=null; this.src='./oga-logo.svg';">
+                </div>
+                <div class="neon-text enter-now hidden">ENTER NOW</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./script.js"></script>
+</body>
+
+</html>

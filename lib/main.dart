@@ -26,6 +26,8 @@ import 'models/oga_character.dart';
 import 'package:flutter/services.dart';
 import 'services/invite_service.dart';
 import 'services/analytics_service.dart';
+import 'screens/oga_splash_screen.dart';
+import 'screens/oga_logout_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -217,7 +219,12 @@ class _OgaAppState extends State<OgaApp> {
             ),
           );
         }
-
+        // ═══════════════════════════════════════════════════════
+        // LOCK OUT
+        // ═══════════════════════════════════════════════════════
+        if (settings.name == '/logout') {
+          return MaterialPageRoute(builder: (_) => const OGALogoutScreen());
+        }
         // ═══════════════════════════════════════════════════════
         // WELCOME SCREEN
         // ═══════════════════════════════════════════════════════
@@ -677,8 +684,8 @@ class _OgaAppState extends State<OgaApp> {
       }
 
       // Default to main landing page
-      debugPrint('✅ Showing main landing page');
-      return const OgaLandingPage();
+      debugPrint('✅ Showing splash screen');
+      return const OGASplashScreen();
     } catch (e) {
       debugPrint('❌ Error determining landing page: $e');
       return const OgaLandingPage();

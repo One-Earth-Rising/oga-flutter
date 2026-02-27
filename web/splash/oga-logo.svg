@@ -1,0 +1,8 @@
+<svg viewBox="0 0 420 100" xmlns="http://www.w3.org/2000/svg">
+    <!-- O -->
+    <path d="M 25 0 L 105 0 L 130 25 L 130 75 L 105 100 L 25 100 L 0 75 L 0 25 Z M 25 25 L 25 75 L 105 75 L 105 25 Z" fill="#ffffff" fill-rule="evenodd"/>
+    <!-- G -->
+    <path d="M 25 25 L 130 25 L 105 0 L 25 0 L 0 25 L 0 75 L 25 100 L 105 100 L 130 75 L 130 45 L 70 45 L 70 65 L 105 65 L 105 75 L 25 75 Z" fill="#ffffff" transform="translate(145, 0)"/>
+    <!-- A -->
+    <path d="M 0 100 L 0 25 L 25 0 L 105 0 L 130 25 L 130 100 L 105 100 L 105 65 L 25 65 L 25 100 Z M 25 25 L 25 45 L 105 45 L 105 25 Z" fill="#ffffff" fill-rule="evenodd" transform="translate(290, 0)"/>
+</svg>
