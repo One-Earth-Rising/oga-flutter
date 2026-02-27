@@ -319,6 +319,15 @@ class _OgaAppState extends State<OgaApp> {
           );
         }
       }
+      // ═══════════════════════════════════════════════════════
+      // CONFIRM SCREEN DETECTION (token_hash approach)
+      // Catches: /#/confirm?token_hash=...&type=magiclink
+      // Must show buffer page so user clicks to trigger PKCE exchange
+      // ═══════════════════════════════════════════════════════
+      if (fragment.startsWith('/confirm')) {
+        debugPrint('🔐 Confirm screen detected in URL fragment');
+        return const ConfirmLoginScreen();
+      }
 
       // Check if this is an auth callback (has access_token or code)
       if (uri.fragment.contains('access_token') ||
