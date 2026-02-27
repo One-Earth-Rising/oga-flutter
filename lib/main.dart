@@ -325,8 +325,18 @@ class _OgaAppState extends State<OgaApp> {
       // Must show buffer page so user clicks to trigger PKCE exchange
       // ═══════════════════════════════════════════════════════
       if (fragment.startsWith('/confirm')) {
-        debugPrint('🔐 Confirm screen detected in URL fragment');
-        return const ConfirmLoginScreen();
+        String? tokenHash;
+        String? type;
+        if (fragment.contains('?')) {
+          final qs = fragment.split('?').last;
+          final params = Uri.splitQueryString(qs);
+          tokenHash = params['token_hash'];
+          type = params['type'];
+        }
+        debugPrint(
+          '🔐 Confirm screen: tokenHash=${tokenHash != null ? "present" : "null"}, type=$type',
+        );
+        return ConfirmLoginScreen(tokenHash: tokenHash, type: type);
       }
 
       // Check if this is an auth callback (has access_token or code)

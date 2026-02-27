@@ -3,7 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ConfirmLoginScreen extends StatefulWidget {
-  const ConfirmLoginScreen({super.key});
+  final String? tokenHash;
+  final String? type;
+
+  const ConfirmLoginScreen({super.key, this.tokenHash, this.type});
 
   @override
   State<ConfirmLoginScreen> createState() => _ConfirmLoginScreenState();
@@ -26,48 +29,58 @@ class _ConfirmLoginScreenState extends State<ConfirmLoginScreen> {
       debugPrint('📍 Full URI: $uri');
       debugPrint('📍 Fragment: ${uri.fragment}');
 
-      // NEW: Check for token_hash (scanner-proof method)
-      String? tokenHash;
-      String? type;
+      String? tokenHash = widget.tokenHash;
+      String? type = widget.type;
 
-      if (uri.fragment.contains('?')) {
-        final queryString = uri.fragment.split('?').last;
-        final queryParams = Uri.splitQueryString(queryString);
+      debugPrint(
+        '📍 Constructor params: tokenHash=${tokenHash != null ? "present (${tokenHash.length} chars)" : "null"}, type=$type',
+      );
 
-        // New token-based approach
-        tokenHash = queryParams['token_hash'];
-        type = queryParams['type'];
-
-        // Legacy: full URL approach (backwards compatible)
-        if (tokenHash == null) {
-          _confirmationUrl = queryParams['url'];
-          if (_confirmationUrl != null) {
-            _confirmationUrl = Uri.decodeComponent(_confirmationUrl!);
+      // Fallback: parse from URL if not passed via constructor
+      if (tokenHash == null) {
+        if (uri.fragment.contains('?')) {
+          final queryString = uri.fragment.split('?').last;
+          final queryParams = Uri.splitQueryString(queryString);
+          tokenHash = queryParams['token_hash'];
+          type = queryParams['type'];
+          if (tokenHash != null) {
+            debugPrint('🔐 Got token_hash from fragment params');
           }
         }
-      }
-
-      // Also check standard query params
-      if (tokenHash == null && _confirmationUrl == null) {
-        tokenHash = uri.queryParameters['token_hash'];
-        type = uri.queryParameters['type'];
 
         if (tokenHash == null) {
-          _confirmationUrl = uri.queryParameters['url'];
-          if (_confirmationUrl != null) {
-            _confirmationUrl = Uri.decodeComponent(_confirmationUrl!);
+          tokenHash = uri.queryParameters['token_hash'];
+          type = uri.queryParameters['type'];
+          if (tokenHash != null) {
+            debugPrint('🔐 Got token_hash from query params');
+          }
+        }
+
+        // Legacy: full URL approach
+        if (tokenHash == null) {
+          if (uri.fragment.contains('?')) {
+            final queryString = uri.fragment.split('?').last;
+            final queryParams = Uri.splitQueryString(queryString);
+            _confirmationUrl = queryParams['url'];
+            if (_confirmationUrl != null) {
+              _confirmationUrl = Uri.decodeComponent(_confirmationUrl!);
+              debugPrint('🔐 Got legacy URL from fragment');
+            }
+          }
+          if (_confirmationUrl == null) {
+            _confirmationUrl = uri.queryParameters['url'];
+            if (_confirmationUrl != null) {
+              _confirmationUrl = Uri.decodeComponent(_confirmationUrl!);
+              debugPrint('🔐 Got legacy URL from query params');
+            }
           }
         }
       }
 
       // Reconstruct verify URL from token parts
       if (tokenHash != null && _confirmationUrl == null) {
-        final supabaseUrl = Supabase.instance.client.auth.currentSession != null
-            ? 'https://jmbzrbteizvuqwukojzu.supabase.co'
-            : 'https://jmbzrbteizvuqwukojzu.supabase.co';
-        final redirectTo = Uri.encodeComponent(
-          '${uri.scheme}://${uri.host}:${uri.port}/',
-        );
+        final supabaseUrl = 'https://jmbzrbteizvuqwukojzu.supabase.co';
+        final redirectTo = Uri.encodeComponent('${uri.scheme}://${uri.host}/');
 
         _confirmationUrl =
             '$supabaseUrl/auth/v1/verify'
@@ -76,9 +89,13 @@ class _ConfirmLoginScreenState extends State<ConfirmLoginScreen> {
             '&redirect_to=$redirectTo';
 
         debugPrint('🔐 Reconstructed verify URL from token_hash');
+        debugPrint('📧 Confirmation URL: $_confirmationUrl');
+      } else if (_confirmationUrl != null) {
+        debugPrint('📧 Confirmation URL (legacy): $_confirmationUrl');
+      } else {
+        debugPrint('❌ No token_hash or URL found — confirmation will fail');
       }
 
-      debugPrint('📧 Confirmation URL: $_confirmationUrl');
       setState(() {});
     } catch (e) {
       debugPrint('❌ Error extracting URL: $e');
