@@ -215,7 +215,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         backgroundColor: voidBlack,
         appBar: _buildAppBar(isMobile),
         drawer: isMobile ? _buildMobileDrawer() : null,
-        body: _buildBody(isMobile),
+        body: FeedbackModal.wrapForScreenshot(child: _buildBody(isMobile)),
         // === BETA FEEDBACK FAB (Sprint 11A) ===
         floatingActionButton: FloatingActionButton.small(
           onPressed: () =>
