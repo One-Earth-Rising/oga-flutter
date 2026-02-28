@@ -28,6 +28,8 @@ import 'services/invite_service.dart';
 import 'services/analytics_service.dart';
 import 'screens/oga_splash_screen.dart';
 import 'screens/oga_logout_screen.dart';
+import 'services/beta_gate_service.dart';
+import 'screens/beta_waitlist_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -219,12 +221,14 @@ class _OgaAppState extends State<OgaApp> {
             ),
           );
         }
+
         // ═══════════════════════════════════════════════════════
-        // LOCK OUT
+        // LOGOUT
         // ═══════════════════════════════════════════════════════
         if (settings.name == '/logout') {
           return MaterialPageRoute(builder: (_) => const OGALogoutScreen());
         }
+
         // ═══════════════════════════════════════════════════════
         // WELCOME SCREEN
         // ═══════════════════════════════════════════════════════
@@ -249,7 +253,7 @@ class _OgaAppState extends State<OgaApp> {
         }
 
         // ═══════════════════════════════════════════════════════
-        // DASHBOARD
+        // DASHBOARD (with beta gate)
         // ═══════════════════════════════════════════════════════
         if (settings.name == '/dashboard') {
           final args = settings.arguments as Map?;
@@ -257,19 +261,40 @@ class _OgaAppState extends State<OgaApp> {
           final character = args?['character'];
           final campaignId = args?['campaignId'];
 
-          return MaterialPageRoute(
-            builder: (context) {
-              if (campaignId == 'fbs_launch') {
-                return FBSCampaignDashboard(
-                  sessionId: sessionId,
-                  acquiredCharacterId: character,
-                );
-              }
-              return OGAAccountDashboard(
+          // FBS campaign bypasses beta gate
+          if (campaignId == 'fbs_launch') {
+            return MaterialPageRoute(
+              builder: (_) => FBSCampaignDashboard(
                 sessionId: sessionId,
                 acquiredCharacterId: character,
-              );
-            },
+              ),
+            );
+          }
+
+          // Main dashboard — beta gate check
+          return MaterialPageRoute(
+            builder: (_) => FutureBuilder<bool>(
+              future: BetaGateService.hasAccess(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    backgroundColor: Colors.black,
+                    body: Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF39FF14),
+                      ),
+                    ),
+                  );
+                }
+                if (snapshot.data == true) {
+                  return OGAAccountDashboard(
+                    sessionId: sessionId,
+                    acquiredCharacterId: character,
+                  );
+                }
+                return const BetaWaitlistScreen();
+              },
+            ),
           );
         }
 
@@ -326,6 +351,7 @@ class _OgaAppState extends State<OgaApp> {
           );
         }
       }
+
       // ═══════════════════════════════════════════════════════
       // CONFIRM SCREEN DETECTION (token_hash approach)
       // Catches: /#/confirm?token_hash=...&type=magiclink
@@ -417,6 +443,7 @@ class _OgaAppState extends State<OgaApp> {
                 );
               }
             }
+
             // If we have a pending invite, process it
             if (pendingInvite != null && pendingInvite.isNotEmpty) {
               final alreadyLinked = response?['invited_by'] as String?;
@@ -494,12 +521,28 @@ class _OgaAppState extends State<OgaApp> {
             // Non-FBS users: Go to main dashboard
             debugPrint('🎯 Routing to main dashboard');
             AnalyticsService.trackDashboardView();
+            // === BETA GATE CHECK ===
+            final hasBetaAccess = await BetaGateService.hasAccess();
+            if (!hasBetaAccess) {
+              debugPrint(
+                '🚫 User does not have beta access — showing waitlist',
+              );
+              return const BetaWaitlistScreen();
+            }
             return OGAAccountDashboard(
               sessionId: sessionId,
               acquiredCharacterId: character,
             );
           } catch (e) {
             debugPrint('⚠️ Error fetching profile: $e');
+            // === BETA GATE CHECK ===
+            final hasBetaAccess = await BetaGateService.hasAccess();
+            if (!hasBetaAccess) {
+              debugPrint(
+                '🚫 User does not have beta access — showing waitlist',
+              );
+              return const BetaWaitlistScreen();
+            }
             return OGAAccountDashboard(
               sessionId: user.id,
               acquiredCharacterId: 'ryu',
@@ -515,15 +558,6 @@ class _OgaAppState extends State<OgaApp> {
           );
         }
       }
-      // ═══════════════════════════════════════════════════════════
-      // PATCH FOR main.dart — _getLandingPage()
-      //
-      // Add this block AFTER the closing brace of:
-      //   if (uri.fragment.contains('access_token') || uri.queryParameters.containsKey('code')) { ... }
-      //
-      // And BEFORE the line:
-      //   // Check if URL is /fbs-success (direct navigation)
-      // ═══════════════════════════════════════════════════════════
 
       // ═══════════════════════════════════════════════════════
       // ALREADY AUTHENTICATED USER (session exists, no callback params)
@@ -648,18 +682,31 @@ class _OgaAppState extends State<OgaApp> {
           // Default: main dashboard
           debugPrint('🎯 Routing to main dashboard (existing session)');
           AnalyticsService.trackDashboardView();
+          // === BETA GATE CHECK ===
+          final hasBetaAccess = await BetaGateService.hasAccess();
+          if (!hasBetaAccess) {
+            debugPrint('🚫 User does not have beta access — showing waitlist');
+            return const BetaWaitlistScreen();
+          }
           return OGAAccountDashboard(
             sessionId: sessionId,
             acquiredCharacterId: character,
           );
         } catch (e) {
           debugPrint('⚠️ Error fetching profile for existing user: $e');
+          // === BETA GATE CHECK ===
+          final hasBetaAccess = await BetaGateService.hasAccess();
+          if (!hasBetaAccess) {
+            debugPrint('🚫 User does not have beta access — showing waitlist');
+            return const BetaWaitlistScreen();
+          }
           return OGAAccountDashboard(
             sessionId: existingUser.id,
             acquiredCharacterId: 'ryu',
           );
         }
       }
+
       // Check if URL is /fbs-success (direct navigation)
       if (uri.path.contains('fbs-success')) {
         final session = uri.queryParameters['session'] ?? '';
