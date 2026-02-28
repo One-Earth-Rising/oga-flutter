@@ -216,7 +216,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           backgroundColor: neonGreen.withValues(alpha: 0.15),
           child: Icon(
             Icons.feedback_outlined,
-            color: neonGreen.withValues(alpha: 0.7),
+            color: Colors.black.withValues(alpha: 0.7),
             size: 20,
           ),
         ),
