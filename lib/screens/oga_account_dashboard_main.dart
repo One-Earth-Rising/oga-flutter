@@ -13,6 +13,8 @@ import '../config/oga_storage.dart';
 import 'feedback_modal.dart';
 import '../services/analytics_service.dart';
 import '../services/admin_guard_service.dart';
+import '../services/character_service.dart';
+import '../services/ownership_service.dart';
 
 class OGAAccountDashboard extends StatefulWidget {
   final String? sessionId;
@@ -41,6 +43,9 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   bool _isAdmin = false;
   final _pageController = PageController();
 
+  // ─── Sprint 12: Ownership from DB ─────────────────────────
+  Set<String> _ownedCharacterIds = {};
+
   // V2 Brand Colors (Heimdal Aesthetic)
   static const Color neonGreen = Color(0xFF39FF14);
   static const Color voidBlack = Color(0xFF000000);
@@ -64,8 +69,12 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     'December',
   ];
 
-  // ─── Character list (no doubling) ─────────────────────────
+  // ─── Character list from catalog cache ────────────────────
   List<OGACharacter> get _characters => getAllCharactersSorted();
+
+  // ─── Ownership helpers (Sprint 12) ────────────────────────
+  bool _isCharOwned(OGACharacter ch) => _ownedCharacterIds.contains(ch.id);
+  double _charProgress(OGACharacter ch) => _isCharOwned(ch) ? 0.99 : 0.0;
 
   @override
   void initState() {
@@ -83,6 +92,16 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   Future<void> _loadUserData() async {
     try {
       final user = supabase.auth.currentUser;
+
+      // ─── Load character catalog from DB (populates OGACharacter.allCharacters cache) ───
+      try {
+        await CharacterService.getAll();
+        debugPrint(
+          '✅ CharacterService: catalog loaded (${OGACharacter.allCharacters.length} characters)',
+        );
+      } catch (e) {
+        debugPrint('⚠️ CharacterService.getAll() failed: $e — using fallback');
+      }
 
       if (user == null) {
         debugPrint('\u26a0\ufe0f No authenticated user');
@@ -105,21 +124,34 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         if (_joinedDate == null && response['created_at'] != null) {
           _joinedDate = DateTime.tryParse(response['created_at'].toString());
         }
-        setState(() {
-          _userData = response;
-          _ownedCharacterId =
-              widget.acquiredCharacterId ??
-              response['starter_character'] ??
-              'ryu';
-          _avatarUrl = response['avatar_url'] as String?;
-          _isLoading = false;
-        });
+        _userData = response;
+        _ownedCharacterId =
+            widget.acquiredCharacterId ??
+            response['starter_character'] ??
+            'ryu';
+        _avatarUrl = response['avatar_url'] as String?;
       } else {
-        setState(() {
-          _ownedCharacterId = widget.acquiredCharacterId ?? 'ryu';
-          _isLoading = false;
-        });
+        _ownedCharacterId = widget.acquiredCharacterId ?? 'ryu';
       }
+
+      // ─── Sprint 12: Load ownership from DB ───────────────
+      try {
+        final owned = await OwnershipService.getMyCharacters();
+        _ownedCharacterIds = owned.map((o) => o.characterId).toSet();
+        debugPrint(
+          '✅ Ownership loaded: ${_ownedCharacterIds.length} characters owned',
+        );
+      } catch (e) {
+        debugPrint(
+          '⚠️ OwnershipService failed: $e — falling back to starter_character',
+        );
+        // Fallback: at least mark the starter character as owned
+        if (_ownedCharacterId != null) {
+          _ownedCharacterIds = {_ownedCharacterId!};
+        }
+      }
+
+      setState(() => _isLoading = false);
 
       // Check admin status (non-blocking)
       AdminGuardService.isAdmin().then((isAdmin) {
@@ -835,6 +867,9 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildSectionHeader(bool isMobile) {
+    final ownedCount = _ownedCharacterIds.length;
+    final totalCount = _characters.length;
+
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: isMobile ? 16 : 40,
@@ -862,7 +897,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           ),
           const SizedBox(width: 8),
           Text(
-            '${_characters.length} CHARACTERS',
+            '$ownedCount CHARACTERS',
             style: const TextStyle(
               color: Colors.white24,
               fontSize: 12,
@@ -939,12 +974,13 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       ),
       delegate: SliverChildBuilderDelegate((context, index) {
         final ch = chars[index];
+        final owned = _isCharOwned(ch);
         return GestureDetector(
           onTap: () => _openDetail(ch),
           child: CharacterCard(
             character: ch,
-            isOwned: ch.isOwned,
-            progress: ch.progress,
+            isOwned: owned,
+            progress: owned ? 0.99 : 0.0,
           ),
         );
       }, childCount: chars.length),
@@ -958,6 +994,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         final ch = chars[index];
+        final owned = _isCharOwned(ch);
         final charColor = ch.cardColor;
 
         return GestureDetector(
@@ -969,7 +1006,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               color: deepCharcoal,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: ch.isOwned
+                color: owned
                     ? ch.glowColor.withValues(alpha: 0.4)
                     : ironGrey.withValues(alpha: 0.5),
               ),
@@ -1051,7 +1088,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                 ),
 
                 // Progress ring or lock
-                if (ch.isOwned) ...[
+                if (owned) ...[
                   SizedBox(
                     width: 36,
                     height: 36,
@@ -1059,14 +1096,14 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                       alignment: Alignment.center,
                       children: [
                         CircularProgressIndicator(
-                          value: ch.progress,
+                          value: 0.99,
                           strokeWidth: 2.5,
                           color: neonGreen,
                           backgroundColor: ironGrey,
                         ),
-                        Text(
-                          '${(ch.progress * 100).toInt()}%',
-                          style: const TextStyle(
+                        const Text(
+                          '99%',
+                          style: TextStyle(
                             color: neonGreen,
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
