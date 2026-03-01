@@ -99,13 +99,13 @@ class _OgaAppState extends State<OgaApp> {
         if (uri.path.startsWith('/character/')) {
           final characterId = uri.path.replaceFirst('/character/', '');
           final character = OGACharacter.fromId(characterId);
+          final args = settings.arguments as Map<String, dynamic>?;
+          final isOwned = args?['isOwned'] == true;
           return PageRouteBuilder(
             settings: RouteSettings(name: '/character/$characterId'),
             transitionDuration: const Duration(milliseconds: 300),
-            pageBuilder: (_, anim, secondAnim) => CharacterDetailScreen(
-              character: character,
-              isOwned: character.isOwned,
-            ),
+            pageBuilder: (_, anim, secondAnim) =>
+                CharacterDetailScreen(character: character, isOwned: isOwned),
             transitionsBuilder: (_, anim, secondAnim, child) => FadeTransition(
               opacity: anim,
               child: SlideTransition(

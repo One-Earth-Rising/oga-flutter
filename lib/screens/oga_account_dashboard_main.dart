@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/oga_character.dart';
 import '../widgets/character_card.dart';
-import 'character_detail_screen.dart';
 import 'settings/settings_modal.dart';
 import 'tabs/friends_tab.dart';
 import 'tabs/about_tab.dart';
@@ -74,7 +73,6 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
 
   // ─── Ownership helpers (Sprint 12) ────────────────────────
   bool _isCharOwned(OGACharacter ch) => _ownedCharacterIds.contains(ch.id);
-  double _charProgress(OGACharacter ch) => _isCharOwned(ch) ? 0.99 : 0.0;
 
   @override
   void initState() {
@@ -723,7 +721,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               image: const AssetImage('assets/heroes/hero.png'),
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
-              onError: (_, _e) {},
+              onError: (_, __) {},
             ),
           ),
           foregroundDecoration: BoxDecoration(
@@ -868,7 +866,6 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
 
   Widget _buildSectionHeader(bool isMobile) {
     final ownedCount = _ownedCharacterIds.length;
-    final totalCount = _characters.length;
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -980,7 +977,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           child: CharacterCard(
             character: ch,
             isOwned: owned,
-            progress: owned ? 0.99 : 0.0,
+            progress: ch.portalPass?.progressPercent ?? 0.0,
           ),
         );
       }, childCount: chars.length),
@@ -1087,8 +1084,44 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                   ),
                 ),
 
-                // Progress ring or lock
+                // Ownership indicator + Portal Pass ring
                 if (owned) ...[
+                  // OWNED badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: neonGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: neonGreen.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: neonGreen.withValues(alpha: 0.8),
+                          size: 10,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          'OWNED',
+                          style: TextStyle(
+                            color: neonGreen.withValues(alpha: 0.8),
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Portal Pass progress ring (0% until Portal Pass is active)
                   SizedBox(
                     width: 36,
                     height: 36,
@@ -1096,14 +1129,14 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                       alignment: Alignment.center,
                       children: [
                         CircularProgressIndicator(
-                          value: 0.99,
+                          value: ch.portalPass?.progressPercent ?? 0.0,
                           strokeWidth: 2.5,
                           color: neonGreen,
                           backgroundColor: ironGrey,
                         ),
-                        const Text(
-                          '99%',
-                          style: TextStyle(
+                        Text(
+                          '${((ch.portalPass?.progressPercent ?? 0.0) * 100).toInt()}%',
+                          style: const TextStyle(
                             color: neonGreen,
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
@@ -1137,6 +1170,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ─── DETAIL NAVIGATION ────────────────────────────────────
 
   void _openDetail(OGACharacter ch) {
-    Navigator.pushNamed(context, '/character/${ch.id}');
+    Navigator.pushNamed(
+      context,
+      '/character/${ch.id}',
+      arguments: {'isOwned': _isCharOwned(ch)},
+    );
   }
 }
