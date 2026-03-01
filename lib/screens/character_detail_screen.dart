@@ -23,6 +23,8 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/invite_service.dart';
 import '../services/analytics_service.dart';
+import 'trade_proposal_modal.dart';
+import 'lend_proposal_modal.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -532,6 +534,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             ),
           ),
           const SizedBox(height: 20),
+
+          // ── TRADE / LEND ACTIONS (owned only) ──────────
+          if (owned && !isGuest) _buildOwnerActions(),
+          if (owned && !isGuest) const SizedBox(height: 20),
 
           // ── MULTIGAMEVERSE ─────────────────────────────
           _buildSectionCard(
@@ -1424,7 +1430,102 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       ),
     );
   }
+  // ═══════════════════════════════════════════════════════════
+  // TRADE / LEND ACTIONS (owned characters)
+  // ═══════════════════════════════════════════════════════════
 
+  Widget _buildOwnerActions() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _deepCharcoal,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _ironGrey, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ACTIONS',
+            style: TextStyle(
+              color: _pureWhite,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Trade or lend ${ch.name} to a friend.',
+            style: TextStyle(
+              color: _pureWhite.withValues(alpha: 0.5),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              // TRADE button
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    TradeProposalModal.show(context, characterId: ch.id);
+                  },
+                  icon: const Icon(Icons.swap_horiz, size: 18),
+                  label: const Text(
+                    'TRADE',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                      fontSize: 13,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _neonGreen,
+                    foregroundColor: _voidBlack,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // LEND button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    LendProposalModal.show(context, characterId: ch.id);
+                  },
+                  icon: Icon(
+                    Icons.handshake_outlined,
+                    size: 18,
+                    color: const Color(0xFF00BCD4),
+                  ),
+                  label: const Text(
+                    'LEND',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                      fontSize: 13,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF00BCD4),
+                    side: const BorderSide(color: Color(0xFF00BCD4)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
   // ═══════════════════════════════════════════════════════════
   // PORTAL PASS SECTION
   // ═══════════════════════════════════════════════════════════
@@ -1657,12 +1758,15 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
   /// Horizontal milestone track with nodes connected by a progress line.
   Widget _buildMilestoneTrack(PortalPass pass) {
+    // Sort ascending by level so LVL 10 is on the LEFT, LVL 50 on the RIGHT
+    final sortedRewards = [...pass.rewards]
+      ..sort((a, b) => a.levelRequired.compareTo(b.levelRequired));
     return SizedBox(
       height: 100,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final trackWidth = constraints.maxWidth;
-          final nodeCount = pass.rewards.length;
+          final nodeCount = sortedRewards.length;
           if (nodeCount == 0) return const SizedBox.shrink();
 
           return Stack(
@@ -1702,7 +1806,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               ),
               // Layer 3: Milestone nodes (on top of everything)
               ...List.generate(nodeCount, (index) {
-                final reward = pass.rewards[index];
+                final reward = sortedRewards[index];
                 final position = nodeCount == 1
                     ? trackWidth / 2
                     : (trackWidth - 40) * (index / (nodeCount - 1)) + 20;
