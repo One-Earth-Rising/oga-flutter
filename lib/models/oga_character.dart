@@ -1,10 +1,23 @@
 // ═══════════════════════════════════════════════════════════════════
-// OGA CHARACTER MODEL — Sprint 8B (Image Update)
-// ═══════════════════════════════════════════════════════════════════
-import 'dart:ui' show Color;
+// OGA CHARACTER MODEL — Sprint 12 (Supabase Catalog)
+//
+// Data classes for character display. Populated from Supabase via
+// CharacterService. No hardcoded character data.
+//
 // All image paths are RELATIVE to Supabase Storage 'characters' bucket.
 // Resolved to full URLs via OgaStorage.resolve() at render time.
 // ═══════════════════════════════════════════════════════════════════
+
+import 'dart:ui' show Color;
+
+// ─── Compatibility shim ─────────────────────────────────────
+// Top-level function used by oga_account_dashboard_main.dart
+// Delegates to CharacterService cache. Returns empty list if
+// cache isn't loaded yet (caller should await getDisplayCharacters).
+// Import this: import '../models/oga_character.dart';
+List<OGACharacter> getAllCharactersSorted() {
+  return OGACharacter.allCharacters;
+}
 
 class OGACharacter {
   final String id;
@@ -24,8 +37,11 @@ class OGACharacter {
   final List<PreviousOwner> ownershipHistory;
   final List<GameplayMedia> gameplayMedia;
   final bool isOwned;
+  final bool isBorrowed;
+  final bool isLentOut;
   final DateTime? acquiredDate;
   final double progress;
+  final Color? accentColorOverride;
 
   const OGACharacter({
     required this.id,
@@ -45,13 +61,69 @@ class OGACharacter {
     this.ownershipHistory = const [],
     this.gameplayMedia = const [],
     this.isOwned = false,
+    this.isBorrowed = false,
+    this.isLentOut = false,
     this.acquiredDate,
     this.progress = 0.0,
+    this.accentColorOverride,
   });
 
   String get imagePath => heroImage;
 
+  // ─── Static compatibility (delegates to CharacterService cache) ──
+  // These exist so screens that used the old hardcoded model
+  // keep compiling. They read from CharacterService's in-memory cache.
+  // Import CharacterService in files that call these if not already imported.
+
+  static List<OGACharacter> get allCharacters {
+    // Lazy import avoidance: access via a late-bound reference.
+    // CharacterService.cached is synchronous and returns [] if not loaded.
+    try {
+      return _cachedCharacters ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Set by CharacterService after fetching from Supabase.
+  /// This avoids a circular import between oga_character.dart ↔ character_service.dart.
+  static List<OGACharacter>? _cachedCharacters;
+
+  /// Called by CharacterService to update the static cache.
+  static void updateCache(List<OGACharacter> characters) {
+    _cachedCharacters = characters;
+  }
+
+  /// Look up a character by ID from the static cache.
+  /// Returns a placeholder if not found (prevents crashes).
+  static OGACharacter fromId(String? id) {
+    if (id == null || id.isEmpty) {
+      return OGACharacter(
+        id: 'unknown',
+        name: 'UNKNOWN',
+        ip: 'Unknown',
+        description: 'No character selected',
+        heroImage: '',
+      );
+    }
+    final cached = allCharacters;
+    try {
+      return cached.firstWhere((c) => c.id == id);
+    } catch (_) {
+      // Return a minimal placeholder so screens don't crash
+      return OGACharacter(
+        id: id,
+        name: id.toUpperCase(),
+        ip: 'Unknown',
+        description: 'Character data loading...',
+        heroImage: '',
+      );
+    }
+  }
+
   Color get accentColor {
+    if (accentColorOverride != null) return accentColorOverride!;
+    // Fallback for any edge case where override isn't set
     switch (id) {
       case 'ryu':
         return const Color(0xFFCC3333);
@@ -77,12 +149,45 @@ class OGACharacter {
     }
   }
 
-  /// Card background tint color (alias for accentColor)
+  /// Card background tint color (alias for accentColor).
   Color get cardColor => accentColor;
 
-  static List<OGACharacter> get allCharacters => getAllCharactersSorted();
-  static OGACharacter fromId(String? id) =>
-      findCharacterById(id ?? 'ryu') ?? hardcodedCharacters.first;
+  /// Create a copy with overridden ownership fields.
+  /// Used by OwnershipService.getDisplayCharacters() to overlay
+  /// per-user ownership onto the shared catalog.
+  OGACharacter copyWith({
+    bool? isOwned,
+    bool? isBorrowed,
+    bool? isLentOut,
+    DateTime? acquiredDate,
+    double? progress,
+    List<PreviousOwner>? ownershipHistory,
+  }) {
+    return OGACharacter(
+      id: id,
+      name: name,
+      ip: ip,
+      description: description,
+      lore: lore,
+      heroImage: heroImage,
+      silhouetteImage: silhouetteImage,
+      thumbnailImage: thumbnailImage,
+      rarity: rarity,
+      characterClass: characterClass,
+      tags: tags,
+      gameVariations: gameVariations,
+      portalPass: portalPass,
+      specialRewards: specialRewards,
+      ownershipHistory: ownershipHistory ?? this.ownershipHistory,
+      gameplayMedia: gameplayMedia,
+      isOwned: isOwned ?? this.isOwned,
+      isBorrowed: isBorrowed ?? this.isBorrowed,
+      isLentOut: isLentOut ?? this.isLentOut,
+      acquiredDate: acquiredDate ?? this.acquiredDate,
+      progress: progress ?? this.progress,
+      accentColorOverride: accentColorOverride,
+    );
+  }
 }
 
 class GameVariation {
@@ -207,390 +312,4 @@ class GameplayMedia {
     this.caption = '',
     this.gameName = '',
   });
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// HARDCODED MVP DATA — Storage-relative paths
-// ═══════════════════════════════════════════════════════════════════
-
-final List<OGACharacter> hardcodedCharacters = [
-  // ─── RYU ──────────────────────────────────────────────────
-  OGACharacter(
-    id: 'ryu',
-    name: 'Ryu',
-    ip: 'Street Fighter',
-    description:
-        'A disciplined martial artist seeking true strength, Ryu is a master of Ansatsuken, blending powerful strikes, fluid movement, and precise technique.',
-    lore:
-        'His iconic Hadouken energy blast controls space, while the Shoryuken uppercut delivers crushing power. The Tatsumaki Senpukyaku spinning kick keeps opponents on edge. Balanced and adaptable, Ryu is perfect for players who value skill and mastery.',
-    heroImage: 'heroes/ryu.png',
-    silhouetteImage: 'silhouettes/ryu.png',
-    thumbnailImage: 'thumbs/ryu.png',
-    rarity: 'Legendary',
-    characterClass: 'Warrior',
-    tags: ['fighting', 'martial-arts', 'classic', 'capcom'],
-    isOwned: true,
-    acquiredDate: DateTime(2026, 1, 15),
-    progress: 0.72,
-    gameVariations: [
-      GameVariation(
-        gameId: 'fortnite',
-        gameName: 'Fortnite',
-        gameIcon: 'icons/fortnite.png',
-        characterImage: 'games/ryu-fortnite.png',
-        engineName: 'Unreal Engine 5',
-        description: 'Battle Royale ready with signature gi and headband.',
-      ),
-      GameVariation(
-        gameId: 'roblox',
-        gameName: 'Roblox',
-        gameIcon: 'icons/roblox.png',
-        characterImage: 'games/ryu-roblox.png',
-        engineName: 'Roblox Engine',
-        description: 'Blocky martial arts master with classic moves.',
-      ),
-      GameVariation(
-        gameId: 'animal_crossing',
-        gameName: 'Animal Crossing',
-        gameIcon: 'icons/animal-crossing.png',
-        characterImage: 'games/ryu-animal-crossing.png',
-        engineName: 'Nintendo Engine',
-        description: 'Island life meets the World Warrior.',
-      ),
-      GameVariation(
-        gameId: 'crash_bandicoot',
-        gameName: 'Crash Bandicoot',
-        gameIcon: 'icons/crash.png',
-        characterImage: 'games/ryu-crash.png',
-        engineName: 'Unreal Engine 4',
-        description: 'Wumpa-powered hadoukens incoming.',
-      ),
-    ],
-    portalPass: PortalPass(
-      id: 'pp_ryu_s1',
-      name: 'Season 1: The Wanderer',
-      description:
-          'Complete cross-game challenges to unlock legendary rewards.',
-      currentLevel: 12,
-      maxLevel: 50,
-      progressPercent: 0.24,
-      expiresAt: DateTime(2026, 6, 30),
-      tasks: [
-        PortalPassTask(
-          id: 'task_ryu_1',
-          title: 'Win 10 matches in Fortnite',
-          targetGame: 'Fortnite',
-          currentProgress: 7,
-          targetProgress: 10,
-          xpReward: 500,
-        ),
-        PortalPassTask(
-          id: 'task_ryu_2',
-          title: 'Complete 5 Roblox quests',
-          targetGame: 'Roblox',
-          currentProgress: 5,
-          targetProgress: 5,
-          xpReward: 300,
-          isCompleted: true,
-        ),
-        PortalPassTask(
-          id: 'task_ryu_3',
-          title: 'Collect 100 island items',
-          targetGame: 'Animal Crossing',
-          currentProgress: 34,
-          targetProgress: 100,
-          xpReward: 750,
-        ),
-        PortalPassTask(
-          id: 'task_ryu_4',
-          title: 'Defeat 3 bosses',
-          targetGame: 'Crash Bandicoot',
-          currentProgress: 1,
-          targetProgress: 3,
-          xpReward: 1000,
-        ),
-      ],
-      rewards: [
-        PortalPassReward(
-          id: 'rew_ryu_1',
-          name: 'Golden Headband',
-          image: 'pass-rewards/golden-headband.png',
-          levelRequired: 10,
-          isUnlocked: true,
-        ),
-        PortalPassReward(
-          id: 'rew_ryu_2',
-          name: 'Neon Gi',
-          image: 'pass-rewards/neon-gi.png',
-          levelRequired: 25,
-        ),
-        PortalPassReward(
-          id: 'rew_ryu_3',
-          name: 'Legendary Aura',
-          image: 'pass-rewards/legendary-aura.png',
-          levelRequired: 50,
-        ),
-      ],
-    ),
-    specialRewards: [
-      SpecialReward(
-        id: 'sr_hadouken',
-        name: 'Hadouken',
-        image: 'rewards/hadouken.png',
-        description: 'Iconic energy blast projectile.',
-        isUnlocked: true,
-        rarity: 'Epic',
-      ),
-      SpecialReward(
-        id: 'sr_mask',
-        name: 'Special Mask',
-        image: 'rewards/special-mask.png',
-        description: 'Mysterious warrior mask from the ancient tournament.',
-        rarity: 'Rare',
-      ),
-      SpecialReward(
-        id: 'sr_scroll',
-        name: 'Dragon Scroll',
-        image: 'rewards/dragon-scroll.png',
-        description: 'Contains the secret of the Satsui no Hado.',
-        rarity: 'Legendary',
-      ),
-    ],
-    ownershipHistory: [
-      PreviousOwner(
-        username: '@shadow_dragon',
-        ownedFrom: DateTime(2025, 8, 10),
-        ownedUntil: DateTime(2025, 11, 3),
-      ),
-      PreviousOwner(
-        username: '@pixel_samurai',
-        ownedFrom: DateTime(2025, 11, 3),
-        ownedUntil: DateTime(2026, 1, 15),
-      ),
-      PreviousOwner(username: '@jan_oer', ownedFrom: DateTime(2026, 1, 15)),
-    ],
-    gameplayMedia: [
-      GameplayMedia(
-        id: 'gp_ryu_1',
-        imageUrl: 'gameplay/ryu-fortnite.png',
-        caption: 'Hadouken meets the Battle Bus',
-        gameName: 'Fortnite',
-      ),
-      GameplayMedia(
-        id: 'gp_ryu_2',
-        imageUrl: 'gameplay/ryu-roblox.png',
-        caption: 'Training dojo experience',
-        gameName: 'Roblox',
-      ),
-    ],
-  ),
-
-  // ─── VEGETA ───────────────────────────────────────────────
-  OGACharacter(
-    id: 'vegeta',
-    name: 'Vegeta',
-    ip: 'Dragon Ball Z',
-    description:
-        'The Prince of all Saiyans. Vegeta combines royal pride with devastating power, constantly pushing beyond his limits in pursuit of ultimate strength.',
-    lore:
-        'From the destruction of Planet Vegeta to his rivalry with Kakarot, Vegeta\'s journey from villain to protector is one of the most compelling arcs in anime history. His Final Flash and Galick Gun are feared across the multiverse.',
-    heroImage: 'heroes/vegeta.png',
-    silhouetteImage: 'silhouettes/vegeta.png',
-    thumbnailImage: 'thumbs/vegeta.png',
-    rarity: 'Legendary',
-    characterClass: 'Warrior',
-    tags: ['anime', 'saiyan', 'dbz', 'toei'],
-    isOwned: true,
-    acquiredDate: DateTime(2026, 2, 1),
-    progress: 0.45,
-    gameVariations: [
-      GameVariation(
-        gameId: 'fortnite',
-        gameName: 'Fortnite',
-        gameIcon: 'icons/fortnite.png',
-        characterImage: 'games/vegeta-fortnite.png',
-        engineName: 'Unreal Engine 5',
-        description: 'The Saiyan Prince drops into the island.',
-      ),
-      GameVariation(
-        gameId: 'roblox',
-        gameName: 'Roblox',
-        gameIcon: 'icons/roblox.png',
-        characterImage: 'games/vegeta-roblox.png',
-        engineName: 'Roblox Engine',
-        description: 'Over 9000 blocks of power.',
-      ),
-      GameVariation(
-        gameId: 'animal_crossing',
-        gameName: 'Animal Crossing',
-        gameIcon: 'icons/animal-crossing.png',
-        characterImage: 'games/vegeta-animal-crossing.png',
-        engineName: 'Nintendo Engine',
-        description: 'Even the Prince needs a vacation island.',
-      ),
-    ],
-    portalPass: PortalPass(
-      id: 'pp_vegeta_s1',
-      name: 'Season 1: Saiyan Pride',
-      description: 'Prove your worth across the multiverse.',
-      currentLevel: 8,
-      maxLevel: 50,
-      progressPercent: 0.16,
-      tasks: [
-        PortalPassTask(
-          id: 'task_veg_1',
-          title: 'Achieve 5 Victory Royales',
-          targetGame: 'Fortnite',
-          currentProgress: 2,
-          targetProgress: 5,
-          xpReward: 600,
-        ),
-        PortalPassTask(
-          id: 'task_veg_2',
-          title: 'Power level over 9000',
-          targetGame: 'Roblox',
-          currentProgress: 6500,
-          targetProgress: 9000,
-          xpReward: 900,
-        ),
-      ],
-      rewards: [
-        PortalPassReward(
-          id: 'rew_veg_1',
-          name: 'Saiyan Armor',
-          image: 'pass-rewards/saiyan-armor.png',
-          levelRequired: 5,
-          isUnlocked: true,
-        ),
-        PortalPassReward(
-          id: 'rew_veg_2',
-          name: 'SSJ Blue Aura',
-          image: 'pass-rewards/ssj-blue-aura.png',
-          levelRequired: 30,
-        ),
-      ],
-    ),
-    specialRewards: [
-      SpecialReward(
-        id: 'sr_galick',
-        name: 'Galick Gun',
-        image: 'rewards/galick-gun.png',
-        description: 'Devastating energy wave attack.',
-        isUnlocked: true,
-        rarity: 'Epic',
-      ),
-      SpecialReward(
-        id: 'sr_scouter',
-        name: 'Royal Scouter',
-        image: 'rewards/royal-scouter.png',
-        description: 'Vintage scouter from Planet Vegeta.',
-        rarity: 'Legendary',
-      ),
-    ],
-    ownershipHistory: [
-      PreviousOwner(
-        username: '@saiyan_elite',
-        ownedFrom: DateTime(2025, 9, 20),
-        ownedUntil: DateTime(2026, 2, 1),
-      ),
-      PreviousOwner(username: '@jan_oer', ownedFrom: DateTime(2026, 2, 1)),
-    ],
-    gameplayMedia: [
-      GameplayMedia(
-        id: 'gp_veg_1',
-        imageUrl: 'gameplay/vegeta-fortnite.png',
-        caption: 'Final Flash from the Storm Circle',
-        gameName: 'Fortnite',
-      ),
-    ],
-  ),
-
-  // ─── GUGGIMON ─────────────────────────────────────────────
-  OGACharacter(
-    id: 'guggimon',
-    name: 'Guggimon',
-    ip: 'Superplastic',
-    description:
-        'The internet\'s most notorious fashion horror rabbit. Part streetwear icon, part nightmare fuel — Guggimon lives at the intersection of haute couture and digital chaos.',
-    lore:
-        'Created by Superplastic, Guggimon has transcended the vinyl toy world to become a cultural phenomenon. From Fortnite to virtual concerts, this masked menace redefines what a character can be across platforms.',
-    heroImage: 'heroes/guggimon.png',
-    silhouetteImage: 'silhouettes/guggimon.png',
-    thumbnailImage: 'thumbs/guggimon.png',
-    rarity: 'Epic',
-    characterClass: 'Trickster',
-    tags: ['streetwear', 'horror', 'superplastic', 'fashion'],
-    isOwned: false,
-    progress: 0.0,
-    gameVariations: [
-      GameVariation(
-        gameId: 'fortnite',
-        gameName: 'Fortnite',
-        gameIcon: 'icons/fortnite.png',
-        characterImage: 'games/guggimon-fortnite.png',
-        engineName: 'Unreal Engine 5',
-        description: 'Streetwear chaos drops into the island.',
-      ),
-      GameVariation(
-        gameId: 'roblox',
-        gameName: 'Roblox',
-        gameIcon: 'icons/roblox.png',
-        characterImage: 'games/guggimon-roblox.png',
-        engineName: 'Roblox Engine',
-        description: 'Fashion horror in block form.',
-      ),
-    ],
-    portalPass: null,
-    specialRewards: [
-      SpecialReward(
-        id: 'sr_mask_gugg',
-        name: 'Neon Skull Mask',
-        image: 'rewards/neon-skull-mask.png',
-        description: 'Iconic horror-fashion headwear.',
-        rarity: 'Epic',
-      ),
-      SpecialReward(
-        id: 'sr_axe_gugg',
-        name: 'Chaos Axe',
-        image: 'rewards/chaos-axe.png',
-        description: 'Fashionably destructive.',
-        rarity: 'Rare',
-      ),
-    ],
-    ownershipHistory: [
-      PreviousOwner(
-        username: '@vinyl_collector',
-        ownedFrom: DateTime(2025, 6, 1),
-        ownedUntil: DateTime(2025, 12, 15),
-      ),
-      PreviousOwner(
-        username: '@streetwear_king',
-        ownedFrom: DateTime(2025, 12, 15),
-      ),
-    ],
-    gameplayMedia: [
-      GameplayMedia(
-        id: 'gp_gugg_1',
-        imageUrl: 'gameplay/guggimon-fortnite.png',
-        caption: 'Fashion week meets fight night',
-        gameName: 'Fortnite',
-      ),
-    ],
-  ),
-];
-
-OGACharacter? findCharacterById(String id) {
-  try {
-    return hardcodedCharacters.firstWhere((c) => c.id == id);
-  } catch (_) {
-    return null;
-  }
-}
-
-List<OGACharacter> getOwnedCharacters() =>
-    hardcodedCharacters.where((c) => c.isOwned).toList();
-List<OGACharacter> getAllCharactersSorted() {
-  final owned = hardcodedCharacters.where((c) => c.isOwned).toList();
-  final locked = hardcodedCharacters.where((c) => !c.isOwned).toList();
-  return [...owned, ...locked];
 }

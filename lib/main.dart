@@ -32,6 +32,8 @@ import 'services/beta_gate_service.dart';
 import 'screens/beta_waitlist_screen.dart';
 import 'services/admin_guard_service.dart';
 import 'screens/admin/admin_analytics_screen.dart';
+import 'services/character_service.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -567,6 +569,7 @@ class _OgaAppState extends State<OgaApp> {
             }
             // ✅ Initialize analytics session — user has access
             await AnalyticsService.init();
+            await NotificationService.init();
             AnalyticsService.trackPageView('dashboard');
             return OGAAccountDashboard(
               sessionId: sessionId,
@@ -583,6 +586,7 @@ class _OgaAppState extends State<OgaApp> {
             }
             // ✅ Initialize analytics session — user has access (error path)
             await AnalyticsService.init();
+            await NotificationService.init();
             AnalyticsService.trackPageView('dashboard');
             return OGAAccountDashboard(
               sessionId: user.id,
@@ -732,6 +736,7 @@ class _OgaAppState extends State<OgaApp> {
           }
           // ✅ Initialize analytics session — user has access
           await AnalyticsService.init();
+          await NotificationService.init();
           AnalyticsService.trackPageView('dashboard');
           return OGAAccountDashboard(
             sessionId: sessionId,
@@ -746,6 +751,7 @@ class _OgaAppState extends State<OgaApp> {
           }
           // ✅ Initialize analytics session — user has access (error path)
           await AnalyticsService.init();
+          await NotificationService.init();
           AnalyticsService.trackPageView('dashboard');
           return OGAAccountDashboard(
             sessionId: existingUser.id,
