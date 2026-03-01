@@ -14,6 +14,7 @@ class Lend {
   final String borrowerEmail;
   final String characterId;
   final int durationHours;
+  final String? message;
   final String status;
   final DateTime proposedAt;
   final DateTime? acceptedAt;
@@ -26,6 +27,7 @@ class Lend {
     required this.borrowerEmail,
     required this.characterId,
     required this.durationHours,
+    this.message,
     required this.status,
     required this.proposedAt,
     this.acceptedAt,
@@ -40,6 +42,7 @@ class Lend {
       borrowerEmail: map['borrower_email'] ?? '',
       characterId: map['character_id'] ?? '',
       durationHours: map['duration_hours'] ?? 168,
+      message: map['message'] as String?,
       status: map['status'] ?? 'pending',
       proposedAt:
           DateTime.tryParse(map['proposed_at']?.toString() ?? '') ??
@@ -83,7 +86,12 @@ class LendService {
     required String borrowerEmail,
     required String characterId,
     int durationHours = 168, // 7 days default
+    int? durationDays, // UI convenience — overrides durationHours
+    String? message,
   }) async {
+    final actualHours = durationDays != null
+        ? durationDays * 24
+        : durationHours;
     final email = _currentEmail;
     if (email == null) return 'Not logged in';
     if (borrowerEmail == email) return 'Cannot lend to yourself';
@@ -128,15 +136,19 @@ class LendService {
         return 'This character already has a pending or active lend';
 
       // Create the lend
+      final insertData = <String, dynamic>{
+        'lender_email': email,
+        'borrower_email': borrowerEmail,
+        'character_id': characterId,
+        'duration_hours': actualHours,
+        'ownership_id': ownership['id'],
+      };
+      if (message != null && message.isNotEmpty) {
+        insertData['message'] = message;
+      }
       final lendRow = await _supabase
           .from('lends')
-          .insert({
-            'lender_email': email,
-            'borrower_email': borrowerEmail,
-            'character_id': characterId,
-            'duration_hours': durationHours,
-            'ownership_id': ownership['id'],
-          })
+          .insert(insertData)
           .select('id')
           .single();
 
@@ -352,4 +364,31 @@ class LendService {
       return [];
     }
   }
+
+  // ─── Convenience aliases (used by UI screens) ────────────
+
+  /// Alias: get characters user is currently borrowing.
+  static Future<List<Lend>> getActiveBorrowing() => getActiveBorrowed();
+
+  /// Alias: get characters user is currently lending out.
+  static Future<List<Lend>> getActiveLending() => getActiveLentOut();
+
+  /// Get pending lend requests where current user is the borrower.
+  static Future<List<Lend>> getPendingRequests() async {
+    final email = _currentEmail;
+    if (email == null) return [];
+    final all = await getMyLends(status: 'pending');
+    return all.where((l) => l.borrowerEmail == email).toList();
+  }
+
+  /// Get completed / returned lends involving current user.
+  static Future<List<Lend>> getLendHistory() async {
+    final all = await getMyLends();
+    return all
+        .where((l) => l.status != 'pending' && l.status != 'active')
+        .toList();
+  }
+
+  /// Alias for returnEarly (UI calls it returnLend).
+  static Future<String> returnLend(String lendId) => returnEarly(lendId);
 }

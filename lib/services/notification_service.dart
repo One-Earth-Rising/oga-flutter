@@ -113,8 +113,23 @@ class NotificationService {
   /// Stream of unread count changes.
   static Stream<int> get onUnreadCountChanged => _unreadCountController.stream;
 
+  /// Alias used by NotificationBellWidget.
+  static Stream<int> get unreadCountStream => _unreadCountController.stream;
+
   /// Current unread count (synchronous access).
   static int get unreadCount => _unreadCount;
+
+  /// Decrement unread count locally (called after marking one notification read).
+  static void decrementUnread() {
+    _unreadCount = (_unreadCount - 1).clamp(0, 999999);
+    _unreadCountController.add(_unreadCount);
+  }
+
+  /// Reset unread count to zero locally (called after mark-all-read).
+  static void resetUnread() {
+    _unreadCount = 0;
+    _unreadCountController.add(0);
+  }
 
   // ─── Init / Dispose ───────────────────────────────────────
 

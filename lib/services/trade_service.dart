@@ -376,4 +376,28 @@ class TradeService {
       return [];
     }
   }
+
+  // ─── Convenience aliases (used by UI screens) ────────────
+
+  /// Get pending trades where current user is receiver.
+  static Future<List<Trade>> getIncomingTrades() async {
+    final email = _currentEmail;
+    if (email == null) return [];
+    final all = await getMyTrades(status: 'pending');
+    return all.where((t) => t.receiverEmail == email).toList();
+  }
+
+  /// Get pending trades where current user is proposer.
+  static Future<List<Trade>> getOutgoingTrades() async {
+    final email = _currentEmail;
+    if (email == null) return [];
+    final all = await getMyTrades(status: 'pending');
+    return all.where((t) => t.proposerEmail == email).toList();
+  }
+
+  /// Get all completed/declined/cancelled trades for current user.
+  static Future<List<Trade>> getAllTradeHistory() async {
+    final all = await getMyTrades();
+    return all.where((t) => t.status != 'pending').toList();
+  }
 }
