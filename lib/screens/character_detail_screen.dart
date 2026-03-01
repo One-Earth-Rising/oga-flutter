@@ -66,6 +66,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   @override
   void initState() {
     super.initState();
+
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -74,6 +75,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
     _heroPageController = PageController(initialPage: 0);
+    AnalyticsService.trackCharacterViewed(
+      ch.id,
+      game: ch.gameVariations.isNotEmpty
+          ? ch.gameVariations.first.gameName
+          : null,
+      owned: owned,
+    );
   }
 
   @override
@@ -2598,7 +2606,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       inviteCode: _userInviteCode!,
       characterId: widget.character.id,
     );
-    AnalyticsService.trackShare(widget.character.id, _userInviteCode!);
+    AnalyticsService.trackShareTapped();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

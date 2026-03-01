@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/friend_service.dart';
+import '../services/analytics_service.dart';
 
 /// Share Profile / Recruit Agents screen.
 /// Shows QR code, invite code, share link, and referral reward.
@@ -37,6 +38,7 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.trackPageView('share_profile');
     _inviteCode = widget.inviteCode;
     if (_inviteCode != null) {
       _isLoading = false;
@@ -404,6 +406,8 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
   }
 
   void _shareInviteLink() {
+    AnalyticsService.trackShareTapped();
+    // Uses share_plus to open native share sheet
     // Uses share_plus to open native share sheet
     // On mobile: shows Mail, Messages, WhatsApp, etc.
     // On web: falls back to clipboard or browser share API

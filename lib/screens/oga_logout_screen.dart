@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/analytics_service.dart';
 
 /// Logout confirmation screen with Heimdal neon aesthetic.
 ///
@@ -63,6 +65,7 @@ class _OGALogoutScreenState extends State<OGALogoutScreen>
 
   Future<void> _performLogout() async {
     try {
+      await AnalyticsService.endSession();
       await Supabase.instance.client.auth.signOut();
       debugPrint('👋 User signed out successfully');
     } catch (e) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/friend_service.dart';
 import '../../screens/feedback_modal.dart';
+import '../../services/analytics_service.dart';
 
 // For web file picking
 // ignore: avoid_web_libraries_in_flutter
@@ -870,6 +871,7 @@ class _SettingsModalState extends State<SettingsModal> {
     });
 
     if (success) {
+      AnalyticsService.trackSettingsAction('profile_saved');
       widget.onProfileUpdated?.call();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

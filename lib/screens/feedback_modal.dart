@@ -595,7 +595,7 @@ class _FeedbackModalState extends State<FeedbackModal> {
     );
 
     // Track the feedback event
-    await AnalyticsService.trackFeedback(_category);
+    AnalyticsService.trackFeedbackSubmitted(_category);
 
     setState(() {
       _isSubmitting = false;

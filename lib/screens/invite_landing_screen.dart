@@ -59,10 +59,10 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
         inviteCode: widget.inviteCode,
         characterId: widget.characterId,
       );
-      AnalyticsService.trackInviteLanding(
-        widget.inviteCode,
-        characterId: widget.characterId,
-      );
+      AnalyticsService.trackFeature('invite_landing', {
+        'invite_code': widget.inviteCode,
+        if (widget.characterId != null) 'character_id': widget.characterId,
+      });
 
       // Auto-open specific character if characterId was in the URL
       if (widget.characterId != null) {

@@ -30,6 +30,8 @@ import 'screens/oga_splash_screen.dart';
 import 'screens/oga_logout_screen.dart';
 import 'services/beta_gate_service.dart';
 import 'screens/beta_waitlist_screen.dart';
+import 'services/admin_guard_service.dart';
+import 'screens/admin/admin_analytics_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -110,6 +112,37 @@ class _OgaAppState extends State<OgaApp> {
                 ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
                 child: child,
               ),
+            ),
+          );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // ADMIN ANALYTICS DASHBOARD
+        // ═══════════════════════════════════════════════════════
+        if (uri.path == '/admin') {
+          return MaterialPageRoute(
+            builder: (_) => FutureBuilder<bool>(
+              future: AdminGuardService.isAdmin(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    backgroundColor: Color(0xFF000000),
+                    body: Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF39FF14),
+                      ),
+                    ),
+                  );
+                }
+                if (snapshot.data == true) {
+                  return const AdminAnalyticsScreen();
+                }
+                // Not admin → redirect to dashboard
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  Navigator.pushReplacementNamed(context, '/dashboard');
+                });
+                return const Scaffold(backgroundColor: Color(0xFF000000));
+              },
             ),
           );
         }
@@ -287,6 +320,8 @@ class _OgaAppState extends State<OgaApp> {
                   );
                 }
                 if (snapshot.data == true) {
+                  // Initialize analytics when dashboard is accessed
+                  AnalyticsService.init();
                   return OGAAccountDashboard(
                     sessionId: sessionId,
                     acquiredCharacterId: character,
@@ -456,10 +491,10 @@ class _OgaAppState extends State<OgaApp> {
                   inviteCode: pendingInvite,
                   inviteeEmail: user.email!,
                 );
-                AnalyticsService.track(
-                  AnalyticsService.eventSignUp,
-                  metadata: {'invite_code': pendingInvite},
-                );
+                // Track invite signup conversion
+                AnalyticsService.trackFeature('invite_conversion', {
+                  'invite_code': pendingInvite,
+                });
 
                 // Look up inviter name for welcome screen
                 final inviterProfile = await FriendService.getPublicProfile(
@@ -518,10 +553,10 @@ class _OgaAppState extends State<OgaApp> {
               return const InviteOnboardingScreen();
             }
 
-            // Non-FBS users: Go to main dashboard
+            // ═══════════════════════════════════════════════════════
+            // MAIN DASHBOARD — BETA GATE + ANALYTICS INIT
+            // ═══════════════════════════════════════════════════════
             debugPrint('🎯 Routing to main dashboard');
-            AnalyticsService.trackDashboardView();
-            // === BETA GATE CHECK ===
             final hasBetaAccess = await BetaGateService.hasAccess();
             if (!hasBetaAccess) {
               debugPrint(
@@ -529,13 +564,15 @@ class _OgaAppState extends State<OgaApp> {
               );
               return const BetaWaitlistScreen();
             }
+            // ✅ Initialize analytics session — user has access
+            await AnalyticsService.init();
+            AnalyticsService.trackPageView('dashboard');
             return OGAAccountDashboard(
               sessionId: sessionId,
               acquiredCharacterId: character,
             );
           } catch (e) {
             debugPrint('⚠️ Error fetching profile: $e');
-            // === BETA GATE CHECK ===
             final hasBetaAccess = await BetaGateService.hasAccess();
             if (!hasBetaAccess) {
               debugPrint(
@@ -543,6 +580,9 @@ class _OgaAppState extends State<OgaApp> {
               );
               return const BetaWaitlistScreen();
             }
+            // ✅ Initialize analytics session — user has access (error path)
+            await AnalyticsService.init();
+            AnalyticsService.trackPageView('dashboard');
             return OGAAccountDashboard(
               sessionId: user.id,
               acquiredCharacterId: 'ryu',
@@ -622,10 +662,10 @@ class _OgaAppState extends State<OgaApp> {
                 inviteCode: pendingInvite,
                 inviteeEmail: existingUser.email!,
               );
-              AnalyticsService.track(
-                AnalyticsService.eventSignUp,
-                metadata: {'invite_code': pendingInvite},
-              );
+              // Track invite signup conversion
+              AnalyticsService.trackFeature('invite_conversion', {
+                'invite_code': pendingInvite,
+              });
 
               final inviterProfile = await FriendService.getPublicProfile(
                 pendingInvite,
@@ -679,27 +719,33 @@ class _OgaAppState extends State<OgaApp> {
             return const InviteOnboardingScreen();
           }
 
-          // Default: main dashboard
+          // ═══════════════════════════════════════════════════════
+          // MAIN DASHBOARD — BETA GATE + ANALYTICS INIT
+          // (Existing Session Path)
+          // ═══════════════════════════════════════════════════════
           debugPrint('🎯 Routing to main dashboard (existing session)');
-          AnalyticsService.trackDashboardView();
-          // === BETA GATE CHECK ===
           final hasBetaAccess = await BetaGateService.hasAccess();
           if (!hasBetaAccess) {
             debugPrint('🚫 User does not have beta access — showing waitlist');
             return const BetaWaitlistScreen();
           }
+          // ✅ Initialize analytics session — user has access
+          await AnalyticsService.init();
+          AnalyticsService.trackPageView('dashboard');
           return OGAAccountDashboard(
             sessionId: sessionId,
             acquiredCharacterId: character,
           );
         } catch (e) {
           debugPrint('⚠️ Error fetching profile for existing user: $e');
-          // === BETA GATE CHECK ===
           final hasBetaAccess = await BetaGateService.hasAccess();
           if (!hasBetaAccess) {
             debugPrint('🚫 User does not have beta access — showing waitlist');
             return const BetaWaitlistScreen();
           }
+          // ✅ Initialize analytics session — user has access (error path)
+          await AnalyticsService.init();
+          AnalyticsService.trackPageView('dashboard');
           return OGAAccountDashboard(
             sessionId: existingUser.id,
             acquiredCharacterId: 'ryu',

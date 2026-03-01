@@ -69,7 +69,8 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   void initState() {
     super.initState();
     _loadUserData();
-    AnalyticsService.trackDashboardView();
+    // REPLACE WITH:
+    AnalyticsService.trackPageView('dashboard');
   }
 
   @override
@@ -229,6 +230,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       controller: _pageController,
       onPageChanged: (index) {
         setState(() => _currentTab = _tabs[index]);
+        AnalyticsService.trackTabSwitch(_tabs[index].toLowerCase());
       },
       children: [
         // Tab 0: PROFILE
@@ -837,7 +839,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 GestureDetector(
-                  onTap: () => setState(() => _isGridView = true),
+                  onTap: () {
+                    setState(() => _isGridView = true);
+                    AnalyticsService.trackViewToggle(true);
+                  },
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -853,7 +858,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                 ),
                 const SizedBox(width: 4),
                 GestureDetector(
-                  onTap: () => setState(() => _isGridView = false),
+                  onTap: () {
+                    setState(() => _isGridView = false);
+                    AnalyticsService.trackViewToggle(false);
+                  },
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(

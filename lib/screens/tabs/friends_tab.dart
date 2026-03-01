@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/friend_service.dart';
 import '../share_profile_screen.dart';
 import '../friend_profile_screen.dart';
+import '../../services/analytics_service.dart';
 
 /// Friends tab with real Supabase data.
 /// Features: "Invited by" card, friend list, invite code search, add friend, pending requests.
@@ -772,6 +773,7 @@ class _FriendsTabState extends State<FriendsTab> {
                           _requestSent = true;
                           _foundUser = null;
                           _addError = null;
+                          AnalyticsService.trackFriendAction('request_sent');
                           // Refresh friends list to show pending
                           _loadData();
                         } else {
