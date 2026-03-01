@@ -92,6 +92,7 @@ class _OgaAppState extends State<OgaApp> {
       ),
       onGenerateRoute: (settings) {
         final uri = Uri.parse(settings.name ?? '');
+
         // /#/character/ryu → CharacterDetailScreen
         if (uri.path.startsWith('/character/')) {
           final characterId = uri.path.replaceFirst('/character/', '');

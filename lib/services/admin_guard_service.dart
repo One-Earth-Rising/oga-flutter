@@ -6,12 +6,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Used to protect the /admin route.
 class AdminGuardService {
   static final _supabase = Supabase.instance.client;
+  static bool? _cachedResult;
+  static String? _cachedRole;
 
   /// Check if current user is an admin
   static Future<bool> isAdmin() async {
+    if (_cachedResult != null) return _cachedResult!;
+
     try {
       final email = _supabase.auth.currentUser?.email;
-      if (email == null) return false;
+      if (email == null) {
+        _cachedResult = false;
+        return false;
+      }
 
       final response = await _supabase
           .from('admin_access')
@@ -19,10 +26,25 @@ class AdminGuardService {
           .eq('email', email)
           .maybeSingle();
 
-      return response != null;
+      _cachedResult = response != null;
+
+      if (kDebugMode) {
+        print(
+          '🔐 Admin check: $email → ${_cachedResult! ? "✅ admin" : "❌ not admin"}',
+        );
+      }
+
+      return _cachedResult!;
     } catch (e) {
       if (kDebugMode) print('⚠️ Admin check failed: $e');
+      _cachedResult = false;
       return false; // Fail closed
     }
+  }
+
+  /// Clear cache (call on logout).
+  static void clearCache() {
+    _cachedResult = null;
+    _cachedRole = null;
   }
 }

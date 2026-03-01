@@ -12,6 +12,7 @@ import 'share_profile_screen.dart';
 import '../config/oga_storage.dart';
 import 'feedback_modal.dart';
 import '../services/analytics_service.dart';
+import '../services/admin_guard_service.dart';
 
 class OGAAccountDashboard extends StatefulWidget {
   final String? sessionId;
@@ -37,6 +38,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   String _currentTab = 'PROFILE';
   DateTime? _joinedDate;
   bool _isGridView = true;
+  bool _isAdmin = false;
   final _pageController = PageController();
 
   // V2 Brand Colors (Heimdal Aesthetic)
@@ -69,7 +71,6 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   void initState() {
     super.initState();
     _loadUserData();
-    // REPLACE WITH:
     AnalyticsService.trackPageView('dashboard');
   }
 
@@ -119,6 +120,11 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           _isLoading = false;
         });
       }
+
+      // Check admin status (non-blocking)
+      AdminGuardService.isAdmin().then((isAdmin) {
+        if (mounted) setState(() => _isAdmin = isAdmin);
+      });
     } catch (e) {
       debugPrint('\u274c Error loading user data: $e');
       setState(() {
@@ -185,6 +191,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   }
 
   void _handleLogout() {
+    AdminGuardService.clearCache();
     Navigator.of(context).pushNamedAndRemoveUntil('/logout', (route) => false);
   }
 
@@ -402,6 +409,9 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           case 'contact':
             ContactModal.show(context);
             break;
+          case 'admin':
+            Navigator.pushNamed(context, '/admin');
+            break;
           case 'logout':
             _handleLogout();
             break;
@@ -447,6 +457,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         _dropItem('about', 'About OGA'),
         _dropItem('faq', 'FAQ'),
         _dropItem('contact', 'Contact'),
+        if (_isAdmin) ...[
+          const PopupMenuDivider(height: 1),
+          _dropItem('admin', '\u26a1 Command Center', isAdmin: true),
+        ],
         const PopupMenuDivider(height: 1),
         _dropItem('logout', 'Log out', dimmed: true),
       ],
@@ -460,7 +474,12 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  PopupMenuItem<String> _dropItem(String v, String l, {bool dimmed = false}) {
+  PopupMenuItem<String> _dropItem(
+    String v,
+    String l, {
+    bool dimmed = false,
+    bool isAdmin = false,
+  }) {
     return PopupMenuItem<String>(
       value: v,
       height: 40,
@@ -468,11 +487,13 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       child: Text(
         l,
         style: TextStyle(
-          color: dimmed
+          color: isAdmin
+              ? neonGreen
+              : dimmed
               ? Colors.white.withValues(alpha: 0.35)
               : Colors.white.withValues(alpha: 0.8),
           fontSize: 13,
-          fontWeight: FontWeight.w500,
+          fontWeight: isAdmin ? FontWeight.w700 : FontWeight.w500,
         ),
       ),
     );
@@ -558,6 +579,19 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             Navigator.pop(context);
             ContactModal.show(context);
           }),
+          // ─── Admin entry (mobile) ─────────────────────────
+          if (_isAdmin) ...[
+            const Divider(color: ironGrey, height: 16),
+            _drawerAction(
+              '\u26a1 COMMAND CENTER',
+              Icons.admin_panel_settings_outlined,
+              () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/admin');
+              },
+              highlight: true,
+            ),
+          ],
           const Spacer(),
           _drawerAction('LOG OUT', Icons.logout, () {
             Navigator.pop(context);
@@ -611,14 +645,23 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
-  Widget _drawerAction(String label, IconData icon, VoidCallback onTap) {
+  Widget _drawerAction(
+    String label,
+    IconData icon,
+    VoidCallback onTap, {
+    bool highlight = false,
+  }) {
     return ListTile(
-      leading: Icon(icon, color: Colors.white54, size: 22),
+      leading: Icon(
+        icon,
+        color: highlight ? neonGreen : Colors.white54,
+        size: 22,
+      ),
       title: Text(
         label,
-        style: const TextStyle(
-          color: Colors.white70,
-          fontWeight: FontWeight.w800,
+        style: TextStyle(
+          color: highlight ? neonGreen : Colors.white70,
+          fontWeight: highlight ? FontWeight.w900 : FontWeight.w800,
           fontSize: 13,
           letterSpacing: 1,
         ),
