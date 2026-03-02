@@ -97,7 +97,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       ),
       builder: (context) {
         return FractionallySizedBox(
-          heightFactor: 0.7, // Takes up 70% of the screen
+          heightFactor: 0.7,
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -124,13 +124,107 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                // TODO: Replace with FutureBuilder hitting FriendService.getFriendsFor(friend.id)
-                const Expanded(
-                  child: Center(
-                    child: Text(
-                      "Friends list coming soon...",
-                      style: TextStyle(color: Colors.white54, fontSize: 13),
-                    ),
+                Expanded(
+                  child: FutureBuilder<List<FriendProfile>>(
+                    // Trigger the service call using the friend's email
+                    future: FriendService.getFriendsForEmail(friend.email),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(color: neonGreen),
+                        );
+                      }
+
+                      if (snapshot.hasError) {
+                        return const Center(
+                          child: Text(
+                            "Failed to load friends.",
+                            style: TextStyle(color: Colors.white54),
+                          ),
+                        );
+                      }
+
+                      final friendsList = snapshot.data;
+
+                      if (friendsList == null || friendsList.isEmpty) {
+                        return Center(
+                          child: Text(
+                            "${friend.name.split(' ').first} hasn't added any friends yet.",
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 13,
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        itemCount: friendsList.length,
+                        itemBuilder: (context, index) {
+                          final f = friendsList[index];
+
+                          // Determine the avatar fallback logic
+                          final starterChar = f.starterCharacter != null
+                              ? OGACharacter.fromId(f.starterCharacter!)
+                              : OGACharacter.allCharacters.first;
+
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                            ),
+                            leading: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: f.characterColor,
+                                  width: 2,
+                                ),
+                              ),
+                              child: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: deepCharcoal,
+                                backgroundImage: f.avatarUrl != null
+                                    ? NetworkImage(f.avatarUrl!)
+                                    : NetworkImage(
+                                        OgaStorage.resolve(
+                                          starterChar.thumbnailImage,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            title: Text(
+                              f.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            subtitle: Text(
+                              f.email,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.5),
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: Icon(
+                              Icons.chevron_right,
+                              color: Colors.white.withValues(alpha: 0.2),
+                            ),
+                            onTap: () {
+                              Navigator.pop(context); // Close modal
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      FriendProfileScreen(friend: f),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
               ],
@@ -188,7 +282,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           ),
           // Friend badge / View Friends Button
           GestureDetector(
-            onTap: _showFriendsListModal, // Action added here
+            onTap: _showFriendsListModal,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
@@ -267,7 +361,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             children: [
               // Avatar with GestureDetector added
               GestureDetector(
-                onTap: _openEnlargedAvatarModal, // Action added here
+                onTap: _openEnlargedAvatarModal,
                 child: Container(
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(

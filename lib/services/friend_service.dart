@@ -60,6 +60,41 @@ class FriendService {
     }
   }
 
+  /// Fetches a list of accepted friends for a specific user's email.
+  static Future<List<FriendProfile>> getFriendsForEmail(String targetEmail) async {
+    try {
+      // 1. Get all accepted friendships for this email
+      final response = await _supabase
+          .from('friendships')
+          .select()
+          .eq('status', 'accepted')
+          .or('requester_email.eq.$targetEmail,receiver_email.eq.$targetEmail');
+
+      if (response.isEmpty) return [];
+
+      // 2. Extract the emails of the friends (ignoring the target user's own email)
+      final friendEmails = response.map((f) {
+        return f['requester_email'] == targetEmail
+            ? f['receiver_email']
+            : f['requester_email'];
+      }).whereType<String>().toList();
+
+      if (friendEmails.isEmpty) return [];
+
+      // 3. Fetch the public profile data for those friend emails
+      final profilesResponse = await _supabase
+          .from('profiles')
+          .select()
+          .inFilter('email', friendEmails);
+
+      // 4. Map the database rows to your FriendProfile model using fromMap
+      return profilesResponse.map((p) => FriendProfile.fromMap(p)).toList();
+    } catch (e) {
+      debugPrint('Error fetching friends: $e');
+      return [];
+    }
+  }
+
   /// Get pending friend requests received by current user.
   static Future<List<FriendProfile>> getPendingRequests() async {
     final email = _currentEmail;
@@ -77,8 +112,7 @@ class FriendService {
 
       // Collect the "other" person's email for each pending request
       final otherEmails = <String>[];
-      final directionMap =
-          <String, bool>{}; // email → isIncoming (they need to approve)
+      final directionMap = <String, bool>{}; // email → isIncoming (they need to approve)
 
       for (final f in pending) {
         final requester = f['requester_email'] as String;
@@ -464,7 +498,7 @@ class FriendService {
       return null;
     }
   }
-}
+} // <--- This closing brace is now correctly at the end of the service class.
 
 /// Friend profile data model.
 class FriendProfile {
@@ -493,7 +527,7 @@ class FriendProfile {
   factory FriendProfile.fromMap(
     Map<String, dynamic> map, {
     bool isPending = false,
-    isIncomingRequest = true, // default, overridden by getPendingRequests()
+    bool isIncomingRequest = true, // Added the missing 'bool' type here
   }) {
     return FriendProfile(
       email: map['email'] as String? ?? '',
