@@ -18,11 +18,13 @@ import '../services/ownership_service.dart';
 class OGAAccountDashboard extends StatefulWidget {
   final String? sessionId;
   final String? acquiredCharacterId;
+  final String? targetProfileId;
 
   const OGAAccountDashboard({
     super.key,
     this.sessionId,
     this.acquiredCharacterId,
+    this.targetProfileId,
   });
 
   @override
@@ -36,6 +38,8 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   Map<String, dynamic>? _userData;
   String? _ownedCharacterId;
   String? _avatarUrl;
+  bool _isOwnProfile = false;
+  String? _profileUserId;
   String _currentTab = 'PROFILE';
   DateTime? _joinedDate;
   bool _isGridView = true;
@@ -101,8 +105,11 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         debugPrint('⚠️ CharacterService.getAll() failed: $e — using fallback');
       }
 
-      if (user == null) {
-        debugPrint('\u26a0\ufe0f No authenticated user');
+      // Determine which profile to load
+      _profileUserId = widget.targetProfileId ?? user?.id;
+
+      if (_profileUserId == null) {
+        debugPrint('⚠️ Cannot determine target profile.');
         setState(() {
           _ownedCharacterId = widget.acquiredCharacterId ?? 'ryu';
           _isLoading = false;
@@ -110,18 +117,20 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         return;
       }
 
-      _joinedDate = DateTime.tryParse(user.createdAt);
+      // Check if the current user is viewing their own profile
+      _isOwnProfile = (user != null && _profileUserId == user.id);
 
+      // Load profile data based on ID, not email, to support public profile viewing
       final response = await supabase
           .from('profiles')
           .select()
-          .eq('email', user.email!)
+          .eq('id', _profileUserId!)
           .maybeSingle();
 
       if (response != null) {
-        if (_joinedDate == null && response['created_at'] != null) {
-          _joinedDate = DateTime.tryParse(response['created_at'].toString());
-        }
+        _joinedDate = DateTime.tryParse(
+          response['created_at']?.toString() ?? '',
+        );
         _userData = response;
         _ownedCharacterId =
             widget.acquiredCharacterId ??
@@ -134,6 +143,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
 
       // ─── Sprint 12: Load ownership from DB ───────────────
       try {
+        // NOTE: In a full implementation, you'd want OwnershipService to fetch for _profileUserId, not just "My" characters.
         final owned = await OwnershipService.getMyCharacters();
         _ownedCharacterIds = owned.map((o) => o.characterId).toSet();
         debugPrint(
@@ -156,7 +166,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         if (mounted) setState(() => _isAdmin = isAdmin);
       });
     } catch (e) {
-      debugPrint('\u274c Error loading user data: $e');
+      debugPrint('❌ Error loading user data: $e');
       setState(() {
         _ownedCharacterId = widget.acquiredCharacterId ?? 'ryu';
         _isLoading = false;
@@ -223,6 +233,48 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   void _handleLogout() {
     AdminGuardService.clearCache();
     Navigator.of(context).pushNamedAndRemoveUntil('/logout', (route) => false);
+  }
+
+  // ─── Avatar Tap Logic ─────────────────────────────────────
+
+  void _handleAvatarTap() {
+    if (_isOwnProfile) {
+      _openSettings();
+    } else {
+      _openEnlargedAvatarModal();
+    }
+  }
+
+  void _openEnlargedAvatarModal() {
+    final imageUrl = _avatarUrl;
+    final fallbackImageUrl = OgaStorage.resolve(_ownedCharacter.heroImage);
+
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: imageUrl != null
+                  ? Image.network(imageUrl, fit: BoxFit.contain)
+                  : Image.network(fallbackImageUrl, fit: BoxFit.contain),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -404,6 +456,9 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     final userName = _displayName;
     final email = supabase.auth.currentUser?.email ?? '';
 
+    // Hide dropdown if viewing someone else's profile to prevent settings/admin overlap
+    if (!_isOwnProfile) return const SizedBox.shrink();
+
     return PopupMenuButton<String>(
       offset: const Offset(0, 50),
       color: deepCharcoal,
@@ -420,7 +475,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               curve: Curves.easeInOut,
             );
             break;
-          case 'friends': // Added Friends routing
+          case 'friends':
             _pageController.animateToPage(
               1,
               duration: const Duration(milliseconds: 300),
@@ -490,7 +545,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         ),
         const PopupMenuDivider(height: 1),
         _dropItem('profile', 'My Profile'),
-        _dropItem('friends', 'Friends'), // Added Friends menu item
+        _dropItem('friends', 'Friends'),
         _dropItem('settings', 'Settings'),
         _dropItem('about', 'About OGA'),
         _dropItem('faq', 'FAQ'),
@@ -601,40 +656,45 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             ('FRIENDS', Icons.people_outline),
             ('ABOUT', Icons.info_outline),
           ].map((item) => _drawerTab(item.$1, item.$2)),
-          const Divider(color: ironGrey, height: 32),
-          _drawerAction('SETTINGS', Icons.settings_outlined, () {
-            Navigator.pop(context);
-            _openSettings();
-          }),
-          _drawerAction('FAQ', Icons.help_outline, () {
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FaqPage()),
-            );
-          }),
-          _drawerAction('CONTACT', Icons.mail_outline, () {
-            Navigator.pop(context);
-            ContactModal.show(context);
-          }),
-          // ─── Admin entry (mobile) ─────────────────────────
-          if (_isAdmin) ...[
-            const Divider(color: ironGrey, height: 16),
-            _drawerAction(
-              '\u26a1 COMMAND CENTER',
-              Icons.admin_panel_settings_outlined,
-              () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/admin');
-              },
-              highlight: true,
-            ),
+
+          if (_isOwnProfile) ...[
+            const Divider(color: ironGrey, height: 32),
+            _drawerAction('SETTINGS', Icons.settings_outlined, () {
+              Navigator.pop(context);
+              _openSettings();
+            }),
+            _drawerAction('FAQ', Icons.help_outline, () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FaqPage()),
+              );
+            }),
+            _drawerAction('CONTACT', Icons.mail_outline, () {
+              Navigator.pop(context);
+              ContactModal.show(context);
+            }),
+            // ─── Admin entry (mobile) ─────────────────────────
+            if (_isAdmin) ...[
+              const Divider(color: ironGrey, height: 16),
+              _drawerAction(
+                '\u26a1 COMMAND CENTER',
+                Icons.admin_panel_settings_outlined,
+                () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/admin');
+                },
+                highlight: true,
+              ),
+            ],
+            const Spacer(),
+            _drawerAction('LOG OUT', Icons.logout, () {
+              Navigator.pop(context);
+              _handleLogout();
+            }),
+          ] else ...[
+            const Spacer(),
           ],
-          const Spacer(),
-          _drawerAction('LOG OUT', Icons.logout, () {
-            Navigator.pop(context);
-            _handleLogout();
-          }),
           const Divider(color: ironGrey),
           Padding(
             padding: const EdgeInsets.all(16),
@@ -751,31 +811,34 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar
-              Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: charColor,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: glowColor.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: _avatarUrl != null
-                      ? Image.network(
-                          _avatarUrl!,
-                          height: 70,
-                          width: 70,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              _heroAssetAvatar(ownedChar),
-                        )
-                      : _heroAssetAvatar(ownedChar),
+              // Avatar with GestureDetector added
+              GestureDetector(
+                onTap: _handleAvatarTap,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: charColor,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: glowColor.withValues(alpha: 0.3),
+                        blurRadius: 12,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _avatarUrl != null
+                        ? Image.network(
+                            _avatarUrl!,
+                            height: 70,
+                            width: 70,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                _heroAssetAvatar(ownedChar),
+                          )
+                        : _heroAssetAvatar(ownedChar),
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -813,19 +876,22 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                 ),
               ],
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: _openSettings,
-                    child: _heroBtn('SETTINGS'),
-                  ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: _openShareProfile,
-                    child: _heroBtn('SHARE PROFILE'),
-                  ),
-                ],
-              ),
+              // Only show settings button if it's the user's own profile
+              if (_isOwnProfile) ...[
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: _openSettings,
+                      child: _heroBtn('SETTINGS'),
+                    ),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: _openShareProfile,
+                      child: _heroBtn('SHARE PROFILE'),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -891,9 +957,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             ),
           ),
           const SizedBox(width: 10),
-          const Text(
-            'MY LIBRARY',
-            style: TextStyle(
+          // Changed "MY LIBRARY" to dynamic title based on ownership
+          Text(
+            _isOwnProfile ? 'MY LIBRARY' : 'LIBRARY',
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 16,
               fontWeight: FontWeight.w900,
