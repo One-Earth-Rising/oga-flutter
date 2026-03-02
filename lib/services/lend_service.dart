@@ -1,7 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════
-// LEND SERVICE — Sprint 12
+// LEND SERVICE — Sprint 12 Phase 1
 // Temporary character delegation with time-locked returns.
 // Auto-return handled via n8n scheduled workflow + return_lend() RPC.
+//
+// PHASE 1 CHANGES:
+//   - Table renamed: trade_notifications → notifications
+//   - Enriched notification inserts: sender_email, category, action_url
 // ═══════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -153,12 +157,15 @@ class LendService {
           .single();
 
       // Notify borrower
-      await _supabase.from('trade_notifications').insert({
+      await _supabase.from('notifications').insert({
         'recipient_email': borrowerEmail,
         'type': 'lend_proposed',
         'reference_id': lendRow['id'],
         'reference_type': 'lend',
         'message': '${email.split('@').first} wants to lend you a character!',
+        'sender_email': email,
+        'category': 'lend',
+        'action_url': '/lend-inbox',
       });
 
       debugPrint('✅ LendService: lend proposed → $borrowerEmail');
@@ -207,12 +214,15 @@ class LendService {
           .eq('id', lend['ownership_id']);
 
       // Notify lender
-      await _supabase.from('trade_notifications').insert({
+      await _supabase.from('notifications').insert({
         'recipient_email': lend['lender_email'],
         'type': 'lend_accepted',
         'reference_id': lendId,
         'reference_type': 'lend',
         'message': '${email.split('@').first} accepted your character lend!',
+        'sender_email': email,
+        'category': 'lend',
+        'action_url': '/lend-inbox',
       });
 
       debugPrint('✅ LendService: lend accepted → $lendId');
@@ -247,12 +257,15 @@ class LendService {
           .eq('id', lendId);
 
       // Notify lender
-      await _supabase.from('trade_notifications').insert({
+      await _supabase.from('notifications').insert({
         'recipient_email': lend['lender_email'],
         'type': 'lend_declined',
         'reference_id': lendId,
         'reference_type': 'lend',
         'message': 'Your lend offer was declined.',
+        'sender_email': email,
+        'category': 'lend',
+        'action_url': '/lend-inbox',
       });
 
       debugPrint('✅ LendService: lend declined → $lendId');

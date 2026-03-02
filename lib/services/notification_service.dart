@@ -1,7 +1,14 @@
 // ═══════════════════════════════════════════════════════════════════
-// NOTIFICATION SERVICE — Sprint 12
+// NOTIFICATION SERVICE — Sprint 12 Phase 1
 // Realtime notifications via Supabase Realtime subscription.
 // Provides stream-based unread count for badge updates.
+//
+// PHASE 1 CHANGES:
+//   - Table renamed: trade_notifications → notifications
+//   - OGANotification model: added sender_email, thumbnailUrl,
+//     actionUrl, category, priority fields
+//   - New methods: delete(), deleteAllRead(), getByCategory()
+//   - New notification types in title/iconType: friend_*, welcome, system
 // ═══════════════════════════════════════════════════════════════════
 
 import 'dart:async';
@@ -19,6 +26,13 @@ class OGANotification {
   final bool isRead;
   final DateTime createdAt;
 
+  // ── Phase 1 enrichment fields ──
+  final String? senderEmail;
+  final String? thumbnailUrl;
+  final String? actionUrl;
+  final String category;
+  final String priority;
+
   const OGANotification({
     required this.id,
     required this.recipientEmail,
@@ -28,6 +42,11 @@ class OGANotification {
     this.message,
     this.isRead = false,
     required this.createdAt,
+    this.senderEmail,
+    this.thumbnailUrl,
+    this.actionUrl,
+    this.category = 'trade',
+    this.priority = 'normal',
   });
 
   factory OGANotification.fromMap(Map<String, dynamic> map) {
@@ -42,6 +61,11 @@ class OGANotification {
       createdAt:
           DateTime.tryParse(map['created_at']?.toString() ?? '') ??
           DateTime.now(),
+      senderEmail: map['sender_email'] as String?,
+      thumbnailUrl: map['thumbnail_url'] as String?,
+      actionUrl: map['action_url'] as String?,
+      category: map['category'] ?? 'trade',
+      priority: map['priority'] ?? 'normal',
     );
   }
 
@@ -66,14 +90,26 @@ class OGANotification {
         return 'LEND RECALLED';
       case 'lend_expiring_soon':
         return 'LEND EXPIRING SOON';
+      case 'lend_declined':
+        return 'LEND DECLINED';
       case 'character_granted':
         return 'NEW CHARACTER';
+      case 'friend_request':
+        return 'FRIEND REQUEST';
+      case 'friend_accepted':
+        return 'FRIEND ACCEPTED';
+      case 'system_announcement':
+        return 'ANNOUNCEMENT';
+      case 'welcome':
+        return 'WELCOME TO OGA';
+      case 'character_updated':
+        return 'CHARACTER UPDATED';
       default:
         return 'NOTIFICATION';
     }
   }
 
-  /// Icon name suggestion for each notification type.
+  /// Icon type suggestion for each notification type.
   String get iconType {
     switch (type) {
       case 'trade_proposed':
@@ -86,9 +122,17 @@ class OGANotification {
       case 'lend_returned':
       case 'lend_recalled':
       case 'lend_expiring_soon':
+      case 'lend_declined':
         return 'lend';
       case 'character_granted':
+      case 'character_updated':
         return 'grant';
+      case 'friend_request':
+      case 'friend_accepted':
+        return 'friend';
+      case 'system_announcement':
+      case 'welcome':
+        return 'system';
       default:
         return 'default';
     }
@@ -151,7 +195,7 @@ class NotificationService {
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
-          table: 'trade_notifications',
+          table: 'notifications',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'recipient_email',
@@ -193,7 +237,7 @@ class NotificationService {
 
     try {
       final rows = await _supabase
-          .from('trade_notifications')
+          .from('notifications')
           .select()
           .eq('recipient_email', email)
           .eq('is_read', false)
@@ -215,7 +259,7 @@ class NotificationService {
 
     try {
       final rows = await _supabase
-          .from('trade_notifications')
+          .from('notifications')
           .select()
           .eq('recipient_email', email)
           .order('created_at', ascending: false)
@@ -230,6 +274,32 @@ class NotificationService {
     }
   }
 
+  /// Get notifications filtered by category.
+  static Future<List<OGANotification>> getByCategory(
+    String category, {
+    int limit = 50,
+  }) async {
+    final email = _currentEmail;
+    if (email == null) return [];
+
+    try {
+      final rows = await _supabase
+          .from('notifications')
+          .select()
+          .eq('recipient_email', email)
+          .eq('category', category)
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      return rows
+          .map<OGANotification>((row) => OGANotification.fromMap(row))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ NotificationService.getByCategory error: $e');
+      return [];
+    }
+  }
+
   /// Get unread count.
   static Future<int> getUnreadCount() async {
     final email = _currentEmail;
@@ -237,7 +307,7 @@ class NotificationService {
 
     try {
       final rows = await _supabase
-          .from('trade_notifications')
+          .from('notifications')
           .select('id')
           .eq('recipient_email', email)
           .eq('is_read', false);
@@ -257,7 +327,7 @@ class NotificationService {
   static Future<void> markRead(String notificationId) async {
     try {
       await _supabase
-          .from('trade_notifications')
+          .from('notifications')
           .update({'is_read': true})
           .eq('id', notificationId);
 
@@ -275,7 +345,7 @@ class NotificationService {
 
     try {
       await _supabase
-          .from('trade_notifications')
+          .from('notifications')
           .update({'is_read': true})
           .eq('recipient_email', email)
           .eq('is_read', false);
@@ -285,6 +355,38 @@ class NotificationService {
       debugPrint('✅ NotificationService: all marked read');
     } catch (e) {
       debugPrint('❌ NotificationService.markAllRead error: $e');
+    }
+  }
+
+  // ─── Delete ───────────────────────────────────────────────
+
+  /// Delete a single notification.
+  static Future<void> delete(String notificationId) async {
+    try {
+      await _supabase.from('notifications').delete().eq('id', notificationId);
+
+      await _refreshUnreadCount();
+      debugPrint('✅ NotificationService: deleted → $notificationId');
+    } catch (e) {
+      debugPrint('❌ NotificationService.delete error: $e');
+    }
+  }
+
+  /// Delete all read notifications for current user.
+  static Future<void> deleteAllRead() async {
+    final email = _currentEmail;
+    if (email == null) return;
+
+    try {
+      await _supabase
+          .from('notifications')
+          .delete()
+          .eq('recipient_email', email)
+          .eq('is_read', true);
+
+      debugPrint('✅ NotificationService: all read notifications deleted');
+    } catch (e) {
+      debugPrint('❌ NotificationService.deleteAllRead error: $e');
     }
   }
 

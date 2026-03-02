@@ -1,7 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════
-// TRADE SERVICE — Sprint 12
+// TRADE SERVICE — Sprint 12 Phase 1
 // P2P character trading: propose, accept, decline, cancel.
 // Atomic swaps via execute_trade() Postgres function.
+//
+// PHASE 1 CHANGES:
+//   - Table renamed: trade_notifications → notifications
+//   - Enriched notification inserts: sender_email, category, action_url
 // ═══════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -169,9 +173,7 @@ class TradeService {
         'receiver_ownership_id': receiverOwns['id'],
       });
 
-      // Create notification for receiver
-      // (trade_notifications will be created by the insert —
-      //  we do it here rather than a trigger for more control)
+      // Get the trade ID for the notification reference
       final tradeRow = await _supabase
           .from('trades')
           .select('id')
@@ -183,12 +185,16 @@ class TradeService {
           .limit(1)
           .single();
 
-      await _supabase.from('trade_notifications').insert({
+      // Notify receiver
+      await _supabase.from('notifications').insert({
         'recipient_email': receiverEmail,
         'type': 'trade_proposed',
         'reference_id': tradeRow['id'],
         'reference_type': 'trade',
         'message': 'New trade proposal from ${email.split('@').first}!',
+        'sender_email': email,
+        'category': 'trade',
+        'action_url': '/trade-inbox',
       });
 
       debugPrint('✅ TradeService: trade proposed → $receiverEmail');
@@ -255,12 +261,15 @@ class TradeService {
           .eq('id', tradeId);
 
       // Notify proposer
-      await _supabase.from('trade_notifications').insert({
+      await _supabase.from('notifications').insert({
         'recipient_email': trade['proposer_email'],
         'type': 'trade_declined',
         'reference_id': tradeId,
         'reference_type': 'trade',
         'message': 'Your trade proposal was declined.',
+        'sender_email': email,
+        'category': 'trade',
+        'action_url': '/trade-inbox',
       });
 
       debugPrint('✅ TradeService: trade declined → $tradeId');
@@ -298,12 +307,15 @@ class TradeService {
           .eq('id', tradeId);
 
       // Notify receiver
-      await _supabase.from('trade_notifications').insert({
+      await _supabase.from('notifications').insert({
         'recipient_email': trade['receiver_email'],
         'type': 'trade_cancelled',
         'reference_id': tradeId,
         'reference_type': 'trade',
         'message': 'A trade proposal was cancelled.',
+        'sender_email': email,
+        'category': 'trade',
+        'action_url': '/trade-inbox',
       });
 
       debugPrint('✅ TradeService: trade cancelled → $tradeId');
