@@ -449,13 +449,14 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       children: [
         // ⚡ Activity bell (Sprint 13)
         NotificationBellWidget(
-          onTap: () async {
-            final result = await Navigator.push(
+          onViewAll: () {
+            Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ActivityScreen()),
             );
-            // Handle deep-link result from Activity screen
-            if (result is Map && result['switchToTab'] == 'FRIENDS') {
+          },
+          onDeepLink: (data) {
+            if (data['switchToTab'] == 'FRIENDS') {
               _pageController.animateToPage(
                 1,
                 duration: const Duration(milliseconds: 300),

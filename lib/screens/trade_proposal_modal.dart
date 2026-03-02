@@ -363,7 +363,7 @@ class _TradeProposalModalState extends State<TradeProposalModal> {
                         ),
                       ),
                       Text(
-                        friend.email,
+                        friend.displayUsername,
                         style: const TextStyle(
                           color: Colors.white38,
                           fontSize: 11,

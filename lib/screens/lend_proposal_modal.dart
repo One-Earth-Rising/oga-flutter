@@ -377,7 +377,7 @@ class _LendProposalModalState extends State<LendProposalModal> {
               ),
             ),
             subtitle: Text(
-              friend.email,
+              friend.displayUsername,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.4),
                 fontSize: 12,
