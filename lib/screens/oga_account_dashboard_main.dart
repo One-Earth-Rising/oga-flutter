@@ -420,6 +420,13 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               curve: Curves.easeInOut,
             );
             break;
+          case 'friends': // Added Friends routing
+            _pageController.animateToPage(
+              1,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+            break;
           case 'settings':
             _openSettings();
             break;
@@ -483,6 +490,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         ),
         const PopupMenuDivider(height: 1),
         _dropItem('profile', 'My Profile'),
+        _dropItem('friends', 'Friends'), // Added Friends menu item
         _dropItem('settings', 'Settings'),
         _dropItem('about', 'About OGA'),
         _dropItem('faq', 'FAQ'),
