@@ -14,6 +14,8 @@ import '../services/analytics_service.dart';
 import '../services/admin_guard_service.dart';
 import '../services/character_service.dart';
 import '../services/ownership_service.dart';
+import '../widgets/notification_bell_widget.dart';
+import 'activity_screen.dart';
 
 class OGAAccountDashboard extends StatefulWidget {
   final String? sessionId;
@@ -444,7 +446,26 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   Widget _buildActionIcons(bool isMobile) {
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: [if (!isMobile) _buildAvatarDropdown()],
+      children: [
+        // ⚡ Activity bell (Sprint 13)
+        NotificationBellWidget(
+          onTap: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ActivityScreen()),
+            );
+            // Handle deep-link result from Activity screen
+            if (result is Map && result['switchToTab'] == 'FRIENDS') {
+              _pageController.animateToPage(
+                1,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+          },
+        ),
+        if (!isMobile) _buildAvatarDropdown(),
+      ],
     );
   }
 
@@ -656,6 +677,15 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             ('FRIENDS', Icons.people_outline),
             ('ABOUT', Icons.info_outline),
           ].map((item) => _drawerTab(item.$1, item.$2)),
+
+          const Divider(color: ironGrey, height: 16),
+          _drawerAction('ACTIVITY', Icons.bolt, () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ActivityScreen()),
+            );
+          }),
 
           if (_isOwnProfile) ...[
             const Divider(color: ironGrey, height: 32),

@@ -841,7 +841,15 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   // ═══════════════════════════════════════════════════════════
 
   void _openCharacterDetail(OGACharacter ch, bool owned) {
-    Navigator.pushNamed(context, '/character/${ch.id}');
+    Navigator.pushNamed(
+      context,
+      '/character/${ch.id}',
+      arguments: {
+        'isOwned': false,
+        'ownerEmail': owned ? friend.email : null,
+        'ownerName': owned ? friend.name : null,
+      },
+    );
   }
 
   // ═══════════════════════════════════════════════════════════

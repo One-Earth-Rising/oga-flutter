@@ -25,6 +25,7 @@ import '../services/invite_service.dart';
 import '../services/analytics_service.dart';
 import 'trade_proposal_modal.dart';
 import 'lend_proposal_modal.dart';
+import 'get_character_modal.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -38,12 +39,16 @@ class CharacterDetailScreen extends StatefulWidget {
   final bool isOwned;
   final bool isGuest;
   final String? inviterName;
+  final String? ownerEmail; // ← ADD
+  final String? ownerName;
   const CharacterDetailScreen({
     super.key,
     required this.character,
     this.isOwned = false,
     this.isGuest = false,
     this.inviterName,
+    this.ownerEmail,
+    this.ownerName,
   });
 
   @override
@@ -591,6 +596,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildLockedCTA() {
+    // Determine if we're viewing a friend's owned character
+    final bool isFriendOwned =
+        widget.ownerEmail != null && widget.ownerEmail!.isNotEmpty && !isGuest;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       padding: const EdgeInsets.all(20),
@@ -616,8 +625,11 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Acquire this OGA to unlock the full experience — '
-            'game variations, Portal Pass, rewards, and more.',
+            isFriendOwned
+                ? 'This character belongs to ${widget.ownerName ?? 'a friend'}. '
+                      'Request a trade, lend, or buy it.'
+                : 'Acquire this OGA to unlock the full experience — '
+                      'game variations, Portal Pass, rewards, and more.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: _pureWhite.withValues(alpha: 0.6),
@@ -631,7 +643,17 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {
-                    // TODO: Navigate to marketplace / acquisition flow
+                    if (isFriendOwned) {
+                      GetCharacterModal.show(
+                        context,
+                        characterId: ch.id,
+                        ownerEmail: widget.ownerEmail!,
+                        ownerName: widget.ownerName ?? 'Friend',
+                        characterName: ch.name,
+                      );
+                    } else {
+                      // TODO: Navigate to marketplace / acquisition flow
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _neonGreen,
@@ -892,24 +914,37 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   ),
                 ),
                 const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: _neonGreen.withValues(alpha: 0.5),
+                GestureDetector(
+                  onTap: () {
+                    if (!isGuest && widget.ownerEmail != null) {
+                      GetCharacterModal.show(
+                        context,
+                        characterId: ch.id,
+                        ownerEmail: widget.ownerEmail!,
+                        ownerName: widget.ownerName ?? 'Friend',
+                        characterName: ch.name,
+                      );
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
                     ),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    'SIGN UP TO UNLOCK',
-                    style: TextStyle(
-                      color: _neonGreen,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: _neonGreen.withValues(alpha: 0.5),
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      isGuest ? 'SIGN UP TO UNLOCK' : 'GET THIS CHARACTER',
+                      style: TextStyle(
+                        color: _neonGreen,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
                     ),
                   ),
                 ),

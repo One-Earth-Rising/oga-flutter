@@ -1,14 +1,25 @@
-// ═══════════════════════════════════════════════════════════════════════
-// NOTIFICATION BELL WIDGET — Sprint 12
-// AppBar icon with unread badge. Taps open NotificationsScreen.
-// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// NOTIFICATION BELL WIDGET — Sprint 13
+// ⚡ icon with green dot indicator for unread notifications.
+// Self-contained: listens to NotificationService streams.
+//
+// Usage:
+//   NotificationBellWidget(onTap: () => Navigator.push(...ActivityScreen))
+// ═══════════════════════════════════════════════════════════════════
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/notification_service.dart';
-import '../screens/notifications_screen.dart';
+
+const Color _neonGreen = Color(0xFF39FF14);
+const Color _deepCharcoal = Color(0xFF121212);
+const Color _ironGrey = Color(0xFF2C2C2C);
+const Color _pureWhite = Color(0xFFFFFFFF);
 
 class NotificationBellWidget extends StatefulWidget {
-  const NotificationBellWidget({super.key});
+  final VoidCallback onTap;
+
+  const NotificationBellWidget({super.key, required this.onTap});
 
   @override
   State<NotificationBellWidget> createState() => _NotificationBellWidgetState();
@@ -16,122 +27,105 @@ class NotificationBellWidget extends StatefulWidget {
 
 class _NotificationBellWidgetState extends State<NotificationBellWidget>
     with SingleTickerProviderStateMixin {
-  late AnimationController _shakeController;
-  late Animation<double> _shakeAnimation;
-  int _lastCount = 0;
-
-  // ─── Heimdal palette ─────────────────────────────────
-  static const Color neonGreen = Color(0xFF39FF14);
+  int _unreadCount = 0;
+  StreamSubscription<int>? _countSub;
+  StreamSubscription<OGANotification>? _newSub;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
-    _shakeController = AnimationController(
+
+    // Initial count
+    _unreadCount = NotificationService.unreadCount;
+
+    // Listen for count changes
+    _countSub = NotificationService.unreadCountStream.listen((count) {
+      if (mounted) setState(() => _unreadCount = count);
+    });
+
+    // Pulse animation when new notification arrives
+    _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 600),
     );
-    _shakeAnimation =
-        TweenSequence<double>([
-          TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.05), weight: 1),
-          TweenSequenceItem(tween: Tween(begin: 0.05, end: -0.05), weight: 1),
-          TweenSequenceItem(tween: Tween(begin: -0.05, end: 0.03), weight: 1),
-          TweenSequenceItem(tween: Tween(begin: 0.03, end: 0.0), weight: 1),
-        ]).animate(
-          CurvedAnimation(parent: _shakeController, curve: Curves.easeInOut),
-        );
-    _shakeController.addListener(() {
-      if (mounted) setState(() {});
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _newSub = NotificationService.onNewNotification.listen((_) {
+      _pulseController.forward().then((_) => _pulseController.reverse());
     });
   }
 
   @override
   void dispose() {
-    _shakeController.dispose();
+    _countSub?.cancel();
+    _newSub?.cancel();
+    _pulseController.dispose();
     super.dispose();
-  }
-
-  void _onCountChanged(int newCount) {
-    if (newCount > _lastCount && newCount > 0) {
-      _shakeController.forward(from: 0);
-    }
-    _lastCount = newCount;
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<int>(
-      stream: NotificationService.unreadCountStream,
-      initialData: NotificationService.unreadCount,
-      builder: (context, snapshot) {
-        final count = snapshot.data ?? 0;
-        _onCountChanged(count);
+    final hasUnread = _unreadCount > 0;
 
-        return Transform.rotate(
-          angle: _shakeAnimation.value,
-          child: IconButton(
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(
-                  Icons.notifications_outlined,
-                  color: Colors.white,
-                  size: 26,
-                ),
-                if (count > 0)
-                  Positioned(
-                    right: -4,
-                    top: -4,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        color: neonGreen,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 18,
-                        minHeight: 18,
-                      ),
-                      child: Text(
-                        count > 9 ? '9+' : '$count',
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: ScaleTransition(
+        scale: _pulseAnimation,
+        child: Container(
+          width: 36,
+          height: 36,
+          margin: const EdgeInsets.only(right: 4),
+          decoration: BoxDecoration(
+            color: hasUnread
+                ? _neonGreen.withValues(alpha: 0.08)
+                : _deepCharcoal.withValues(alpha: 0.6),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: hasUnread
+                  ? _neonGreen.withValues(alpha: 0.25)
+                  : _ironGrey.withValues(alpha: 0.5),
+            ),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // ⚡ icon
+              Icon(
+                Icons.bolt,
+                color: hasUnread
+                    ? _neonGreen
+                    : _pureWhite.withValues(alpha: 0.5),
+                size: 18,
+              ),
+              // Green dot indicator
+              if (hasUnread)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _neonGreen,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _deepCharcoal, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _neonGreen.withValues(alpha: 0.5),
+                          blurRadius: 4,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
+                      ],
                     ),
                   ),
-              ],
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                PageRouteBuilder(
-                  pageBuilder: (_, __, ___) => const NotificationsScreen(),
-                  transitionsBuilder: (_, anim, __, child) {
-                    return SlideTransition(
-                      position:
-                          Tween<Offset>(
-                            begin: const Offset(1, 0),
-                            end: Offset.zero,
-                          ).animate(
-                            CurvedAnimation(
-                              parent: anim,
-                              curve: Curves.easeOutCubic,
-                            ),
-                          ),
-                      child: child,
-                    );
-                  },
-                  transitionDuration: const Duration(milliseconds: 250),
                 ),
-              );
-            },
-            tooltip: count > 0 ? '$count notifications' : 'Notifications',
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
