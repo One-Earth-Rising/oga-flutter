@@ -49,6 +49,99 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   bool get _isMobile => MediaQuery.of(context).size.width < 900;
 
   // ═══════════════════════════════════════════════════════════
+  // MODALS & ACTIONS
+  // ═══════════════════════════════════════════════════════════
+
+  void _openEnlargedAvatarModal() {
+    final starterChar = friend.starterCharacter != null
+        ? OGACharacter.fromId(friend.starterCharacter!)
+        : OGACharacter.allCharacters.first;
+
+    final fallbackImageUrl = OgaStorage.resolve(starterChar.heroImage);
+
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: friend.avatarUrl != null
+                  ? Image.network(friend.avatarUrl!, fit: BoxFit.contain)
+                  : Image.network(fallbackImageUrl, fit: BoxFit.contain),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFriendsListModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: deepCharcoal,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.7, // Takes up 70% of the screen
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: ironGrey,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Text(
+                  "${friend.name.toUpperCase()}'S FRIENDS",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // TODO: Replace with FutureBuilder hitting FriendService.getFriendsFor(friend.id)
+                const Expanded(
+                  child: Center(
+                    child: Text(
+                      "Friends list coming soon...",
+                      style: TextStyle(color: Colors.white54, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // TOP BAR
   // ═══════════════════════════════════════════════════════════
 
@@ -93,33 +186,36 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          // Friend badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: neonGreen.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: neonGreen.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.people,
-                  color: neonGreen.withValues(alpha: 0.7),
-                  size: 13,
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  'FRIEND',
-                  style: TextStyle(
-                    color: neonGreen.withValues(alpha: 0.8),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1,
+          // Friend badge / View Friends Button
+          GestureDetector(
+            onTap: _showFriendsListModal, // Action added here
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: neonGreen.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: neonGreen.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.people,
+                    color: neonGreen.withValues(alpha: 0.7),
+                    size: 13,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 5),
+                  Text(
+                    'FRIENDS',
+                    style: TextStyle(
+                      color: neonGreen.withValues(alpha: 0.8),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -132,14 +228,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildHero() {
-    // Get the friend's starter character for the hero background
     final starterChar = friend.starterCharacter != null
         ? OGACharacter.fromId(friend.starterCharacter!)
         : OGACharacter.allCharacters.first;
 
     return Stack(
       children: [
-        // Background — character art
         Container(
           height: _isMobile ? 280 : 320,
           width: double.infinity,
@@ -164,7 +258,6 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             ),
           ),
         ),
-        // Profile info overlay
         Positioned(
           left: _isMobile ? 20 : 60,
           bottom: 16,
@@ -172,34 +265,36 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Avatar
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: friend.characterColor,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: friend.characterColor.withValues(alpha: 0.3),
-                      blurRadius: 16,
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(11),
-                  child: friend.avatarUrl != null
-                      ? Image.network(
-                          friend.avatarUrl!,
-                          height: 72,
-                          width: 72,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => _buildFallbackAvatar(72),
-                        )
-                      : _buildFallbackAvatar(72),
+              // Avatar with GestureDetector added
+              GestureDetector(
+                onTap: _openEnlargedAvatarModal, // Action added here
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: friend.characterColor,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: friend.characterColor.withValues(alpha: 0.3),
+                        blurRadius: 16,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: friend.avatarUrl != null
+                        ? Image.network(
+                            friend.avatarUrl!,
+                            height: 72,
+                            width: 72,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => _buildFallbackAvatar(72),
+                          )
+                        : _buildFallbackAvatar(72),
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
-              // Name + meta
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -611,7 +706,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             ),
           ),
         );
-      }, childCount: chars.length), // Fixed the allChars doubling bug here too!
+      }, childCount: chars.length),
     );
   }
 
