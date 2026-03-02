@@ -61,7 +61,9 @@ class FriendService {
   }
 
   /// Fetches a list of accepted friends for a specific user's email.
-  static Future<List<FriendProfile>> getFriendsForEmail(String targetEmail) async {
+  static Future<List<FriendProfile>> getFriendsForEmail(
+    String targetEmail,
+  ) async {
     try {
       // 1. Get all accepted friendships for this email
       final response = await _supabase
@@ -73,11 +75,14 @@ class FriendService {
       if (response.isEmpty) return [];
 
       // 2. Extract the emails of the friends (ignoring the target user's own email)
-      final friendEmails = response.map((f) {
-        return f['requester_email'] == targetEmail
-            ? f['receiver_email']
-            : f['requester_email'];
-      }).whereType<String>().toList();
+      final friendEmails = response
+          .map((f) {
+            return f['requester_email'] == targetEmail
+                ? f['receiver_email']
+                : f['requester_email'];
+          })
+          .whereType<String>()
+          .toList();
 
       if (friendEmails.isEmpty) return [];
 
@@ -91,6 +96,26 @@ class FriendService {
       return profilesResponse.map((p) => FriendProfile.fromMap(p)).toList();
     } catch (e) {
       debugPrint('Error fetching friends: $e');
+      return [];
+    }
+  }
+
+  /// Get owned character IDs for a given user email.
+  /// Queries character_ownership table for active characters.
+  static Future<List<String>> getOwnedCharacterIds(String userEmail) async {
+    try {
+      final rows = await _supabase
+          .from('character_ownership')
+          .select('character_id')
+          .eq('owner_email', userEmail)
+          .eq('status', 'active');
+
+      return rows
+          .map<String>((row) => row['character_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error fetching owned characters for $userEmail: $e');
       return [];
     }
   }
@@ -112,7 +137,8 @@ class FriendService {
 
       // Collect the "other" person's email for each pending request
       final otherEmails = <String>[];
-      final directionMap = <String, bool>{}; // email → isIncoming (they need to approve)
+      final directionMap =
+          <String, bool>{}; // email → isIncoming (they need to approve)
 
       for (final f in pending) {
         final requester = f['requester_email'] as String;
@@ -143,6 +169,7 @@ class FriendService {
         return FriendProfile(
           email: profile.email,
           name: profile.name,
+          username: profile.username,
           avatarUrl: profile.avatarUrl,
           starterCharacter: profile.starterCharacter,
           inviteCode: profile.inviteCode,
@@ -498,12 +525,13 @@ class FriendService {
       return null;
     }
   }
-} // <--- This closing brace is now correctly at the end of the service class.
+}
 
 /// Friend profile data model.
 class FriendProfile {
   final String email;
   final String name;
+  final String? username;
   final String? avatarUrl;
   final String? starterCharacter;
   final String? inviteCode;
@@ -515,6 +543,7 @@ class FriendProfile {
   const FriendProfile({
     required this.email,
     required this.name,
+    this.username,
     this.avatarUrl,
     this.starterCharacter,
     this.inviteCode,
@@ -527,11 +556,12 @@ class FriendProfile {
   factory FriendProfile.fromMap(
     Map<String, dynamic> map, {
     bool isPending = false,
-    bool isIncomingRequest = true, // Added the missing 'bool' type here
+    bool isIncomingRequest = true,
   }) {
     return FriendProfile(
       email: map['email'] as String? ?? '',
       name: map['full_name'] as String? ?? 'Player',
+      username: map['username'] as String?,
       avatarUrl: map['avatar_url'] as String?,
       starterCharacter: map['starter_character'] as String?,
       inviteCode: map['invite_code'] as String?,
@@ -541,6 +571,14 @@ class FriendProfile {
           : null,
       isPending: isPending,
     );
+  }
+
+  /// Display-ready username: "@username" or empty string if none.
+  String get displayUsername {
+    if (username != null && username!.isNotEmpty) {
+      return '@$username';
+    }
+    return '';
   }
 
   /// Get the character color for this friend's starter character.

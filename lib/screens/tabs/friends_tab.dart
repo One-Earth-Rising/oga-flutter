@@ -897,7 +897,9 @@ class _FriendsTabState extends State<FriendsTab> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    friend.email,
+                    friend.displayUsername.isNotEmpty
+                        ? friend.displayUsername
+                        : friend.email,
                     style: const TextStyle(color: Colors.white38, fontSize: 11),
                   ),
                 ],

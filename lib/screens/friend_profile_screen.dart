@@ -7,6 +7,11 @@ import '../widgets/character_card.dart';
 
 /// Authenticated view of a friend's profile and character library.
 /// Navigated to by tapping a friend row in the Friends tab.
+///
+/// PHASE 1 CHANGES:
+///   - Shows @username instead of email everywhere
+///   - Loads actual owned characters from character_ownership table
+///   - Stats bar shows real ownership count
 class FriendProfileScreen extends StatefulWidget {
   final FriendProfile friend;
 
@@ -24,7 +29,32 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
   bool _isGridView = true;
 
+  // ── Ownership state (loaded from character_ownership table) ──
+  List<String> _ownedCharacterIds = [];
+  bool _isLoadingOwnership = true;
+
   FriendProfile get friend => widget.friend;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOwnership();
+  }
+
+  Future<void> _loadOwnership() async {
+    if (friend.email.isEmpty) {
+      setState(() => _isLoadingOwnership = false);
+      return;
+    }
+
+    final ids = await FriendService.getOwnedCharacterIds(friend.email);
+    if (mounted) {
+      setState(() {
+        _ownedCharacterIds = ids;
+        _isLoadingOwnership = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -201,7 +231,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                               ),
                             ),
                             subtitle: Text(
-                              f.email,
+                              f.displayUsername,
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.5),
                                 fontSize: 12,
@@ -359,7 +389,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Avatar with GestureDetector added
+              // Avatar with GestureDetector
               GestureDetector(
                 onTap: _openEnlargedAvatarModal,
                 child: Container(
@@ -402,9 +432,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                         letterSpacing: 1,
                       ),
                     ),
-                    if (friend.email.isNotEmpty)
+                    // Show @username instead of email
+                    if (friend.displayUsername.isNotEmpty)
                       Text(
-                        friend.email,
+                        friend.displayUsername,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.35),
                           fontSize: 12,
@@ -460,11 +491,11 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // STATS BAR
+  // STATS BAR — uses actual character_ownership data
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildStatsBar() {
-    final ownedCount = friend.starterCharacter != null ? 1 : 0;
+    final ownedCount = _ownedCharacterIds.length;
     final totalChars = OGACharacter.allCharacters.length;
 
     return Padding(
@@ -483,7 +514,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         ),
         child: Row(
           children: [
-            _buildStat('CHARACTERS', '$ownedCount / $totalChars'),
+            _buildStat(
+              'CHARACTERS',
+              _isLoadingOwnership ? '...' : '$ownedCount / $totalChars',
+            ),
             _buildStatDivider(),
             _buildStat(
               'STARTER',
@@ -631,12 +665,11 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // CHARACTER GRID
+  // CHARACTER GRID — uses character_ownership data
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildCharacterGrid() {
     final chars = OGACharacter.allCharacters;
-    final ownedId = friend.starterCharacter;
 
     return SliverGrid(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -647,32 +680,31 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       ),
       delegate: SliverChildBuilderDelegate((context, index) {
         final ch = chars[index];
-        final owned = ch.id == ownedId; // Only their starter is owned
+        final owned = _ownedCharacterIds.contains(ch.id);
 
         return GestureDetector(
           onTap: () => _openCharacterDetail(ch, owned),
           child: CharacterCard(
             character: ch,
             isOwned: owned,
-            progress: owned ? 1.0 : 0.0, // Shows 100% if they own it
+            progress: owned ? 1.0 : 0.0,
           ),
         );
-      }, childCount: chars.length), // Fixed the * 2 doubling bug!
+      }, childCount: chars.length),
     );
   }
 
   // ═══════════════════════════════════════════════════════════
-  // CHARACTER LIST
+  // CHARACTER LIST — uses character_ownership data
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildCharacterList() {
     final chars = OGACharacter.allCharacters;
-    final ownedId = friend.starterCharacter;
 
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         final ch = chars[index];
-        final owned = ch.id == ownedId;
+        final owned = _ownedCharacterIds.contains(ch.id);
         final charColor = ch.cardColor;
 
         return GestureDetector(
