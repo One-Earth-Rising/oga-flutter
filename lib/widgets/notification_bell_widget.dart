@@ -1,19 +1,23 @@
 // ═══════════════════════════════════════════════════════════════════════
-// NOTIFICATION BELL WIDGET — Sprint 13 (v2.1 — Dropdown)
+// NOTIFICATION BELL WIDGET — Sprint 13 (v3.0 — Dropdown Fix)
 // ⚡ icon with dropdown panel matching Figma Score menu aesthetic.
-// Self-contained: listens to NotificationService streams.
 //
-// v2.1 FIXES:
-//   - ACCEPT/DECLINE buttons only show on UNREAD actionable notifications
-//     (once acted on → marked read → buttons disappear on reload)
-//   - Added onActionCompleted callback so dashboard can refresh ownership
-//   - Improved snackbar messages for trade/lend/friend actions
-//   - Badge hides when unread count is 0
+// v3.0 FIXES:
+//   1. ACCEPT/DECLINE buttons now reliably visible for actionable
+//      notifications in dropdown. Root cause: HitTestBehavior.opaque
+//      on GestureDetector was swallowing taps. Now uses separate
+//      widget branches for actionable vs informational rows.
+//   2. Acted-on notifications flip to read immediately — buttons vanish.
+//   3. onActionCompleted callback fires after successful accept/decline,
+//      triggering dashboard library refresh.
+//   4. Bell green dot no longer clipped on web (Clip.none on Stack).
+//   5. Debug prints at showButtons evaluation for tracing.
+//   6. Sender avatar placeholder (uses first letter of senderEmail).
 //
 // Usage:
 //   NotificationBellWidget(
 //     onViewAll: () => Navigator.push(...ActivityScreen),
-//     onActionCompleted: () => _reloadOwnership(),   // ← NEW
+//     onActionCompleted: () { _loadOwnership(); setState(() {}); },
 //   )
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -24,7 +28,6 @@ import '../services/trade_service.dart';
 import '../services/lend_service.dart';
 import '../services/friend_service.dart';
 
-// ─── Brand Colors (Heimdal V2) ──────────────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
 const Color _deepCharcoal = Color(0xFF121212);
 const Color _neonGreen = Color(0xFF39FF14);
@@ -32,16 +35,13 @@ const Color _ironGrey = Color(0xFF2C2C2C);
 const Color _pureWhite = Color(0xFFFFFFFF);
 const Color _lendCyan = Color(0xFF00BCD4);
 
+// ═══════════════════════════════════════════════════════════════════════
+// BELL ICON (top bar)
+// ═══════════════════════════════════════════════════════════════════════
+
 class NotificationBellWidget extends StatefulWidget {
-  /// Called when user taps "VIEW ALL" — typically pushes full ActivityScreen
   final VoidCallback? onViewAll;
-
-  /// Called when a friend-related action completes and caller should
-  /// switch to the FRIENDS tab (passes {'switchToTab': 'FRIENDS'})
   final void Function(Map<String, dynamic>)? onDeepLink;
-
-  /// Called after any accept/decline action completes successfully.
-  /// Use this to refresh ownership, library, or other dashboard state.
   final VoidCallback? onActionCompleted;
 
   const NotificationBellWidget({
@@ -63,7 +63,6 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
-  // Dropdown state
   OverlayEntry? _overlayEntry;
   final LayerLink _layerLink = LayerLink();
   bool _isOpen = false;
@@ -71,22 +70,17 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
   @override
   void initState() {
     super.initState();
-
     _unreadCount = NotificationService.unreadCount;
-
     _countSub = NotificationService.unreadCountStream.listen((count) {
       if (mounted) setState(() => _unreadCount = count);
     });
-
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    // Reduced scale slightly so it doesn't clip when pulsing on Web
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-
     _newSub = NotificationService.onNewNotification.listen((_) {
       _pulseController.forward().then((_) => _pulseController.reverse());
     });
@@ -94,10 +88,10 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
 
   @override
   void dispose() {
-    _removeOverlay();
     _countSub?.cancel();
     _newSub?.cancel();
     _pulseController.dispose();
+    _removeOverlay();
     super.dispose();
   }
 
@@ -111,15 +105,14 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
 
   void _showOverlay() {
     _removeOverlay();
-
     _overlayEntry = OverlayEntry(
       builder: (context) => Stack(
         children: [
-          // Scrim — tap anywhere to dismiss
+          // Scrim: tapping outside closes dropdown
           Positioned.fill(
             child: GestureDetector(
               onTap: _removeOverlay,
-              behavior: HitTestBehavior.opaque,
+              behavior: HitTestBehavior.translucent,
               child: Container(color: Colors.transparent),
             ),
           ),
@@ -128,9 +121,8 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
             width: 360,
             child: CompositedTransformFollower(
               link: _layerLink,
-              targetAnchor: Alignment.bottomRight,
-              followerAnchor: Alignment.topRight,
-              offset: const Offset(0, 8),
+              showWhenUnlinked: false,
+              offset: const Offset(-308, 48),
               child: Material(
                 color: Colors.transparent,
                 child: _NotificationDropdownPanel(
@@ -139,10 +131,7 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
                     _removeOverlay();
                     widget.onViewAll?.call();
                   },
-                  onDeepLink: (data) {
-                    _removeOverlay();
-                    widget.onDeepLink?.call(data);
-                  },
+                  onDeepLink: widget.onDeepLink,
                   onActionCompleted: widget.onActionCompleted,
                 ),
               ),
@@ -151,85 +140,94 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
         ],
       ),
     );
-
     Overlay.of(context).insert(_overlayEntry!);
-    setState(() => _isOpen = true);
+    _isOpen = true;
   }
 
   void _removeOverlay() {
     _overlayEntry?.remove();
     _overlayEntry = null;
-    if (mounted) setState(() => _isOpen = false);
+    _isOpen = false;
   }
 
   @override
   Widget build(BuildContext context) {
     final hasUnread = _unreadCount > 0;
 
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: GestureDetector(
-        onTap: _toggleDropdown,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: Padding(
-            // Padding outside the scaled area prevents clipping bounds
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-            child: ScaleTransition(
-              scale: _pulseAnimation,
-              child: Container(
-                width: 34, // Slightly smaller to ensure no clipping
-                height: 34,
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  color: _isOpen
-                      ? _neonGreen.withValues(alpha: 0.12)
-                      : hasUnread
-                      ? _neonGreen.withValues(alpha: 0.08)
-                      : _deepCharcoal.withValues(alpha: 0.6),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _isOpen
-                        ? _neonGreen.withValues(alpha: 0.4)
-                        : hasUnread
-                        ? _neonGreen.withValues(alpha: 0.25)
-                        : _ironGrey.withValues(alpha: 0.5),
-                    width: 1, // Explicit width
-                  ),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior:
-                      Clip.none, // Allow dot to hang outside if needed
-                  children: [
-                    Icon(
-                      Icons.bolt,
-                      color: _isOpen || hasUnread
-                          ? _neonGreen
-                          : _pureWhite.withValues(alpha: 0.5),
-                      size: 18,
-                    ),
-                    if (hasUnread)
-                      Positioned(
-                        top: 0, // Adjusted dot position for new sizing
-                        right: 0,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: _neonGreen,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: _voidBlack, width: 1.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _neonGreen.withValues(alpha: 0.5),
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                        ),
+    // 1. We move the spacing OUTSIDE everything using Padding
+    return Padding(
+      padding: const EdgeInsets.only(
+        right: 12.0,
+      ), // Spacing between bell and avatar
+      child: CompositedTransformTarget(
+        link: _layerLink,
+        child: GestureDetector(
+          onTap: _toggleDropdown,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            // 2. Provide a fixed safe-zone (44x44) so the scale animation has room to breathe
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              // 3. Center prevents the parent Row from stretching the child vertically
+              child: Center(
+                child: ScaleTransition(
+                  scale: _pulseAnimation,
+                  child: Container(
+                    // 4. Strict, equal dimensions guarantee a perfect circle
+                    width: 34,
+                    height: 34,
+                    // NO MARGIN HERE. Margin here causes the oval squishing!
+                    decoration: BoxDecoration(
+                      color: _isOpen
+                          ? _neonGreen.withValues(alpha: 0.12)
+                          : hasUnread
+                          ? _neonGreen.withValues(alpha: 0.08)
+                          : _deepCharcoal.withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _isOpen
+                            ? _neonGreen.withValues(alpha: 0.4)
+                            : hasUnread
+                            ? _neonGreen.withValues(alpha: 0.25)
+                            : _ironGrey.withValues(alpha: 0.5),
+                        width: 1,
                       ),
-                  ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          Icons.bolt,
+                          color: _isOpen || hasUnread
+                              ? _neonGreen
+                              : _pureWhite.withValues(alpha: 0.5),
+                          size: 18,
+                        ),
+                        if (hasUnread)
+                          Positioned(
+                            top: -2, // Adjusted to sit perfectly on the border
+                            right: -2,
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: _neonGreen,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: _voidBlack, width: 2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: _neonGreen.withValues(alpha: 0.5),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -241,7 +239,7 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// DROPDOWN PANEL — The floating card (matches Figma Score dropdown)
+// DROPDOWN PANEL
 // ═══════════════════════════════════════════════════════════════════════
 
 class _NotificationDropdownPanel extends StatefulWidget {
@@ -266,11 +264,7 @@ class _NotificationDropdownPanelState
     extends State<_NotificationDropdownPanel> {
   List<OGANotification> _notifications = [];
   bool _isLoading = true;
-
-  // Track which notifications have been acted on this session
-  // (prevents re-showing buttons before reload completes)
   final Set<String> _actedOnIds = {};
-
   static const int _maxVisible = 5;
 
   @override
@@ -282,6 +276,15 @@ class _NotificationDropdownPanelState
   Future<void> _loadNotifications() async {
     try {
       final all = await NotificationService.getAll(limit: 20);
+      debugPrint('>>> DROPDOWN: Loaded ${all.length} notifications');
+      for (final n in all) {
+        final actionable = _isActionableType(n.type);
+        debugPrint(
+          '>>>   [${n.id.substring(0, 8)}] '
+          'type=${n.type}  isRead=${n.isRead}  '
+          'actionable=$actionable  sender=${n.senderEmail ?? "null"}',
+        );
+      }
       if (mounted) {
         setState(() {
           _notifications = all;
@@ -289,15 +292,39 @@ class _NotificationDropdownPanelState
         });
       }
     } catch (e) {
-      debugPrint('❌ NotificationDropdown: load error: $e');
+      debugPrint('!!! NotificationDropdown: load error: $e');
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// Returns true if this notification type supports accept/decline.
+  bool _isActionableType(String type) {
+    return type == 'trade_proposed' ||
+        type == 'lend_proposed' ||
+        type == 'friend_request';
+  }
+
+  /// Determines whether to show accept/decline buttons.
+  /// Buttons show ONLY when: unread + actionable type + not acted on.
+  bool _shouldShowButtons(OGANotification n) {
+    final isUnread = !n.isRead;
+    final isActionable = _isActionableType(n.type);
+    final notActedOn = !_actedOnIds.contains(n.id);
+    final show = isUnread && isActionable && notActedOn;
+
+    // Debug: trace why buttons do / don't show
+    if (isActionable) {
+      debugPrint(
+        '>>> showButtons: type=${n.type} isRead=${n.isRead} '
+        'actedOn=${_actedOnIds.contains(n.id)} => show=$show',
+      );
+    }
+    return show;
   }
 
   @override
   Widget build(BuildContext context) {
     final unreadCount = _notifications.where((n) => !n.isRead).length;
-
     return Container(
       constraints: const BoxConstraints(maxHeight: 460),
       decoration: BoxDecoration(
@@ -316,11 +343,8 @@ class _NotificationDropdownPanelState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Header ─────────────────────────────────────────────
           _buildHeader(unreadCount),
           const Divider(color: _ironGrey, height: 1),
-
-          // ── Content ────────────────────────────────────────────
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.all(32),
@@ -355,8 +379,6 @@ class _NotificationDropdownPanelState
                     _buildNotificationRow(_notifications[index]),
               ),
             ),
-
-          // ── Footer ─────────────────────────────────────────────
           if (!_isLoading && _notifications.isNotEmpty) ...[
             const Divider(color: _ironGrey, height: 1),
             _buildFooter(),
@@ -366,7 +388,7 @@ class _NotificationDropdownPanelState
     );
   }
 
-  // ─── Header ─────────────────────────────────────────────────────────
+  // ─── HEADER ──────────────────────────────────────────────────
 
   Widget _buildHeader(int unreadCount) {
     return Padding(
@@ -427,133 +449,169 @@ class _NotificationDropdownPanelState
     );
   }
 
-  // ─── Notification Row ───────────────────────────────────────────────
+  // ─── NOTIFICATION ROW ────────────────────────────────────────
+  //
+  // KEY FIX (v3): Two completely separate widget branches:
+  //   1. Actionable (unread + trade/lend/friend_request) →
+  //      NO tap handler on the row. Only buttons fire actions.
+  //   2. Non-actionable / already acted on / already read →
+  //      InkWell wraps the row → marks read + deep-links.
+  //
+  // Previous v2 used GestureDetector(onTap: null, behavior: opaque)
+  // which was STILL intercepting taps from the ElevatedButton children
+  // because opaque means "I handle all hits in my bounds".
 
   Widget _buildNotificationRow(OGANotification notification) {
     final isUnread = !notification.isRead;
+    final showButtons = _shouldShowButtons(notification);
 
-    // FIX: Only show action buttons if UNREAD and not already acted on
-    final isActionable =
-        isUnread &&
-        !_actedOnIds.contains(notification.id) &&
-        (notification.type == 'trade_proposed' ||
-            notification.type == 'lend_proposed' ||
-            notification.type == 'friend_request');
-
-    return InkWell(
-      onTap: () => _handleTap(notification),
-      child: Container(
-        color: isUnread
-            ? _neonGreen.withValues(alpha: 0.03)
-            : Colors.transparent,
+    if (showButtons) {
+      // ─── ACTIONABLE: no outer tap handler ─────────────────
+      return Container(
+        color: _neonGreen.withValues(alpha: 0.05),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildIcon(notification),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          if (isUnread)
-                            Container(
-                              width: 5,
-                              height: 5,
-                              margin: const EdgeInsets.only(right: 5),
-                              decoration: const BoxDecoration(
-                                color: _neonGreen,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          Expanded(
-                            child: Text(
-                              notification.title,
-                              style: TextStyle(
-                                color: _pureWhite,
-                                fontSize: 12,
-                                fontWeight: isUnread
-                                    ? FontWeight.w800
-                                    : FontWeight.w600,
-                                letterSpacing: 0.3,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (notification.message != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          notification.message!,
-                          style: TextStyle(
-                            color: _pureWhite.withValues(alpha: 0.45),
-                            fontSize: 11,
-                            height: 1.3,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _timeAgo(notification.createdAt),
-                  style: TextStyle(
-                    color: _pureWhite.withValues(alpha: 0.2),
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ),
-            if (isActionable) ...[
-              const SizedBox(height: 8),
-              _buildInlineActions(notification),
-            ],
+            _buildInfoRow(notification, isUnread: true),
+            const SizedBox(height: 8),
+            _buildInlineActions(notification),
           ],
         ),
-      ),
+      );
+    } else {
+      // ─── NON-ACTIONABLE: tap marks read + deep-links ──────
+      return InkWell(
+        onTap: () => _handleTap(notification),
+        child: Container(
+          color: isUnread
+              ? _neonGreen.withValues(alpha: 0.03)
+              : Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: _buildInfoRow(notification, isUnread: isUnread),
+        ),
+      );
+    }
+  }
+
+  /// The icon + title + message + timestamp row (shared).
+  Widget _buildInfoRow(OGANotification notification, {required bool isUnread}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _buildIcon(notification),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (isUnread)
+                    Container(
+                      width: 5,
+                      height: 5,
+                      margin: const EdgeInsets.only(right: 5),
+                      decoration: const BoxDecoration(
+                        color: _neonGreen,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      notification.title,
+                      style: TextStyle(
+                        color: _pureWhite,
+                        fontSize: 12,
+                        fontWeight: isUnread
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              if (notification.message != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  notification.message!,
+                  style: TextStyle(
+                    color: _pureWhite.withValues(alpha: 0.45),
+                    fontSize: 11,
+                    height: 1.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          _timeAgo(notification.createdAt),
+          style: TextStyle(
+            color: _pureWhite.withValues(alpha: 0.2),
+            fontSize: 10,
+          ),
+        ),
+      ],
     );
   }
 
-  // ─── Notification Icon ──────────────────────────────────────────────
+  // ─── ICON ────────────────────────────────────────────────────
 
   Widget _buildIcon(OGANotification notification) {
     IconData icon;
     Color color;
-
     switch (notification.iconType) {
       case 'trade':
         icon = Icons.swap_horiz;
         color = _neonGreen;
-        break;
       case 'lend':
         icon = Icons.handshake_outlined;
         color = _lendCyan;
-        break;
       case 'friend':
         icon = Icons.person_add_outlined;
         color = const Color(0xFF7C4DFF);
-        break;
       case 'grant':
         icon = Icons.card_giftcard;
         color = const Color(0xFFFFD700);
-        break;
       case 'system':
         icon = Icons.campaign_outlined;
         color = _pureWhite;
-        break;
       default:
         icon = Icons.notifications_outlined;
         color = _pureWhite.withValues(alpha: 0.5);
+    }
+
+    // Sender avatar for actionable items (shows initial letter)
+    if (notification.senderEmail != null &&
+        notification.senderEmail!.isNotEmpty &&
+        _isActionableType(notification.type)) {
+      final initial = notification.senderEmail!.substring(0, 1).toUpperCase();
+      return Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Center(
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      );
     }
 
     return Container(
@@ -568,14 +626,14 @@ class _NotificationDropdownPanelState
     );
   }
 
-  // ─── Inline Accept/Decline ──────────────────────────────────────────
+  // ─── ACCEPT / DECLINE BUTTONS ────────────────────────────────
 
   Widget _buildInlineActions(OGANotification notification) {
     return Row(
       children: [
         Expanded(
           child: SizedBox(
-            height: 28,
+            height: 30,
             child: ElevatedButton(
               onPressed: () => _handleAccept(notification),
               style: ElevatedButton.styleFrom(
@@ -601,12 +659,12 @@ class _NotificationDropdownPanelState
         const SizedBox(width: 8),
         Expanded(
           child: SizedBox(
-            height: 28,
+            height: 30,
             child: OutlinedButton(
               onPressed: () => _handleDecline(notification),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _pureWhite.withValues(alpha: 0.5),
-                side: BorderSide(color: _ironGrey),
+                side: const BorderSide(color: _ironGrey),
                 padding: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(6),
@@ -627,7 +685,7 @@ class _NotificationDropdownPanelState
     );
   }
 
-  // ─── Empty State ────────────────────────────────────────────────────
+  // ─── EMPTY STATE ─────────────────────────────────────────────
 
   Widget _buildEmptyState() {
     return Padding(
@@ -660,7 +718,7 @@ class _NotificationDropdownPanelState
     );
   }
 
-  // ─── Footer ─────────────────────────────────────────────────────────
+  // ─── FOOTER ──────────────────────────────────────────────────
 
   Widget _buildFooter() {
     return GestureDetector(
@@ -682,40 +740,17 @@ class _NotificationDropdownPanelState
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
   // ACTIONS
-  // ═══════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
 
   Future<void> _handleTap(OGANotification notification) async {
     if (!notification.isRead) {
       await NotificationService.markRead(notification.id);
       NotificationService.decrementUnread();
-      if (mounted) {
-        setState(() {
-          final idx = _notifications.indexWhere((n) => n.id == notification.id);
-          if (idx >= 0) {
-            final n = _notifications[idx];
-            _notifications[idx] = OGANotification(
-              id: n.id,
-              recipientEmail: n.recipientEmail,
-              type: n.type,
-              referenceId: n.referenceId,
-              referenceType: n.referenceType,
-              message: n.message,
-              isRead: true,
-              createdAt: n.createdAt,
-              senderEmail: n.senderEmail,
-              thumbnailUrl: n.thumbnailUrl,
-              actionUrl: n.actionUrl,
-              category: n.category,
-              priority: n.priority,
-            );
-          }
-        });
-      }
+      _updateLocalReadState(notification.id);
     }
-
-    // Deep link for friend-related taps
+    // Deep-link based on type
     if (notification.type == 'friend_request' ||
         notification.type == 'friend_accepted') {
       widget.onDeepLink?.call({'switchToTab': 'FRIENDS'});
@@ -723,7 +758,12 @@ class _NotificationDropdownPanelState
   }
 
   Future<void> _handleAccept(OGANotification notification) async {
-    // Immediately mark as acted on to hide buttons
+    debugPrint(
+      '>>> ACCEPT tapped: type=${notification.type} '
+      'refId=${notification.referenceId}',
+    );
+
+    // Immediately hide buttons via _actedOnIds
     setState(() => _actedOnIds.add(notification.id));
 
     String result;
@@ -733,16 +773,13 @@ class _NotificationDropdownPanelState
       case 'trade_proposed':
         result = await TradeService.acceptTrade(notification.referenceId);
         successMsg = 'Trade completed! Your library has been updated.';
-        break;
       case 'lend_proposed':
         result = await LendService.acceptLend(notification.referenceId);
         successMsg = 'Lend accepted! Character added to your library.';
-        break;
       case 'friend_request':
         final ok = await FriendService.acceptRequest(notification.referenceId);
         result = ok ? 'success' : 'Failed to accept friend request';
         successMsg = 'Friend request accepted!';
-        break;
       default:
         return;
     }
@@ -750,23 +787,32 @@ class _NotificationDropdownPanelState
     if (!mounted) return;
 
     if (result == 'success') {
+      // 1. Mark read in DB
       await NotificationService.markRead(notification.id);
       NotificationService.decrementUnread();
+      // 2. Update local state (buttons disappear)
+      _updateLocalReadState(notification.id);
+      // 3. Re-fetch notifications to get fresh data
       await _loadNotifications();
-
-      // Notify dashboard to refresh ownership / library
+      // 4. Tell dashboard to reload ownership / library
       widget.onActionCompleted?.call();
-
+      // 5. Show success snackbar
       _showSnackBar(successMsg, isSuccess: true);
+      debugPrint('>>> ACCEPT success: $successMsg');
     } else {
-      // Undo acted-on state so buttons come back
+      // Rollback — show buttons again
       setState(() => _actedOnIds.remove(notification.id));
       _showSnackBar(result, isSuccess: false);
+      debugPrint('>>> ACCEPT failed: $result');
     }
   }
 
   Future<void> _handleDecline(OGANotification notification) async {
-    // Immediately mark as acted on to hide buttons
+    debugPrint(
+      '>>> DECLINE tapped: type=${notification.type} '
+      'refId=${notification.referenceId}',
+    );
+
     setState(() => _actedOnIds.add(notification.id));
 
     String result;
@@ -776,16 +822,13 @@ class _NotificationDropdownPanelState
       case 'trade_proposed':
         result = await TradeService.declineTrade(notification.referenceId);
         successMsg = 'Trade declined.';
-        break;
       case 'lend_proposed':
         result = await LendService.declineLend(notification.referenceId);
         successMsg = 'Lend declined.';
-        break;
       case 'friend_request':
         final ok = await FriendService.declineRequest(notification.referenceId);
         result = ok ? 'success' : 'Failed to decline friend request';
         successMsg = 'Friend request declined.';
-        break;
       default:
         return;
     }
@@ -795,17 +838,42 @@ class _NotificationDropdownPanelState
     if (result == 'success') {
       await NotificationService.markRead(notification.id);
       NotificationService.decrementUnread();
+      _updateLocalReadState(notification.id);
       await _loadNotifications();
-
-      // Notify dashboard to refresh
       widget.onActionCompleted?.call();
-
       _showSnackBar(successMsg, isSuccess: true);
+      debugPrint('>>> DECLINE success: $successMsg');
     } else {
-      // Undo acted-on state so buttons come back
       setState(() => _actedOnIds.remove(notification.id));
       _showSnackBar(result, isSuccess: false);
+      debugPrint('>>> DECLINE failed: $result');
     }
+  }
+
+  /// Locally flip a notification to isRead=true so buttons vanish.
+  void _updateLocalReadState(String notificationId) {
+    if (!mounted) return;
+    setState(() {
+      final idx = _notifications.indexWhere((n) => n.id == notificationId);
+      if (idx >= 0) {
+        final n = _notifications[idx];
+        _notifications[idx] = OGANotification(
+          id: n.id,
+          recipientEmail: n.recipientEmail,
+          type: n.type,
+          referenceId: n.referenceId,
+          referenceType: n.referenceType,
+          message: n.message,
+          isRead: true,
+          createdAt: n.createdAt,
+          senderEmail: n.senderEmail,
+          thumbnailUrl: n.thumbnailUrl,
+          actionUrl: n.actionUrl,
+          category: n.category,
+          priority: n.priority,
+        );
+      }
+    });
   }
 
   Future<void> _markAllRead() async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Waitlist screen displayed when an authenticated user
 /// does NOT have an active row in the beta_access table.
@@ -182,8 +183,22 @@ class BetaWaitlistScreen extends StatelessWidget {
 
                 // === DISCORD CTA ===
                 GestureDetector(
-                  onTap: () {
+                  onTap: () async {
+                    // <--- Added 'async' right here
                     debugPrint('📣 Open Discord link');
+
+                    // Removed the trailing space at the end of the URL just to be safe!
+                    final Uri url = Uri.parse('https://discord.gg/G9mbqyNhYD');
+
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(
+                        url,
+                        mode: LaunchMode
+                            .externalApplication, // Opens in browser or Discord app
+                      );
+                    } else {
+                      debugPrint('Could not launch $url');
+                    }
                   },
                   child: Container(
                     width: double.infinity,
@@ -192,6 +207,7 @@ class BetaWaitlistScreen extends StatelessWidget {
                       color: neonGreen,
                       borderRadius: BorderRadius.circular(8),
                     ),
+                    // ... the rest of the button stays exactly the same
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

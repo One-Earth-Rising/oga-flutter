@@ -452,10 +452,20 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           onViewAll: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const ActivityScreen()),
+              MaterialPageRoute(
+                builder: (_) => ActivityScreen(
+                  onActionCompleted: () {
+                    // Reload character ownership data
+                    _loadUserData();
+                    // Refresh the dashboard UI
+                    if (mounted) setState(() {});
+                  },
+                ),
+              ),
             );
           },
           onDeepLink: (data) {
+            // Optional: handle deep-links like switching to FRIENDS tab
             if (data['switchToTab'] == 'FRIENDS') {
               _pageController.animateToPage(
                 1,
@@ -463,6 +473,11 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
                 curve: Curves.easeInOut,
               );
             }
+          },
+          // THIS IS THE KEY LINE — triggers library refresh after accept/decline
+          onActionCompleted: () {
+            _loadUserData(); // re-fetch character ownership from Supabase
+            if (mounted) setState(() {}); // rebuild dashboard UI
           },
         ),
         if (!isMobile) _buildAvatarDropdown(),
