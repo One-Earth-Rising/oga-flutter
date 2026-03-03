@@ -3,9 +3,8 @@
 // Temporary character delegation with time-locked returns.
 // Auto-return handled via n8n scheduled workflow + return_lend() RPC.
 //
-// PHASE 1 CHANGES:
-//   - Table renamed: trade_notifications → notifications
-//   - Enriched notification inserts: sender_email, category, action_url
+// FIXED: Ownership queries now use .limit(1) to prevent 406 errors
+// when users own duplicate copies of the same character.
 // ═══════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -110,6 +109,7 @@ class LendService {
             'and(requester_email.eq.$email,receiver_email.eq.$borrowerEmail),'
             'and(requester_email.eq.$borrowerEmail,receiver_email.eq.$email)',
           )
+          .limit(1)
           .maybeSingle();
 
       if (friendship == null) return 'You must be friends to lend';
@@ -122,6 +122,7 @@ class LendService {
           .eq('character_id', characterId)
           .eq('status', 'active')
           .eq('is_lent_out', false)
+          .limit(1)
           .maybeSingle();
 
       if (ownership == null)
@@ -134,6 +135,7 @@ class LendService {
           .eq('lender_email', email)
           .eq('character_id', characterId)
           .inFilter('status', ['pending', 'active'])
+          .limit(1)
           .maybeSingle();
 
       if (activeLend != null)

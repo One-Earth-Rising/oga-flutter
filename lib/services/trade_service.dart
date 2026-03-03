@@ -3,9 +3,8 @@
 // P2P character trading: propose, accept, decline, cancel.
 // Atomic swaps via execute_trade() Postgres function.
 //
-// PHASE 1 CHANGES:
-//   - Table renamed: trade_notifications → notifications
-//   - Enriched notification inserts: sender_email, category, action_url
+// FIXED: Ownership queries now use .limit(1) to prevent 406 errors
+// when users own duplicate copies of the same character.
 // ═══════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -118,6 +117,7 @@ class TradeService {
             'and(requester_email.eq.$email,receiver_email.eq.$receiverEmail),'
             'and(requester_email.eq.$receiverEmail,receiver_email.eq.$email)',
           )
+          .limit(1)
           .maybeSingle();
 
       if (friendship == null) return 'You must be friends to trade';
@@ -130,6 +130,7 @@ class TradeService {
           .eq('character_id', offeredCharacterId)
           .eq('status', 'active')
           .eq('is_lent_out', false)
+          .limit(1)
           .maybeSingle();
 
       if (proposerOwns == null)
@@ -143,6 +144,7 @@ class TradeService {
           .eq('character_id', requestedCharacterId)
           .eq('status', 'active')
           .eq('is_lent_out', false)
+          .limit(1)
           .maybeSingle();
 
       if (receiverOwns == null)
@@ -157,6 +159,7 @@ class TradeService {
           .eq('offered_character_id', offeredCharacterId)
           .eq('requested_character_id', requestedCharacterId)
           .eq('status', 'pending')
+          .limit(1)
           .maybeSingle();
 
       if (existingTrade != null)
