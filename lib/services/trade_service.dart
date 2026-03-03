@@ -163,7 +163,7 @@ class TradeService {
         return 'You already have a pending trade for this exact swap';
 
       // Create the trade and get its ID in one call
-      final tradeRow = await _supabase
+      final rows = await _supabase
           .from('trades')
           .insert({
             'proposer_email': email,
@@ -174,8 +174,8 @@ class TradeService {
             'proposer_ownership_id': proposerOwns['id'],
             'receiver_ownership_id': receiverOwns['id'],
           })
-          .select('id')
-          .single();
+          .select('id');
+      final tradeRow = rows[0];
 
       // Notify receiver
       await _supabase.from('notifications').insert({

@@ -915,9 +915,39 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 ),
                 const SizedBox(height: 12),
                 GestureDetector(
-                  onTap: () {
-                    if (!isGuest && widget.ownerEmail != null) {
-                      GetCharacterModal.show(
+                 onTap: () {
+    if (isGuest) return;
+    if (widget.ownerEmail != null) {
+      GetCharacterModal.show(
+        context,
+        characterId: ch.id,
+        ownerEmail: widget.ownerEmail!,
+        ownerName: widget.ownerName ?? 'Friend',
+        characterName: ch.name,
+      );
+    } else {
+      // Own library — placeholder until marketplace
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF121212),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: const Color(0xFF39FF14).withValues(alpha: 0.3)),
+          ),
+          content: const Row(
+            children: [
+              Icon(Icons.storefront, color: Color(0xFF39FF14), size: 18),
+              SizedBox(width: 10),
+              Text('MARKETPLACE COMING SOON',
+                style: TextStyle(color: Colors.white, fontSize: 12,
+                  fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+            ],
+          ),
+        ),
+      );
+    }
+},
                         context,
                         characterId: ch.id,
                         ownerEmail: widget.ownerEmail!,
