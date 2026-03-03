@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/analytics_service.dart';
 
 /// Admin Analytics Dashboard
@@ -20,6 +21,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   static const pureWhite = Color(0xFFFFFFFF);
   static const dimWhite = Color(0x99FFFFFF); // 60% opacity
 
+  final supabase = Supabase.instance.client;
+
   // ─── STATE ────────────────────────────────────────────────
   bool _isLoading = true;
   int _selectedTab = 0; // 0=Overview, 1=Users, 2=Funnel, 3=Live Feed
@@ -28,7 +31,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   List<Map<String, dynamic>> _dauData = [];
   List<Map<String, dynamic>> _featureUsage = [];
   Map<String, int> _inviteFunnel = {};
-  List<Map<String, dynamic>> _betaUsers = [];
+  List<Map<String, dynamic>> _activeBetaUsers = [];
+  List<Map<String, dynamic>> _pendingBetaUsers = [];
   List<Map<String, dynamic>> _recentEvents = [];
   List<Map<String, dynamic>> _topCharacters = [];
   double _avgSessionDuration = 0;
@@ -46,25 +50,87 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
         AnalyticsService.getDailyActiveUsers(days: 14),
         AnalyticsService.getFeatureUsage(days: 7),
         AnalyticsService.getInviteFunnel(days: 30),
-        AnalyticsService.getActiveBetaUsers(),
+        AnalyticsService.getActiveBetaUsers(), // Gets users from beta_access where revoked_at is null
         AnalyticsService.getRecentEvents(limit: 50),
         AnalyticsService.getTopCharacters(days: 7),
         AnalyticsService.getAvgSessionDuration(days: 7),
       ]);
 
-      setState(() {
-        _dauData = results[0] as List<Map<String, dynamic>>;
-        _featureUsage = results[1] as List<Map<String, dynamic>>;
-        _inviteFunnel = results[2] as Map<String, int>;
-        _betaUsers = results[3] as List<Map<String, dynamic>>;
-        _recentEvents = results[4] as List<Map<String, dynamic>>;
-        _topCharacters = results[5] as List<Map<String, dynamic>>;
-        _avgSessionDuration = results[6] as double;
-        _isLoading = false;
-      });
+      final activeBetaUsers = results[3] as List<Map<String, dynamic>>;
+      final activeEmails = activeBetaUsers.map((u) => u['email']).toList();
+
+      // Fetch all users from profiles to find pending requests
+      final profilesResponse = await supabase
+          .from('profiles')
+          .select('email, full_name, created_at');
+
+      final pendingUsers = profilesResponse
+          .where((p) => !activeEmails.contains(p['email']))
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _dauData = results[0] as List<Map<String, dynamic>>;
+          _featureUsage = results[1] as List<Map<String, dynamic>>;
+          _inviteFunnel = results[2] as Map<String, int>;
+          _activeBetaUsers = activeBetaUsers;
+          _pendingBetaUsers = List<Map<String, dynamic>>.from(pendingUsers);
+          _recentEvents = results[4] as List<Map<String, dynamic>>;
+          _topCharacters = results[5] as List<Map<String, dynamic>>;
+          _avgSessionDuration = results[6] as double;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('⚠️ Admin data load failed: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // ─── ADMIN ACTIONS ────────────────────────────────────────
+
+  Future<void> _approveUser(String email) async {
+    try {
+      final adminEmail = supabase.auth.currentUser?.email;
+
+      // Upsert into beta_access to grant access
+      await supabase.from('beta_access').upsert({
+        'email': email,
+        'granted_by': adminEmail,
+        'granted_at': DateTime.now().toIso8601String(),
+        'revoked_at': null, // Clear revocation if they were previously banned
+      });
+
+      // Show success feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Approved $email'), backgroundColor: neonGreen),
+      );
+
+      _loadAllData(); // Refresh data
+    } catch (e) {
+      debugPrint('Error approving user: $e');
+    }
+  }
+
+  Future<void> _revokeUser(String email) async {
+    try {
+      // Set revoked_at to current timestamp
+      await supabase
+          .from('beta_access')
+          .update({'revoked_at': DateTime.now().toIso8601String()})
+          .eq('email', email);
+
+      // Show warning feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Revoked access for $email'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+
+      _loadAllData(); // Refresh data
+    } catch (e) {
+      debugPrint('Error revoking user: $e');
     }
   }
 
@@ -191,7 +257,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   Widget _buildOverviewTab(bool isMobile) {
     // Calculate summary stats
     final todayDAU = _dauData.isNotEmpty ? _dauData.last['user_count'] ?? 0 : 0;
-    final totalBetaUsers = _betaUsers.length;
+    final totalBetaUsers = _activeBetaUsers.length;
     final totalInvites = _inviteFunnel.values.fold(0, (sum, v) => sum + v);
     final avgDuration = _avgSessionDuration;
 
@@ -312,96 +378,161 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     );
   }
 
-  // ─── USERS TAB ────────────────────────────────────────────
+  // ─── USERS TAB (UPDATED) ──────────────────────────────────
 
   Widget _buildUsersTab(bool isMobile) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: _buildCard(
-        'ACTIVE BETA USERS',
-        '${_betaUsers.length} users',
-        Column(
-          children: _betaUsers.isEmpty
-              ? [
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'No beta users yet',
-                      style: TextStyle(color: dimWhite),
-                    ),
-                  ),
-                ]
-              : _betaUsers.map((user) {
-                  final email = user['email'] ?? 'unknown';
-                  final notes = user['notes'] ?? '';
-                  final granted = _formatDate(user['granted_at']);
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: ironGrey, width: 0.5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // === PENDING USERS SECTION ===
+          _buildCard(
+            'PENDING APPROVAL',
+            '${_pendingBetaUsers.length} users',
+            Column(
+              children: _pendingBetaUsers.isEmpty
+                  ? [
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'No pending requests',
+                          style: TextStyle(color: dimWhite),
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        // Avatar circle
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: neonGreen.withValues(alpha: 0.15),
-                            border: Border.all(
-                              color: neonGreen.withValues(alpha: 0.4),
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              email[0].toUpperCase(),
-                              style: const TextStyle(
-                                color: neonGreen,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
+                    ]
+                  : _pendingBetaUsers.map((user) {
+                      final email = user['email'] ?? 'Unknown';
+                      final joined = _formatDate(user['created_at']);
+                      return _buildUserRow(
+                        email: email,
+                        subtitle: 'Joined $joined',
+                        isPending: true,
+                        isAdmin: false,
+                      );
+                    }).toList(),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // === ACTIVE USERS SECTION ===
+          _buildCard(
+            'ACTIVE BETA USERS',
+            '${_activeBetaUsers.length} users',
+            Column(
+              children: _activeBetaUsers.isEmpty
+                  ? [
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'No active users',
+                          style: TextStyle(color: dimWhite),
                         ),
-                        const SizedBox(width: 12),
-                        // Info
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                email,
-                                style: const TextStyle(
-                                  color: pureWhite,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              if (notes.isNotEmpty)
-                                Text(
-                                  notes,
-                                  style: TextStyle(
-                                    color: dimWhite,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        // Date
-                        Text(
-                          granted,
-                          style: TextStyle(color: dimWhite, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-        ),
+                      ),
+                    ]
+                  : _activeBetaUsers.map((user) {
+                      final email = user['email'] ?? 'Unknown';
+                      final isAdmin = user['is_admin'] == true;
+                      final subtitle = isAdmin ? 'Admin' : 'Beta Tester';
+                      return _buildUserRow(
+                        email: email,
+                        subtitle: subtitle,
+                        isPending: false,
+                        isAdmin: isAdmin,
+                      );
+                    }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserRow({
+    required String email,
+    required String subtitle,
+    required bool isPending,
+    required bool isAdmin,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: ironGrey, width: 0.5)),
+      ),
+      child: Row(
+        children: [
+          // Avatar circle
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: neonGreen.withValues(alpha: 0.15),
+              border: Border.all(color: neonGreen.withValues(alpha: 0.4)),
+            ),
+            child: Center(
+              child: Text(
+                email[0].toUpperCase(),
+                style: const TextStyle(
+                  color: neonGreen,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  email,
+                  style: const TextStyle(
+                    color: pureWhite,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(subtitle, style: TextStyle(color: dimWhite, fontSize: 12)),
+              ],
+            ),
+          ),
+          // Actions
+          if (isPending)
+            ElevatedButton(
+              onPressed: () => _approveUser(email),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: neonGreen,
+                foregroundColor: voidBlack,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 0,
+                ),
+                minimumSize: const Size(0, 32),
+              ),
+              child: const Text(
+                'APPROVE',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+              ),
+            )
+          else if (!isAdmin)
+            TextButton(
+              onPressed: () => _revokeUser(email),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 0,
+                ),
+                minimumSize: const Size(0, 32),
+              ),
+              child: const Text(
+                'REVOKE',
+                style: TextStyle(color: Colors.redAccent, fontSize: 11),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -643,7 +643,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {
-                    if (isFriendOwned) {
+                    if (isGuest) return;
+                    if (widget.ownerEmail != null &&
+                        widget.ownerEmail!.isNotEmpty) {
                       GetCharacterModal.show(
                         context,
                         characterId: ch.id,
@@ -652,7 +654,112 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                         characterName: ch.name,
                       );
                     } else {
-                      // TODO: Navigate to marketplace / acquisition flow
+                      // No known owner — marketplace placeholder
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF121212),
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(20),
+                            ),
+                            border: Border(
+                              top: BorderSide(color: Color(0xFF2C2C2C)),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Icon(
+                                Icons.lock_outline,
+                                color: const Color(0xFF39FF14),
+                                size: 36,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                '${ch.name.toUpperCase()} IS LOCKED',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'The marketplace is coming soon. In the meantime, find friends who own this character and propose a trade.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                  fontSize: 13,
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    // Pop back to dashboard, switch to friends tab
+                                    Navigator.of(
+                                      context,
+                                    ).pop({'switchToTab': 'FRIENDS'});
+                                  },
+                                  icon: const Icon(
+                                    Icons.people_outline,
+                                    size: 16,
+                                  ),
+                                  label: const Text(
+                                    'FIND FRIENDS WHO OWN THIS',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF39FF14),
+                                    side: const BorderSide(
+                                      color: Color(0xFF39FF14),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'MARKETPLACE COMING SOON',
+                                style: TextStyle(
+                                  color: const Color(
+                                    0xFF39FF14,
+                                  ).withValues(alpha: 0.3),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ),
+                        ),
+                      );
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -915,44 +1022,123 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 ),
                 const SizedBox(height: 12),
                 GestureDetector(
-                 onTap: () {
-    if (isGuest) return;
-    if (widget.ownerEmail != null) {
-      GetCharacterModal.show(
-        context,
-        characterId: ch.id,
-        ownerEmail: widget.ownerEmail!,
-        ownerName: widget.ownerName ?? 'Friend',
-        characterName: ch.name,
-      );
-    } else {
-      // Own library — placeholder until marketplace
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: const Color(0xFF121212),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: const Color(0xFF39FF14).withValues(alpha: 0.3)),
-          ),
-          content: const Row(
-            children: [
-              Icon(Icons.storefront, color: Color(0xFF39FF14), size: 18),
-              SizedBox(width: 10),
-              Text('MARKETPLACE COMING SOON',
-                style: TextStyle(color: Colors.white, fontSize: 12,
-                  fontWeight: FontWeight.w800, letterSpacing: 0.5)),
-            ],
-          ),
-        ),
-      );
-    }
-},
+                  onTap: () {
+                    if (isGuest) return;
+                    if (widget.ownerEmail != null &&
+                        widget.ownerEmail!.isNotEmpty) {
+                      GetCharacterModal.show(
                         context,
                         characterId: ch.id,
                         ownerEmail: widget.ownerEmail!,
                         ownerName: widget.ownerName ?? 'Friend',
                         characterName: ch.name,
+                      );
+                    } else {
+                      // No known owner — marketplace placeholder
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF121212),
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(20),
+                            ),
+                            border: Border(
+                              top: BorderSide(color: Color(0xFF2C2C2C)),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Icon(
+                                Icons.lock_outline,
+                                color: const Color(0xFF39FF14),
+                                size: 36,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                '${ch.name.toUpperCase()} IS LOCKED',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'The marketplace is coming soon. In the meantime, find friends who own this character and propose a trade.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                  fontSize: 13,
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    // Pop back to dashboard, switch to friends tab
+                                    Navigator.of(
+                                      context,
+                                    ).pop({'switchToTab': 'FRIENDS'});
+                                  },
+                                  icon: const Icon(
+                                    Icons.people_outline,
+                                    size: 16,
+                                  ),
+                                  label: const Text(
+                                    'FIND FRIENDS WHO OWN THIS',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF39FF14),
+                                    side: const BorderSide(
+                                      color: Color(0xFF39FF14),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'MARKETPLACE COMING SOON',
+                                style: TextStyle(
+                                  color: const Color(
+                                    0xFF39FF14,
+                                  ).withValues(alpha: 0.3),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ),
+                        ),
                       );
                     }
                   },

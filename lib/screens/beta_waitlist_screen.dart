@@ -3,13 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Waitlist screen displayed when an authenticated user
 /// does NOT have an active row in the beta_access table.
-///
-/// Shows:
-/// - OGA branding with glow
-/// - "BETA ACCESS PENDING" header
-/// - Explanation text
-/// - Discord link (for community access)
-/// - Sign out option (to switch accounts)
 class BetaWaitlistScreen extends StatelessWidget {
   const BetaWaitlistScreen({super.key});
 
@@ -27,6 +20,28 @@ class BetaWaitlistScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: voidBlack,
+      // === ADDED: Standard Top Logo Navigation ===
+      appBar: AppBar(
+        backgroundColor: voidBlack,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        toolbarHeight: 64,
+        title: Center(
+          child: Image.asset(
+            'assets/logo.png',
+            height: isMobile ? 24 : 32,
+            errorBuilder: (_, __, ___) => const Text(
+              'OGA',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+              ),
+            ),
+          ),
+        ),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
@@ -38,58 +53,6 @@ class BetaWaitlistScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // === OGA LOGO WITH GLOW ===
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: neonGreen.withValues(alpha: 0.3),
-                        blurRadius: 40,
-                        spreadRadius: 8,
-                      ),
-                      BoxShadow(
-                        color: neonGreen.withValues(alpha: 0.1),
-                        blurRadius: 80,
-                        spreadRadius: 16,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.asset(
-                      'assets/oga_logo.png',
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: deepCharcoal,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: ironGrey),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'OGA',
-                            style: TextStyle(
-                              color: neonGreen,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
                 // === STATUS BADGE ===
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -204,7 +167,7 @@ class BetaWaitlistScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'When your access is approved, you\'ll be able to log in and explore the full OGA experience — your character library, friends, and more.',
+                        'We will notify you when your access is approved. You\'ll then be able to log in and explore your character library.',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.4),
                           fontSize: 13,
@@ -220,7 +183,6 @@ class BetaWaitlistScreen extends StatelessWidget {
                 // === DISCORD CTA ===
                 GestureDetector(
                   onTap: () {
-                    // TODO: Replace with actual Discord invite link
                     debugPrint('📣 Open Discord link');
                   },
                   child: Container(
