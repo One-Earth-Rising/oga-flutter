@@ -150,11 +150,11 @@ class LendService {
       if (message != null && message.isNotEmpty) {
         insertData['message'] = message;
       }
-      final lendRow = await _supabase
+      final rows = await _supabase
           .from('lends')
           .insert(insertData)
-          .select('id')
-          .single();
+          .select('id');
+      final lendRow = rows[0];
 
       // Notify borrower
       await _supabase.from('notifications').insert({
