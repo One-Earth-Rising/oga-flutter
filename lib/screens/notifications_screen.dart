@@ -1,6 +1,10 @@
 // ═══════════════════════════════════════════════════════════════════════
-// NOTIFICATIONS SCREEN — Sprint 12
+// NOTIFICATIONS SCREEN — Sprint 12 (v1.1 — Column Name Fix)
 // Lists all notifications. Trade/lend actions inline.
+//
+// v1.1 FIXES:
+//   - user_email → recipient_email (matches notifications table schema)
+//   - read → is_read (matches notifications table schema)
 // ═══════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -41,7 +45,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final rows = await Supabase.instance.client
           .from('notifications')
           .select()
-          .eq('user_email', email)
+          .eq('recipient_email', email) // FIX: was user_email
           .order('created_at', ascending: false)
           .limit(50);
 
@@ -61,7 +65,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       await Supabase.instance.client
           .from('notifications')
-          .update({'read': true})
+          .update({'is_read': true}) // FIX: was 'read'
           .eq('id', notifId);
       NotificationService.decrementUnread();
     } catch (e) {
@@ -76,9 +80,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
       await Supabase.instance.client
           .from('notifications')
-          .update({'read': true})
-          .eq('user_email', email)
-          .eq('read', false);
+          .update({'is_read': true}) // FIX: was 'read'
+          .eq('recipient_email', email) // FIX: was user_email
+          .eq('is_read', false); // FIX: was 'read'
 
       NotificationService.resetUnread();
       _loadNotifications();
@@ -155,6 +159,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           color: Colors.orange.shade400,
           label: 'LEND RECALLED',
         );
+      case 'friend_request':
+        return _NotifDisplay(
+          icon: Icons.person_add_outlined,
+          color: const Color(0xFF7C4DFF),
+          label: 'FRIEND REQUEST',
+        );
+      case 'friend_accepted':
+        return _NotifDisplay(
+          icon: Icons.people_outline,
+          color: const Color(0xFF7C4DFF),
+          label: 'FRIEND ACCEPTED',
+        );
+      case 'welcome':
+        return _NotifDisplay(
+          icon: Icons.celebration_outlined,
+          color: const Color(0xFFFFD700),
+          label: 'WELCOME',
+        );
+      case 'system_announcement':
+        return _NotifDisplay(
+          icon: Icons.campaign_outlined,
+          color: Colors.white70,
+          label: 'ANNOUNCEMENT',
+        );
       default:
         return _NotifDisplay(
           icon: Icons.info_outline,
@@ -197,7 +225,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
         ),
         actions: [
-          if (_notifications.any((n) => n['read'] == false))
+          if (_notifications.any(
+            (n) => n['is_read'] == false,
+          )) // FIX: was 'read'
             TextButton(
               onPressed: _markAllAsRead,
               child: const Text(
@@ -267,7 +297,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget _buildNotificationTile(Map<String, dynamic> notif) {
     final type = notif['type'] as String? ?? '';
     final message = notif['message'] as String? ?? '';
-    final isRead = notif['read'] as bool? ?? false;
+    final isRead = notif['is_read'] as bool? ?? false; // FIX: was 'read'
     final display = _getDisplay(type);
     final timeStr = _timeAgo(notif['created_at']?.toString());
 

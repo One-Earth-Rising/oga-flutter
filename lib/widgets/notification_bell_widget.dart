@@ -1,11 +1,19 @@
 // ═══════════════════════════════════════════════════════════════════════
-// NOTIFICATION BELL WIDGET — Sprint 13 (v2 — Dropdown)
+// NOTIFICATION BELL WIDGET — Sprint 13 (v2.1 — Dropdown)
 // ⚡ icon with dropdown panel matching Figma Score menu aesthetic.
 // Self-contained: listens to NotificationService streams.
+//
+// v2.1 FIXES:
+//   - ACCEPT/DECLINE buttons only show on UNREAD actionable notifications
+//     (once acted on → marked read → buttons disappear on reload)
+//   - Added onActionCompleted callback so dashboard can refresh ownership
+//   - Improved snackbar messages for trade/lend/friend actions
+//   - Badge hides when unread count is 0
 //
 // Usage:
 //   NotificationBellWidget(
 //     onViewAll: () => Navigator.push(...ActivityScreen),
+//     onActionCompleted: () => _reloadOwnership(),   // ← NEW
 //   )
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -32,7 +40,16 @@ class NotificationBellWidget extends StatefulWidget {
   /// switch to the FRIENDS tab (passes {'switchToTab': 'FRIENDS'})
   final void Function(Map<String, dynamic>)? onDeepLink;
 
-  const NotificationBellWidget({super.key, this.onViewAll, this.onDeepLink});
+  /// Called after any accept/decline action completes successfully.
+  /// Use this to refresh ownership, library, or other dashboard state.
+  final VoidCallback? onActionCompleted;
+
+  const NotificationBellWidget({
+    super.key,
+    this.onViewAll,
+    this.onDeepLink,
+    this.onActionCompleted,
+  });
 
   @override
   State<NotificationBellWidget> createState() => _NotificationBellWidgetState();
@@ -65,7 +82,8 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+    // Reduced scale slightly so it doesn't clip when pulsing on Web
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
@@ -125,6 +143,7 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
                     _removeOverlay();
                     widget.onDeepLink?.call(data);
                   },
+                  onActionCompleted: widget.onActionCompleted,
                 ),
               ),
             ),
@@ -151,58 +170,68 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
       link: _layerLink,
       child: GestureDetector(
         onTap: _toggleDropdown,
-        child: ScaleTransition(
-          scale: _pulseAnimation,
-          child: Container(
-            width: 36,
-            height: 36,
-            margin: const EdgeInsets.only(right: 4),
-            decoration: BoxDecoration(
-              color: _isOpen
-                  ? _neonGreen.withValues(alpha: 0.12)
-                  : hasUnread
-                  ? _neonGreen.withValues(alpha: 0.08)
-                  : _deepCharcoal.withValues(alpha: 0.6),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: _isOpen
-                    ? _neonGreen.withValues(alpha: 0.4)
-                    : hasUnread
-                    ? _neonGreen.withValues(alpha: 0.25)
-                    : _ironGrey.withValues(alpha: 0.5),
-              ),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Icon(
-                  Icons.bolt,
-                  color: _isOpen || hasUnread
-                      ? _neonGreen
-                      : _pureWhite.withValues(alpha: 0.5),
-                  size: 18,
-                ),
-                if (hasUnread)
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _neonGreen,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _deepCharcoal, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _neonGreen.withValues(alpha: 0.5),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Padding(
+            // Padding outside the scaled area prevents clipping bounds
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: ScaleTransition(
+              scale: _pulseAnimation,
+              child: Container(
+                width: 34, // Slightly smaller to ensure no clipping
+                height: 34,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: _isOpen
+                      ? _neonGreen.withValues(alpha: 0.12)
+                      : hasUnread
+                      ? _neonGreen.withValues(alpha: 0.08)
+                      : _deepCharcoal.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _isOpen
+                        ? _neonGreen.withValues(alpha: 0.4)
+                        : hasUnread
+                        ? _neonGreen.withValues(alpha: 0.25)
+                        : _ironGrey.withValues(alpha: 0.5),
+                    width: 1, // Explicit width
                   ),
-              ],
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior:
+                      Clip.none, // Allow dot to hang outside if needed
+                  children: [
+                    Icon(
+                      Icons.bolt,
+                      color: _isOpen || hasUnread
+                          ? _neonGreen
+                          : _pureWhite.withValues(alpha: 0.5),
+                      size: 18,
+                    ),
+                    if (hasUnread)
+                      Positioned(
+                        top: 0, // Adjusted dot position for new sizing
+                        right: 0,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _neonGreen,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: _voidBlack, width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _neonGreen.withValues(alpha: 0.5),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -219,11 +248,13 @@ class _NotificationDropdownPanel extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback? onViewAll;
   final void Function(Map<String, dynamic>)? onDeepLink;
+  final VoidCallback? onActionCompleted;
 
   const _NotificationDropdownPanel({
     required this.onClose,
     this.onViewAll,
     this.onDeepLink,
+    this.onActionCompleted,
   });
 
   @override
@@ -235,6 +266,10 @@ class _NotificationDropdownPanelState
     extends State<_NotificationDropdownPanel> {
   List<OGANotification> _notifications = [];
   bool _isLoading = true;
+
+  // Track which notifications have been acted on this session
+  // (prevents re-showing buttons before reload completes)
+  final Set<String> _actedOnIds = {};
 
   static const int _maxVisible = 5;
 
@@ -338,7 +373,6 @@ class _NotificationDropdownPanelState
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
       child: Row(
         children: [
-          // Title
           const Text(
             'ACTIVITY',
             style: TextStyle(
@@ -348,38 +382,33 @@ class _NotificationDropdownPanelState
               letterSpacing: 1.5,
             ),
           ),
-
           const SizedBox(width: 8),
-
-          // ⚡ icon + unread count badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: _neonGreen.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: _neonGreen.withValues(alpha: 0.25)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.bolt, color: _neonGreen, size: 12),
-                const SizedBox(width: 3),
-                Text(
-                  '$unreadCount NEW',
-                  style: const TextStyle(
-                    color: _neonGreen,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
+          if (unreadCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _neonGreen.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: _neonGreen.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.bolt, color: _neonGreen, size: 12),
+                  const SizedBox(width: 3),
+                  Text(
+                    '$unreadCount NEW',
+                    style: const TextStyle(
+                      color: _neonGreen,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-
           const Spacer(),
-
-          // Mark all read
           if (unreadCount > 0)
             GestureDetector(
               onTap: _markAllRead,
@@ -402,10 +431,14 @@ class _NotificationDropdownPanelState
 
   Widget _buildNotificationRow(OGANotification notification) {
     final isUnread = !notification.isRead;
+
+    // FIX: Only show action buttons if UNREAD and not already acted on
     final isActionable =
-        notification.type == 'trade_proposed' ||
-        notification.type == 'lend_proposed' ||
-        notification.type == 'friend_request';
+        isUnread &&
+        !_actedOnIds.contains(notification.id) &&
+        (notification.type == 'trade_proposed' ||
+            notification.type == 'lend_proposed' ||
+            notification.type == 'friend_request');
 
     return InkWell(
       onTap: () => _handleTap(notification),
@@ -420,11 +453,8 @@ class _NotificationDropdownPanelState
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Icon
                 _buildIcon(notification),
                 const SizedBox(width: 10),
-
-                // Title + message
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,10 +504,7 @@ class _NotificationDropdownPanelState
                     ],
                   ),
                 ),
-
                 const SizedBox(width: 8),
-
-                // Time
                 Text(
                   _timeAgo(notification.createdAt),
                   style: TextStyle(
@@ -487,8 +514,6 @@ class _NotificationDropdownPanelState
                 ),
               ],
             ),
-
-            // Inline action buttons for pending items
             if (isActionable) ...[
               const SizedBox(height: 8),
               _buildInlineActions(notification),
@@ -698,18 +723,25 @@ class _NotificationDropdownPanelState
   }
 
   Future<void> _handleAccept(OGANotification notification) async {
+    // Immediately mark as acted on to hide buttons
+    setState(() => _actedOnIds.add(notification.id));
+
     String result;
+    String successMsg;
 
     switch (notification.type) {
       case 'trade_proposed':
         result = await TradeService.acceptTrade(notification.referenceId);
+        successMsg = 'Trade completed! Your library has been updated.';
         break;
       case 'lend_proposed':
         result = await LendService.acceptLend(notification.referenceId);
+        successMsg = 'Lend accepted! Character added to your library.';
         break;
       case 'friend_request':
         final ok = await FriendService.acceptRequest(notification.referenceId);
         result = ok ? 'success' : 'Failed to accept friend request';
+        successMsg = 'Friend request accepted!';
         break;
       default:
         return;
@@ -719,26 +751,40 @@ class _NotificationDropdownPanelState
 
     if (result == 'success') {
       await NotificationService.markRead(notification.id);
+      NotificationService.decrementUnread();
       await _loadNotifications();
-      _showSnackBar('Action completed!', isSuccess: true);
+
+      // Notify dashboard to refresh ownership / library
+      widget.onActionCompleted?.call();
+
+      _showSnackBar(successMsg, isSuccess: true);
     } else {
+      // Undo acted-on state so buttons come back
+      setState(() => _actedOnIds.remove(notification.id));
       _showSnackBar(result, isSuccess: false);
     }
   }
 
   Future<void> _handleDecline(OGANotification notification) async {
+    // Immediately mark as acted on to hide buttons
+    setState(() => _actedOnIds.add(notification.id));
+
     String result;
+    String successMsg;
 
     switch (notification.type) {
       case 'trade_proposed':
         result = await TradeService.declineTrade(notification.referenceId);
+        successMsg = 'Trade declined.';
         break;
       case 'lend_proposed':
         result = await LendService.declineLend(notification.referenceId);
+        successMsg = 'Lend declined.';
         break;
       case 'friend_request':
         final ok = await FriendService.declineRequest(notification.referenceId);
         result = ok ? 'success' : 'Failed to decline friend request';
+        successMsg = 'Friend request declined.';
         break;
       default:
         return;
@@ -748,9 +794,16 @@ class _NotificationDropdownPanelState
 
     if (result == 'success') {
       await NotificationService.markRead(notification.id);
+      NotificationService.decrementUnread();
       await _loadNotifications();
-      _showSnackBar('Declined.', isSuccess: true);
+
+      // Notify dashboard to refresh
+      widget.onActionCompleted?.call();
+
+      _showSnackBar(successMsg, isSuccess: true);
     } else {
+      // Undo acted-on state so buttons come back
+      setState(() => _actedOnIds.remove(notification.id));
       _showSnackBar(result, isSuccess: false);
     }
   }
@@ -767,7 +820,7 @@ class _NotificationDropdownPanelState
       SnackBar(
         backgroundColor: _deepCharcoal,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(
