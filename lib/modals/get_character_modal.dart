@@ -14,7 +14,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
-import '../screens/trade_proposal_modal.dart';
+import 'trade_proposal_modal.dart';
 import 'lend_request_modal.dart';
 
 const Color _voidBlack = Color(0xFF000000);
