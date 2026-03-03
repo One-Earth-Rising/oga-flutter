@@ -81,7 +81,7 @@ class _FBSSuccessScreenState extends State<FBSSuccessScreen>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF00FF00).withOpacity(0.15),
+                        color: const Color(0xFF00FF00).withValues(alpha: 0.15),
                         blurRadius: _glowAnimation.value * 5,
                         spreadRadius: _glowAnimation.value,
                       ),

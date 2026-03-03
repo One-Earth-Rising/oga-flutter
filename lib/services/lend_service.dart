@@ -1,10 +1,18 @@
 // ═══════════════════════════════════════════════════════════════════
-// LEND SERVICE — Sprint 12 Phase 1
+// LEND SERVICE — Sprint 13 v2
 // Temporary character delegation with time-locked returns.
-// Auto-return handled via n8n scheduled workflow + return_lend() RPC.
 //
-// FIXED: Ownership queries now use .limit(1) to prevent 406 errors
-// when users own duplicate copies of the same character.
+// v2 CHANGES:
+//   - Added requestLend() — borrower asks owner to lend their character
+//   - Added acceptLendRequest() — owner approves a borrow request
+//   - Added declineLendRequest() — owner declines a borrow request
+//   - New lend status: 'requested' (borrower-initiated, awaiting owner approval)
+//   - Existing statuses: 'pending' (lender-initiated), 'active', 'declined',
+//     'returned', 'recalled', 'expired'
+//
+// Two flows:
+//   LENDER-INITIATED: proposeLend → borrower sees lend_proposed → acceptLend
+//   BORROWER-INITIATED: requestLend → owner sees lend_requested → acceptLendRequest
 // ═══════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
@@ -64,32 +72,34 @@ class Lend {
 
   bool get isActive => status == 'active';
   bool get isPending => status == 'pending';
-  bool get isOverdue =>
-      isActive && returnDueAt != null && DateTime.now().isAfter(returnDueAt!);
+  bool get isRequested => status == 'requested';
 
-  Duration get timeRemaining =>
-      returnDueAt?.difference(DateTime.now()) ?? Duration.zero;
-
-  String get durationLabel {
-    if (durationHours < 24) return '${durationHours}h';
-    final days = durationHours ~/ 24;
-    return '${days}d';
+  Duration? get timeRemaining {
+    if (returnDueAt == null) return null;
+    final remaining = returnDueAt!.difference(DateTime.now());
+    return remaining.isNegative ? Duration.zero : remaining;
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// LEND SERVICE
+// ═══════════════════════════════════════════════════════════════════
+
 class LendService {
+  LendService._();
   static final _supabase = Supabase.instance.client;
+
   static String? get _currentEmail => _supabase.auth.currentUser?.email;
 
-  // ─── Propose a Lend ───────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // LENDER-INITIATED: "I own this, I'll lend it to you"
+  // ─────────────────────────────────────────────────────────────
 
-  /// Offer to lend a character to a friend.
-  /// Returns 'success' or an error message.
   static Future<String> proposeLend({
     required String borrowerEmail,
     required String characterId,
-    int durationHours = 168, // 7 days default
-    int? durationDays, // UI convenience — overrides durationHours
+    int durationHours = 168,
+    int? durationDays,
     String? message,
   }) async {
     final actualHours = durationDays != null
@@ -100,7 +110,6 @@ class LendService {
     if (borrowerEmail == email) return 'Cannot lend to yourself';
 
     try {
-      // Verify friendship
       final friendship = await _supabase
           .from('friendships')
           .select('id')
@@ -109,12 +118,10 @@ class LendService {
             'and(requester_email.eq.$email,receiver_email.eq.$borrowerEmail),'
             'and(requester_email.eq.$borrowerEmail,receiver_email.eq.$email)',
           )
-          .limit(1)
           .maybeSingle();
 
       if (friendship == null) return 'You must be friends to lend';
 
-      // Verify ownership (active, not already lent out)
       final ownership = await _supabase
           .from('character_ownership')
           .select('id')
@@ -122,26 +129,22 @@ class LendService {
           .eq('character_id', characterId)
           .eq('status', 'active')
           .eq('is_lent_out', false)
-          .limit(1)
           .maybeSingle();
 
       if (ownership == null)
         return 'You don\'t own this character or it\'s already lent out';
 
-      // Check no active lend for this character
       final activeLend = await _supabase
           .from('lends')
           .select('id')
           .eq('lender_email', email)
           .eq('character_id', characterId)
-          .inFilter('status', ['pending', 'active'])
-          .limit(1)
+          .inFilter('status', ['pending', 'requested', 'active'])
           .maybeSingle();
 
       if (activeLend != null)
         return 'This character already has a pending or active lend';
 
-      // Create the lend
       final insertData = <String, dynamic>{
         'lender_email': email,
         'borrower_email': borrowerEmail,
@@ -152,13 +155,12 @@ class LendService {
       if (message != null && message.isNotEmpty) {
         insertData['message'] = message;
       }
-      final rows = await _supabase
+      final lendRow = await _supabase
           .from('lends')
           .insert(insertData)
-          .select('id');
-      final lendRow = rows[0];
+          .select('id')
+          .single();
 
-      // Notify borrower
       await _supabase.from('notifications').insert({
         'recipient_email': borrowerEmail,
         'type': 'lend_proposed',
@@ -178,9 +180,109 @@ class LendService {
     }
   }
 
-  // ─── Accept a Lend ────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // BORROWER-INITIATED: "You own this, please lend it to me"
+  // ─────────────────────────────────────────────────────────────
 
-  /// Accept a lend offer (borrower action).
+  /// Request to borrow a friend's character.
+  /// Creates a lend with status='requested' (vs 'pending' for lender-initiated).
+  /// Owner receives lend_requested notification with ACCEPT/DECLINE.
+  static Future<String> requestLend({
+    required String ownerEmail,
+    required String characterId,
+    int durationDays = 7,
+    String? message,
+  }) async {
+    final email = _currentEmail;
+    if (email == null) return 'Not logged in';
+    if (ownerEmail == email) return 'Cannot request from yourself';
+
+    try {
+      // Verify friendship
+      final friendship = await _supabase
+          .from('friendships')
+          .select('id')
+          .eq('status', 'accepted')
+          .or(
+            'and(requester_email.eq.$email,receiver_email.eq.$ownerEmail),'
+            'and(requester_email.eq.$ownerEmail,receiver_email.eq.$email)',
+          )
+          .maybeSingle();
+
+      if (friendship == null) return 'You must be friends to request a lend';
+
+      // Verify the OWNER actually owns this character
+      final ownership = await _supabase
+          .from('character_ownership')
+          .select('id')
+          .eq('owner_email', ownerEmail)
+          .eq('character_id', characterId)
+          .eq('status', 'active')
+          .eq('is_lent_out', false)
+          .maybeSingle();
+
+      if (ownership == null) {
+        return 'This character is not available for lending';
+      }
+
+      // Check no existing request/lend for this character from us
+      final existing = await _supabase
+          .from('lends')
+          .select('id')
+          .eq('lender_email', ownerEmail)
+          .eq('borrower_email', email)
+          .eq('character_id', characterId)
+          .inFilter('status', ['pending', 'requested', 'active'])
+          .maybeSingle();
+
+      if (existing != null) {
+        return 'You already have a pending request for this character';
+      }
+
+      // Create the lend with status='requested'
+      final insertData = <String, dynamic>{
+        'lender_email': ownerEmail,
+        'borrower_email': email,
+        'character_id': characterId,
+        'duration_hours': durationDays * 24,
+        'ownership_id': ownership['id'],
+        'status': 'requested',
+      };
+      if (message != null && message.isNotEmpty) {
+        insertData['message'] = message;
+      }
+
+      final lendRow = await _supabase
+          .from('lends')
+          .insert(insertData)
+          .select('id')
+          .single();
+
+      // Notify the OWNER
+      await _supabase.from('notifications').insert({
+        'recipient_email': ownerEmail,
+        'type': 'lend_requested',
+        'reference_id': lendRow['id'],
+        'reference_type': 'lend',
+        'message': '${email.split('@').first} wants to borrow your character!',
+        'sender_email': email,
+        'category': 'lend',
+        'action_url': '/lend-inbox',
+      });
+
+      debugPrint('✅ LendService: lend requested from $ownerEmail');
+      return 'success';
+    } catch (e) {
+      debugPrint('❌ LendService.requestLend error: $e');
+      return 'Something went wrong. Please try again.';
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // ACCEPT / DECLINE
+  // ─────────────────────────────────────────────────────────────
+
+  /// Accept a lend offer (BORROWER action — lender-initiated flow).
   static Future<String> acceptLend(String lendId) async {
     final email = _currentEmail;
     if (email == null) return 'Not logged in';
@@ -199,7 +301,6 @@ class LendService {
       final now = DateTime.now();
       final returnDue = now.add(Duration(hours: lend['duration_hours'] as int));
 
-      // Activate the lend
       await _supabase
           .from('lends')
           .update({
@@ -209,13 +310,11 @@ class LendService {
           })
           .eq('id', lendId);
 
-      // Mark the character as lent out
       await _supabase
           .from('character_ownership')
           .update({'is_lent_out': true})
           .eq('id', lend['ownership_id']);
 
-      // Notify lender
       await _supabase.from('notifications').insert({
         'recipient_email': lend['lender_email'],
         'type': 'lend_accepted',
@@ -235,9 +334,60 @@ class LendService {
     }
   }
 
-  // ─── Decline a Lend ───────────────────────────────────────
+  /// Accept a lend REQUEST (OWNER action — borrower-initiated flow).
+  static Future<String> acceptLendRequest(String lendId) async {
+    final email = _currentEmail;
+    if (email == null) return 'Not logged in';
 
-  /// Decline a lend offer (borrower action).
+    try {
+      final lend = await _supabase
+          .from('lends')
+          .select()
+          .eq('id', lendId)
+          .eq('lender_email', email)
+          .eq('status', 'requested')
+          .maybeSingle();
+
+      if (lend == null) return 'Request not found or already resolved';
+
+      final now = DateTime.now();
+      final returnDue = now.add(Duration(hours: lend['duration_hours'] as int));
+
+      await _supabase
+          .from('lends')
+          .update({
+            'status': 'active',
+            'accepted_at': now.toIso8601String(),
+            'return_due_at': returnDue.toIso8601String(),
+          })
+          .eq('id', lendId);
+
+      await _supabase
+          .from('character_ownership')
+          .update({'is_lent_out': true})
+          .eq('id', lend['ownership_id']);
+
+      await _supabase.from('notifications').insert({
+        'recipient_email': lend['borrower_email'],
+        'type': 'lend_accepted',
+        'reference_id': lendId,
+        'reference_type': 'lend',
+        'message':
+            '${email.split('@').first} approved your lend request! Character is now in your library.',
+        'sender_email': email,
+        'category': 'lend',
+        'action_url': '/lend-inbox',
+      });
+
+      debugPrint('✅ LendService: lend request accepted → $lendId');
+      return 'success';
+    } catch (e) {
+      debugPrint('❌ LendService.acceptLendRequest error: $e');
+      return 'Something went wrong. Please try again.';
+    }
+  }
+
+  /// Decline a lend offer (BORROWER action — lender-initiated flow).
   static Future<String> declineLend(String lendId) async {
     final email = _currentEmail;
     if (email == null) return 'Not logged in';
@@ -258,7 +408,6 @@ class LendService {
           .update({'status': 'declined'})
           .eq('id', lendId);
 
-      // Notify lender
       await _supabase.from('notifications').insert({
         'recipient_email': lend['lender_email'],
         'type': 'lend_declined',
@@ -278,9 +427,48 @@ class LendService {
     }
   }
 
+  /// Decline a lend REQUEST (OWNER action — borrower-initiated flow).
+  static Future<String> declineLendRequest(String lendId) async {
+    final email = _currentEmail;
+    if (email == null) return 'Not logged in';
+
+    try {
+      final lend = await _supabase
+          .from('lends')
+          .select()
+          .eq('id', lendId)
+          .eq('lender_email', email)
+          .eq('status', 'requested')
+          .maybeSingle();
+
+      if (lend == null) return 'Request not found or already resolved';
+
+      await _supabase
+          .from('lends')
+          .update({'status': 'declined'})
+          .eq('id', lendId);
+
+      await _supabase.from('notifications').insert({
+        'recipient_email': lend['borrower_email'],
+        'type': 'lend_declined',
+        'reference_id': lendId,
+        'reference_type': 'lend',
+        'message': 'Your lend request was declined.',
+        'sender_email': email,
+        'category': 'lend',
+        'action_url': '/lend-inbox',
+      });
+
+      debugPrint('✅ LendService: lend request declined → $lendId');
+      return 'success';
+    } catch (e) {
+      debugPrint('❌ LendService.declineLendRequest error: $e');
+      return 'Something went wrong. Please try again.';
+    }
+  }
+
   // ─── Return / Recall ──────────────────────────────────────
 
-  /// Return a borrowed character early (borrower action).
   static Future<String> returnEarly(String lendId) async {
     try {
       final result = await _supabase.rpc(
@@ -298,9 +486,7 @@ class LendService {
     }
   }
 
-  /// Recall a lent character (lender action — early return).
   static Future<String> recallLend(String lendId) async {
-    // Same operation — return_lend() handles it from either side
     try {
       final result = await _supabase.rpc(
         'return_lend',
@@ -319,7 +505,6 @@ class LendService {
 
   // ─── Query Lends ──────────────────────────────────────────
 
-  /// Get all lends involving the current user.
   static Future<List<Lend>> getMyLends({String? status}) async {
     final email = _currentEmail;
     if (email == null) return [];
@@ -342,18 +527,15 @@ class LendService {
     }
   }
 
-  /// Get characters actively borrowed by current user.
   static Future<List<Lend>> getActiveBorrowed() async {
     final email = _currentEmail;
     if (email == null) return [];
-
     try {
       final rows = await _supabase
           .from('lends')
           .select()
           .eq('borrower_email', email)
           .eq('status', 'active');
-
       return rows.map<Lend>((row) => Lend.fromMap(row)).toList();
     } catch (e) {
       debugPrint('❌ LendService.getActiveBorrowed error: $e');
@@ -361,18 +543,15 @@ class LendService {
     }
   }
 
-  /// Get characters actively lent out by current user.
   static Future<List<Lend>> getActiveLentOut() async {
     final email = _currentEmail;
     if (email == null) return [];
-
     try {
       final rows = await _supabase
           .from('lends')
           .select()
           .eq('lender_email', email)
           .eq('status', 'active');
-
       return rows.map<Lend>((row) => Lend.fromMap(row)).toList();
     } catch (e) {
       debugPrint('❌ LendService.getActiveLentOut error: $e');
@@ -380,15 +559,11 @@ class LendService {
     }
   }
 
-  // ─── Convenience aliases (used by UI screens) ────────────
+  // ─── Convenience aliases ──────────────────────────────────
 
-  /// Alias: get characters user is currently borrowing.
   static Future<List<Lend>> getActiveBorrowing() => getActiveBorrowed();
-
-  /// Alias: get characters user is currently lending out.
   static Future<List<Lend>> getActiveLending() => getActiveLentOut();
 
-  /// Get pending lend requests where current user is the borrower.
   static Future<List<Lend>> getPendingRequests() async {
     final email = _currentEmail;
     if (email == null) return [];
@@ -396,14 +571,17 @@ class LendService {
     return all.where((l) => l.borrowerEmail == email).toList();
   }
 
-  /// Get completed / returned lends involving current user.
   static Future<List<Lend>> getLendHistory() async {
     final all = await getMyLends();
     return all
-        .where((l) => l.status != 'pending' && l.status != 'active')
+        .where(
+          (l) =>
+              l.status != 'pending' &&
+              l.status != 'active' &&
+              l.status != 'requested',
+        )
         .toList();
   }
 
-  /// Alias for returnEarly (UI calls it returnLend).
   static Future<String> returnLend(String lendId) => returnEarly(lendId);
 }

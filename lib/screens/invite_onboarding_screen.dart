@@ -257,7 +257,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
                   Text(
                     _stepLabel,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1,
@@ -266,7 +266,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
                   Text(
                     '${_currentStep + 1} / 3',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                       fontSize: 11,
                     ),
                   ),
@@ -334,7 +334,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
           Text(
             'Tell us who you are, Agent.',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 14,
             ),
           ),
@@ -388,7 +388,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
             child: Text(
               'Optional — you can set this later in Settings',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.35),
+                color: Colors.white.withValues(alpha: 0.35),
                 fontSize: 12,
               ),
             ),
@@ -460,7 +460,10 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
         const SizedBox(height: 8),
         Text(
           'Choose your first character. More will follow.',
-          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.6),
+            fontSize: 14,
+          ),
         ),
 
         const SizedBox(height: 32),
@@ -529,7 +532,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: neonGreen.withOpacity(0.15),
+                    color: neonGreen.withValues(alpha: 0.15),
                     blurRadius: 20,
                     spreadRadius: 2,
                   ),
@@ -554,7 +557,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [color.withOpacity(0.3), deepCharcoal],
+                          colors: [color.withValues(alpha: 0.3), deepCharcoal],
                         ),
                       ),
                     ),
@@ -565,7 +568,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
                       errorBuilder: (_, __, ___) => Center(
                         child: Icon(
                           Icons.person,
-                          color: color.withOpacity(0.5),
+                          color: color.withValues(alpha: 0.5),
                           size: 48,
                         ),
                       ),
@@ -611,7 +614,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
                     Text(
                       description,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         fontSize: 12,
                       ),
                     ),
@@ -622,9 +625,9 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.15),
+                        color: color.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: color.withOpacity(0.3)),
+                        border: Border.all(color: color.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         ip,
@@ -670,7 +673,10 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
         const SizedBox(height: 8),
         Text(
           'Help us personalize your experience.',
-          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.6),
+            fontSize: 14,
+          ),
         ),
 
         const SizedBox(height: 32),
@@ -741,7 +747,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.5,
@@ -763,7 +769,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
                 ),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? neonGreen.withOpacity(0.12)
+                      ? neonGreen.withValues(alpha: 0.12)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
@@ -796,9 +802,9 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
       width: 64,
       height: 64,
       decoration: BoxDecoration(
-        color: neonGreen.withOpacity(0.1),
+        color: neonGreen.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: neonGreen.withOpacity(0.3)),
+        border: Border.all(color: neonGreen.withValues(alpha: 0.3)),
       ),
       child: Icon(icon, color: neonGreen, size: 32),
     );
@@ -818,7 +824,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
         width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
-          color: isEnabled ? neonGreen : neonGreen.withOpacity(0.2),
+          color: isEnabled ? neonGreen : neonGreen.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
@@ -860,7 +866,10 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
       onPressed: onTap,
       child: Text(
         label ?? 'Skip for now',
-        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.4),
+          fontSize: 13,
+        ),
       ),
     );
   }
@@ -880,7 +889,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.5,
@@ -894,10 +903,10 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
           style: const TextStyle(color: Colors.white, fontSize: 16),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
             prefixText: prefix,
             prefixStyle: TextStyle(
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
               fontSize: 16,
             ),
             errorText: errorText,

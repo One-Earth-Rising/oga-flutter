@@ -27,6 +27,8 @@ import '../services/notification_service.dart';
 import '../services/trade_service.dart';
 import '../services/lend_service.dart';
 import '../services/friend_service.dart';
+import '../widgets/notification_detail_sheet.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 const Color _voidBlack = Color(0xFF000000);
 const Color _deepCharcoal = Color(0xFF121212);
@@ -66,7 +68,6 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
   OverlayEntry? _overlayEntry;
   final LayerLink _layerLink = LayerLink();
   bool _isOpen = false;
-
   @override
   void initState() {
     super.initState();
@@ -265,6 +266,7 @@ class _NotificationDropdownPanelState
   List<OGANotification> _notifications = [];
   bool _isLoading = true;
   final Set<String> _actedOnIds = {};
+  final Map<String, String?> _avatarCache = {};
   static const int _maxVisible = 5;
 
   @override
@@ -285,6 +287,31 @@ class _NotificationDropdownPanelState
           'actionable=$actionable  sender=${n.senderEmail ?? "null"}',
         );
       }
+      // Batch-fetch sender avatars
+      final emails = all
+          .where((n) => n.senderEmail != null)
+          .map((n) => n.senderEmail!)
+          .toSet()
+          .toList();
+      if (emails.isNotEmpty) {
+        try {
+          final profiles = await Supabase.instance.client
+              .from('profiles')
+              .select('email, avatar_url, full_name')
+              .inFilter('email', emails);
+          for (final p in profiles) {
+            _avatarCache[p['email'] as String] = p['avatar_url'] as String?;
+          }
+        } catch (e) {
+          debugPrint('!!! Avatar fetch error: $e');
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _notifications = all;
+          _isLoading = false;
+        });
+      }
       if (mounted) {
         setState(() {
           _notifications = all;
@@ -301,7 +328,8 @@ class _NotificationDropdownPanelState
   bool _isActionableType(String type) {
     return type == 'trade_proposed' ||
         type == 'lend_proposed' ||
-        type == 'friend_request';
+        type == 'friend_request' ||
+        type == 'lend_requested';
   }
 
   /// Determines whether to show accept/decline buttons.
@@ -588,10 +616,11 @@ class _NotificationDropdownPanelState
         color = _pureWhite.withValues(alpha: 0.5);
     }
 
-    // Sender avatar for actionable items (shows initial letter)
+    // Sender avatar for actionable items (real image or initial letter)
     if (notification.senderEmail != null &&
         notification.senderEmail!.isNotEmpty &&
         _isActionableType(notification.type)) {
+      final avatarUrl = _avatarCache[notification.senderEmail];
       final initial = notification.senderEmail!.substring(0, 1).toUpperCase();
       return Container(
         width: 36,
@@ -601,15 +630,35 @@ class _NotificationDropdownPanelState
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
-        child: Center(
-          child: Text(
-            initial,
-            style: TextStyle(
-              color: color,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: avatarUrl != null && avatarUrl.isNotEmpty
+              ? Image.network(
+                  avatarUrl,
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Center(
+                    child: Text(
+                      initial,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                )
+              : Center(
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
         ),
       );
     }
@@ -750,10 +799,14 @@ class _NotificationDropdownPanelState
       NotificationService.decrementUnread();
       _updateLocalReadState(notification.id);
     }
-    // Deep-link based on type
-    if (notification.type == 'friend_request' ||
-        notification.type == 'friend_accepted') {
-      widget.onDeepLink?.call({'switchToTab': 'FRIENDS'});
+    // Open detail sheet
+    if (mounted) {
+      NotificationDetailSheet.show(
+        context,
+        notification: notification,
+        onAccept: () => _handleAccept(notification),
+        onDecline: () => _handleDecline(notification),
+      );
     }
   }
 
@@ -776,6 +829,9 @@ class _NotificationDropdownPanelState
       case 'lend_proposed':
         result = await LendService.acceptLend(notification.referenceId);
         successMsg = 'Lend accepted! Character added to your library.';
+      case 'lend_requested':
+        result = await LendService.acceptLendRequest(notification.referenceId);
+        successMsg = 'Lend request approved! Character sent.';
       case 'friend_request':
         final ok = await FriendService.acceptRequest(notification.referenceId);
         result = ok ? 'success' : 'Failed to accept friend request';
@@ -825,6 +881,9 @@ class _NotificationDropdownPanelState
       case 'lend_proposed':
         result = await LendService.declineLend(notification.referenceId);
         successMsg = 'Lend declined.';
+      case 'lend_requested':
+        result = await LendService.declineLendRequest(notification.referenceId);
+        successMsg = 'Lend request declined.';
       case 'friend_request':
         final ok = await FriendService.declineRequest(notification.referenceId);
         result = ok ? 'success' : 'Failed to decline friend request';

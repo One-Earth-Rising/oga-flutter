@@ -23,9 +23,9 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/invite_service.dart';
 import '../services/analytics_service.dart';
-import 'trade_proposal_modal.dart';
-import 'lend_proposal_modal.dart';
-import 'get_character_modal.dart';
+import '../modals/trade_proposal_modal.dart';
+import '../modals/lend_proposal_modal.dart';
+import '../modals/get_character_modal.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);

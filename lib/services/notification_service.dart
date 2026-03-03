@@ -92,6 +92,8 @@ class OGANotification {
         return 'LEND EXPIRING SOON';
       case 'lend_declined':
         return 'LEND DECLINED';
+      case 'lend_requested':
+        return 'LEND REQUEST';
       case 'character_granted':
         return 'NEW CHARACTER';
       case 'friend_request':
@@ -123,6 +125,7 @@ class OGANotification {
       case 'lend_recalled':
       case 'lend_expiring_soon':
       case 'lend_declined':
+      case 'lend_requested':
         return 'lend';
       case 'character_granted':
       case 'character_updated':

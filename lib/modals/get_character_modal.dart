@@ -1,17 +1,21 @@
 // ═══════════════════════════════════════════════════════════════════
-// GET CHARACTER MODAL — Sprint 13
+// GET CHARACTER MODAL — Sprint 13 v2
 // Shows options to acquire a character from a friend:
-//   1. Request Trade
-//   2. Request Lend
+//   1. Request Trade — opens TradeProposalModal (pick your character to offer)
+//   2. Request Lend — opens LendRequestModal (ask owner to lend)
 //   3. Buy (coming later)
+//
+// v2 FIX: "Request Lend" now correctly opens a BORROW request flow
+// (ask the owner to lend YOU their character) instead of opening
+// the LENDER flow (lend YOUR character to them).
 //
 // Opens from "GET THIS CHARACTER" button on locked characters
 // when viewing a friend's library.
 // ═══════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
-import 'trade_proposal_modal.dart';
-import 'lend_proposal_modal.dart';
+import '../screens/trade_proposal_modal.dart';
+import 'lend_request_modal.dart';
 
 const Color _voidBlack = Color(0xFF000000);
 const Color _deepCharcoal = Color(0xFF121212);
@@ -27,12 +31,14 @@ class GetCharacterModal {
   /// [ownerEmail] — the email of the friend who owns this character
   /// [ownerName] — display name of the friend (for UI text)
   /// [characterName] — display name of the character (for UI text)
+  /// [characterImageUrl] — optional image URL for character preview
   static void show(
     BuildContext context, {
     required String characterId,
     required String ownerEmail,
     required String ownerName,
     required String characterName,
+    String? characterImageUrl,
   }) {
     showModalBottomSheet(
       context: context,
@@ -43,6 +49,7 @@ class GetCharacterModal {
         ownerEmail: ownerEmail,
         ownerName: ownerName,
         characterName: characterName,
+        characterImageUrl: characterImageUrl,
       ),
     );
   }
@@ -53,12 +60,14 @@ class _GetCharacterSheet extends StatelessWidget {
   final String ownerEmail;
   final String ownerName;
   final String characterName;
+  final String? characterImageUrl;
 
   const _GetCharacterSheet({
     required this.characterId,
     required this.ownerEmail,
     required this.ownerName,
     required this.characterName,
+    this.characterImageUrl,
   });
 
   @override
@@ -109,7 +118,7 @@ class _GetCharacterSheet extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // ── Option 1: Trade ─────────────────────────────
+          // ── Option 1: Trade ─────────────────────────────────
           _buildOption(
             context,
             icon: Icons.swap_horiz,
@@ -127,7 +136,9 @@ class _GetCharacterSheet extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // ── Option 2: Lend ──────────────────────────────
+          // ── Option 2: Request Lend (FIXED in v2) ────────────
+          // Previously called LendProposalModal (lend YOUR character),
+          // now correctly calls LendRequestModal (ask THEM to lend THEIR character).
           _buildOption(
             context,
             icon: Icons.handshake_outlined,
@@ -136,16 +147,19 @@ class _GetCharacterSheet extends StatelessWidget {
             subtitle: 'Ask $ownerName to lend you this character temporarily',
             onTap: () {
               Navigator.pop(context); // Close this sheet
-              LendProposalModal.show(
+              LendRequestModal.show(
                 context,
                 characterId: characterId,
-                friendEmail: ownerEmail,
+                characterName: characterName,
+                ownerEmail: ownerEmail,
+                ownerName: ownerName,
+                characterImageUrl: characterImageUrl,
               );
             },
           ),
           const SizedBox(height: 10),
 
-          // ── Option 3: Buy (coming later) ────────────────
+          // ── Option 3: Buy (coming later) ────────────────────
           _buildOption(
             context,
             icon: Icons.shopping_cart_outlined,

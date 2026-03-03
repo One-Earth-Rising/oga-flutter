@@ -26,6 +26,7 @@ import '../services/notification_service.dart';
 import '../services/trade_service.dart';
 import '../services/lend_service.dart';
 import '../services/friend_service.dart';
+import '../widgets/notification_detail_sheet.dart';
 
 const Color _voidBlack = Color(0xFF000000);
 const Color _deepCharcoal = Color(0xFF121212);
@@ -91,7 +92,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
   bool _isActionableType(String type) {
     return type == 'trade_proposed' ||
         type == 'lend_proposed' ||
-        type == 'friend_request';
+        type == 'friend_request' ||
+        type == 'lend_requested';
   }
 
   bool _shouldShowButtons(OGANotification n) {
@@ -515,6 +517,15 @@ class _ActivityScreenState extends State<ActivityScreen> {
       await NotificationService.markRead(notification.id);
       NotificationService.decrementUnread();
       _updateLocalReadState(notification.id);
+    }
+    // Open detail sheet
+    if (mounted) {
+      NotificationDetailSheet.show(
+        context,
+        notification: notification,
+        onAccept: () => _handleAccept(notification),
+        onDecline: () => _handleDecline(notification),
+      );
     }
   }
 

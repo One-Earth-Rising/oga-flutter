@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/friend_service.dart';
-import '../../screens/feedback_modal.dart';
+import '../../modals/feedback_modal.dart';
 import '../../services/analytics_service.dart';
 
 // For web file picking

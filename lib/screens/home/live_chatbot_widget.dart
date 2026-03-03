@@ -178,14 +178,14 @@ class _LiveNetlifyChatbotState extends State<LiveNetlifyChatbot> {
           children: [
             Icon(
               Icons.chat_bubble_outline,
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.white.withValues(alpha: 0.3),
               size: 48,
             ),
             const SizedBox(height: 16),
             Text(
               'Chat couldn\'t load',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -194,7 +194,7 @@ class _LiveNetlifyChatbotState extends State<LiveNetlifyChatbot> {
             Text(
               'Tap below to try again or sign in directly',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
+                color: Colors.white.withValues(alpha: 0.4),
                 fontSize: 13,
               ),
               textAlign: TextAlign.center,
