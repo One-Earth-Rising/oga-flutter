@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/oga_image.dart';
 import '../services/invite_service.dart';
 import '../services/analytics_service.dart';
+import '../services/character_service.dart';
 
 /// Public invite landing page — no auth required.
 /// Loads inviter's profile and shows their library in a guest-friendly view.
@@ -63,6 +64,16 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
         'invite_code': widget.inviteCode,
         if (widget.characterId != null) 'character_id': widget.characterId,
       });
+
+      // Ensure character catalog is loaded (guests skip normal boot)
+      if (OGACharacter.allCharacters.isEmpty) {
+        try {
+          await CharacterService.getAll();
+          if (mounted) setState(() {}); // rebuild with characters
+        } catch (e) {
+          debugPrint('⚠️ Guest catalog load: $e');
+        }
+      }
 
       // Auto-open specific character if characterId was in the URL
       if (widget.characterId != null) {
