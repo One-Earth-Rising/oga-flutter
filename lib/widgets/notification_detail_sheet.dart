@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/notification_service.dart';
 import '../models/oga_character.dart';
+import '../config/oga_storage.dart';
 
 const Color _voidBlack = Color(0xFF000000);
 const Color _deepCharcoal = Color(0xFF121212);
@@ -597,7 +598,7 @@ class _DetailSheetState extends State<_DetailSheet> {
             borderRadius: BorderRadius.circular(11),
             child: imgPath.isNotEmpty
                 ? Image.network(
-                    imgPath,
+                    OgaStorage.resolve(imgPath),
                     width: 52,
                     height: 52,
                     fit: BoxFit.cover,
