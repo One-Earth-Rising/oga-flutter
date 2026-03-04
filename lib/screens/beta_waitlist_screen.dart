@@ -26,7 +26,7 @@ class BetaWaitlistScreen extends StatelessWidget {
         backgroundColor: voidBlack,
         elevation: 0,
         automaticallyImplyLeading: false,
-        toolbarHeight: 64,
+        toolbarHeight: 56,
         title: Center(
           child: Image.asset(
             'assets/logo.png',

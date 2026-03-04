@@ -130,7 +130,11 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
                   onClose: _removeOverlay,
                   onViewAll: () {
                     _removeOverlay();
-                    widget.onViewAll?.call();
+                    if (widget.onViewAll != null) {
+                      widget.onViewAll!();
+                    } else {
+                      Navigator.of(context).pushNamed('/activity');
+                    }
                   },
                   onDeepLink: widget.onDeepLink,
                   onActionCompleted: widget.onActionCompleted,
