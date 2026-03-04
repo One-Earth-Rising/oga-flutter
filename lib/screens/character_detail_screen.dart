@@ -29,6 +29,7 @@ import '../modals/friends_who_own_modal.dart';
 import '../modals/get_character_modal.dart';
 import '../widgets/notification_bell_widget.dart';
 import '../modals/lend_proposal_modal.dart';
+import '../config/oga_storage.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -1162,7 +1163,46 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           const SizedBox(height: 14),
           Row(
             children: [
-              _buildHistoryAvatar(avatarUrl, name, false),
+              // Real avatar (or initial fallback)
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _tradeAmber.withValues(alpha: 0.3)),
+                  color: _voidBlack,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(9),
+                  child: avatarUrl != null && avatarUrl.isNotEmpty
+                      ? Image.network(
+                          avatarUrl,
+                          width: 36,
+                          height: 36,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, e, st) => Center(
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : 'A',
+                              style: TextStyle(
+                                color: _tradeAmber,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : 'A',
+                            style: TextStyle(
+                              color: _tradeAmber,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1292,6 +1332,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           ],
 
           // ── Trade summary (what's being exchanged) ──
+          // ── Trade summary (what's being exchanged) ──
           if (_fullTradeDetails != null) ...[
             const SizedBox(height: 16),
             Container(
@@ -1315,23 +1356,15 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                             letterSpacing: 0.5,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _charNameFromId(
-                            isProposer ? offeredCharId : requestedCharId,
-                          ),
-                          style: const TextStyle(
-                            color: _pureWhite,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          textAlign: TextAlign.center,
+                        const SizedBox(height: 8),
+                        _buildTradeCharCard(
+                          isProposer ? offeredCharId : requestedCharId,
                         ),
                       ],
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Icon(
                       Icons.swap_horiz,
                       color: _tradeAmber.withValues(alpha: 0.4),
@@ -1350,17 +1383,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                             letterSpacing: 0.5,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _charNameFromId(
-                            isProposer ? requestedCharId : offeredCharId,
-                          ),
-                          style: const TextStyle(
-                            color: _pureWhite,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          textAlign: TextAlign.center,
+                        const SizedBox(height: 8),
+                        _buildTradeCharCard(
+                          isProposer ? requestedCharId : offeredCharId,
                         ),
                       ],
                     ),
@@ -1497,6 +1522,62 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     }
   }
 
+  /// Build a mini character card for the trade summary.
+  Widget _buildTradeCharCard(String? charId) {
+    final character = charId != null ? OGACharacter.fromId(charId) : null;
+    final charName = _charNameFromId(charId);
+    final heroImg = character?.heroImage ?? '';
+
+    return Column(
+      children: [
+        Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _tradeAmber.withValues(alpha: 0.2)),
+            color: _deepCharcoal,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: heroImg.isNotEmpty
+                ? Image.network(
+                    OgaStorage.resolve(heroImg),
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, e, st) => Center(
+                      child: Icon(
+                        Icons.swap_horiz,
+                        color: _tradeAmber.withValues(alpha: 0.3),
+                        size: 24,
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Icon(
+                      Icons.swap_horiz,
+                      color: _tradeAmber.withValues(alpha: 0.3),
+                      size: 24,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          charName,
+          style: const TextStyle(
+            color: _pureWhite,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
   Future<void> _revokeTradeOffer() async {
     final tradeId = widget.pendingTradeInfo?['trade_id'];
     if (tradeId == null) return;
@@ -1525,7 +1606,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       final counterpartyEmail =
           widget.pendingTradeInfo?['counterparty_email'] as String?;
       if (counterpartyEmail != null) {
-        await supabase.from('trade_notifications').insert({
+        await supabase.from('notifications').insert({
           'recipient_email': counterpartyEmail,
           'type': 'trade_revoked',
           'message': 'Trade offer for ${ch.name} was revoked.',
@@ -1662,7 +1743,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       final counterpartyEmail =
           widget.pendingTradeInfo?['counterparty_email'] as String?;
       if (counterpartyEmail != null) {
-        await supabase.from('trade_notifications').insert({
+        await supabase.from('notifications').insert({
           'recipient_email': counterpartyEmail,
           'type': 'trade_declined',
           'message': 'Your trade offer for ${ch.name} was declined.',
