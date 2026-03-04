@@ -767,11 +767,12 @@ class _NotificationDropdownPanelState
   Widget _buildFooter() {
     return GestureDetector(
       onTap: () {
+        final navigator = Navigator.of(context);
         widget.onClose();
         if (widget.onViewAll != null) {
           widget.onViewAll!();
         } else {
-          Navigator.of(context).pushNamed('/activity');
+          navigator.pushNamed('/activity');
         }
       },
       child: Container(

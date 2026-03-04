@@ -98,8 +98,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
         'email': email,
         'granted_by': adminEmail,
         'granted_at': DateTime.now().toIso8601String(),
-        'revoked_at': null, // Clear revocation if they were previously banned
-      });
+        'revoked_at': null,
+      }, onConflict: 'email');
 
       // Show success feedback
       ScaffoldMessenger.of(context).showSnackBar(
@@ -109,6 +109,14 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       _loadAllData(); // Refresh data
     } catch (e) {
       debugPrint('Error approving user: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to approve: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -131,6 +139,14 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       _loadAllData(); // Refresh data
     } catch (e) {
       debugPrint('Error revoking user: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to revoke: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
