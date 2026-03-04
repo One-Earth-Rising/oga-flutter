@@ -122,8 +122,7 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
       // Source A: character_ownership table
       final ownershipRows = await supabase
           .from('character_ownership')
-          .select('owner_email, character_id, acquired_at, is_active')
-          .eq('is_active', true)
+          .select('owner_email, character_id, acquired_at')
           .inFilter('owner_email', friendEmails.toList())
           .ilike('character_id', '$baseId%');
 
