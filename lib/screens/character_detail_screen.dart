@@ -1546,6 +1546,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                     width: 64,
                     height: 64,
                     fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
                     errorBuilder: (_, e, st) => Center(
                       child: Icon(
                         Icons.swap_horiz,
