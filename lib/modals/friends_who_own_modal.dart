@@ -138,6 +138,21 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
       final ownerEmailsFromTable = ownershipRows
           .map((r) => r['owner_email'] as String)
           .toSet();
+      // ── DEBUG: Remove after diagnosis ──
+      debugPrint('🔍 FriendsWhoOwn DEBUG:');
+      debugPrint('   userEmail: $userEmail');
+      debugPrint('   baseId: $baseId');
+      debugPrint('   friendEmails: $friendEmails');
+      debugPrint('   ownership rows: ${ownershipRows.length}');
+      for (final r in ownershipRows) {
+        debugPrint(
+          '     ownership: ${r['owner_email']} → ${r['character_id']}',
+        );
+      }
+      debugPrint('   starter profiles: ${starterProfiles.length}');
+      for (final s in starterProfiles) {
+        debugPrint('     starter: ${s['email']} → ${s['starter_character']}');
+      }
 
       // Add starter_character owners as synthetic ownership rows
       final allOwnershipRows = [...ownershipRows];
@@ -286,7 +301,7 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
                   ? Image.network(
                       OgaStorage.resolve(imageUrl),
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _err) => _placeholderIcon(),
+                      errorBuilder: (_, e, st) => _placeholderIcon(),
                     )
                   : _placeholderIcon(),
             ),
