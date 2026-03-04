@@ -78,8 +78,10 @@ class OGANotification {
         return 'TRADE COMPLETED';
       case 'trade_declined':
         return 'TRADE DECLINED';
-      case 'trade_cancelled':
-        return 'TRADE CANCELLED';
+      case 'trade_proposed_sent':
+        return 'TRADE OFFER SENT';
+      case 'trade_revoked':
+        return 'TRADE REVOKED';
       case 'lend_proposed':
         return 'CHARACTER LEND OFFER';
       case 'lend_accepted':
@@ -115,9 +117,11 @@ class OGANotification {
   String get iconType {
     switch (type) {
       case 'trade_proposed':
+      case 'trade_proposed_sent':
       case 'trade_accepted':
       case 'trade_declined':
       case 'trade_cancelled':
+      case 'trade_revoked':
         return 'trade';
       case 'lend_proposed':
       case 'lend_accepted':

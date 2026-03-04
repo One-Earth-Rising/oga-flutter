@@ -97,6 +97,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   // ── Lend counterparty info (loaded from DB) ──
   Map<String, dynamic>? _lendCounterpartyProfile;
   Map<String, dynamic>? _tradeCounterpartyProfile;
+  Map<String, dynamic>? _fullTradeDetails; // full trade row from DB
+  bool _isTradeActionLoading =
+      false; // ── Lend counterparty info (loaded from DB) ──
   static const Color _lendCyan = Color(0xFF00BCD4);
   static const Color _tradeAmber = Color(0xFFF59E0B);
 
@@ -312,7 +315,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       }
     }
 
-    // Load trade counterparty
+    // Load trade counterparty + full trade details
     if (isPendingTrade && widget.pendingTradeInfo != null) {
       final counterpartyEmail =
           widget.pendingTradeInfo!['counterparty_email'] as String?;
@@ -330,6 +333,23 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           }
         } catch (e) {
           debugPrint('⚠️ Trade counterparty load failed: $e');
+        }
+      }
+      // Load full trade row for character details
+      final tradeId = widget.pendingTradeInfo!['trade_id'];
+      if (tradeId != null) {
+        try {
+          final trade = await supabase
+              .from('trades')
+              .select('*')
+              .eq('id', tradeId)
+              .maybeSingle();
+          if (mounted && trade != null) {
+            setState(() => _fullTradeDetails = trade);
+            debugPrint('✅ Full trade details loaded: $tradeId');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Full trade details load failed: $e');
         }
       }
     }
@@ -1189,6 +1209,12 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     final avatarUrl = _tradeCounterpartyProfile?['avatar_url'] as String?;
     final role = widget.pendingTradeInfo?['role'] as String?;
     final proposedAt = widget.pendingTradeInfo?['proposed_at'] as String?;
+    final isProposer = role == 'proposer';
+
+    // Character IDs from full trade details
+    final offeredCharId = _fullTradeDetails?['offered_character_id'] as String?;
+    final requestedCharId =
+        _fullTradeDetails?['requested_character_id'] as String?;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
@@ -1221,6 +1247,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             ],
           ),
           const SizedBox(height: 14),
+          // Counterparty row
           Row(
             children: [
               _buildHistoryAvatar(avatarUrl, name, false),
@@ -1230,9 +1257,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      role == 'proposer'
-                          ? 'TRADE OFFERED TO'
-                          : 'TRADE PROPOSED BY',
+                      isProposer ? 'TRADE OFFERED TO' : 'TRADE PROPOSED BY',
                       style: TextStyle(
                         color: _tradeAmber.withValues(alpha: 0.6),
                         fontSize: 9,
@@ -1264,36 +1289,491 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               ),
             ),
           ],
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                // Navigate to activity/notification for this trade
-                Navigator.of(context).pop({'switchToTab': 'ACTIVITY'});
-              },
-              icon: const Icon(Icons.open_in_new, size: 14),
-              label: const Text(
-                'VIEW TRADE DETAILS',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                  fontSize: 12,
-                ),
+
+          // ── Trade summary (what's being exchanged) ──
+          if (_fullTradeDetails != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _voidBlack.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _tradeAmber.withValues(alpha: 0.15)),
               ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _tradeAmber,
-                side: BorderSide(color: _tradeAmber.withValues(alpha: 0.5)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          isProposer ? 'YOU GIVE' : 'YOU RECEIVE',
+                          style: TextStyle(
+                            color: _tradeAmber.withValues(alpha: 0.5),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _charNameFromId(
+                            isProposer ? offeredCharId : requestedCharId,
+                          ),
+                          style: const TextStyle(
+                            color: _pureWhite,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Icon(
+                      Icons.swap_horiz,
+                      color: _tradeAmber.withValues(alpha: 0.4),
+                      size: 20,
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          isProposer ? 'YOU RECEIVE' : 'YOU GIVE',
+                          style: TextStyle(
+                            color: _tradeAmber.withValues(alpha: 0.5),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _charNameFromId(
+                            isProposer ? requestedCharId : offeredCharId,
+                          ),
+                          style: const TextStyle(
+                            color: _pureWhite,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
+          ],
+
+          const SizedBox(height: 16),
+
+          // ── Action Buttons ──
+          if (_isTradeActionLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    color: _tradeAmber,
+                    strokeWidth: 2,
+                  ),
+                ),
+              ),
+            )
+          else if (isProposer)
+            // PROPOSER: Can revoke
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _revokeTradeOffer(),
+                icon: const Icon(Icons.undo, size: 14),
+                label: const Text(
+                  'REVOKE TRADE OFFER',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    fontSize: 12,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFEF4444),
+                  side: BorderSide(
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            )
+          else ...[
+            // RECEIVER: Can accept or decline
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _acceptTrade(),
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text(
+                      'ACCEPT',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                        fontSize: 13,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _neonGreen,
+                      foregroundColor: _voidBlack,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _declineTrade(),
+                    icon: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: const Color(0xFFEF4444),
+                    ),
+                    label: const Text(
+                      'DECLINE',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                        fontSize: 13,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFEF4444),
+                      side: BorderSide(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
+  }
+  // ═══════════════════════════════════════════════════════════
+  // TRADE ACTIONS (revoke / accept / decline)
+  // ═══════════════════════════════════════════════════════════
+
+  /// Look up character name from hardcoded data by ID
+  String _charNameFromId(String? charId) {
+    if (charId == null) return 'Unknown';
+    // Check current character first
+    if (ch.id == charId) return ch.name;
+    // Search all characters (from OGACharacter.allCharacters)
+    try {
+      final match = OGACharacter.allCharacters.firstWhere(
+        (c) => c.id == charId,
+      );
+      return match.name;
+    } catch (_) {
+      // Fallback: capitalize the ID
+      return charId.replaceAll('_', ' ').toUpperCase();
+    }
+  }
+
+  Future<void> _revokeTradeOffer() async {
+    final tradeId = widget.pendingTradeInfo?['trade_id'];
+    if (tradeId == null) return;
+
+    final confirmed = await _showConfirmDialog(
+      'REVOKE TRADE OFFER',
+      'Are you sure you want to cancel this trade offer? '
+          '${ch.name} will be unlocked for other actions.',
+      confirmText: 'REVOKE',
+      confirmColor: const Color(0xFFEF4444),
+    );
+    if (!confirmed) return;
+
+    setState(() => _isTradeActionLoading = true);
+    try {
+      final supabase = Supabase.instance.client;
+      await supabase
+          .from('trades')
+          .update({
+            'status': 'revoked',
+            'responded_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', tradeId);
+
+      // Notify counterparty
+      final counterpartyEmail =
+          widget.pendingTradeInfo?['counterparty_email'] as String?;
+      if (counterpartyEmail != null) {
+        await supabase.from('trade_notifications').insert({
+          'recipient_email': counterpartyEmail,
+          'type': 'trade_revoked',
+          'message': 'Trade offer for ${ch.name} was revoked.',
+          'related_character_id': ch.id,
+          'metadata': {'trade_id': tradeId},
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: _deepCharcoal,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: _neonGreen.withValues(alpha: 0.3)),
+            ),
+            content: const Text(
+              'Trade offer revoked.',
+              style: TextStyle(color: _pureWhite),
+            ),
+          ),
+        );
+        Navigator.of(context).pop({'tradeResolved': true});
+      }
+    } catch (e) {
+      debugPrint('⚠️ Revoke trade failed: $e');
+      if (mounted) {
+        setState(() => _isTradeActionLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              'Failed to revoke trade: $e',
+              style: const TextStyle(color: _pureWhite),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _acceptTrade() async {
+    final tradeId = widget.pendingTradeInfo?['trade_id'];
+    if (tradeId == null) return;
+
+    final confirmed = await _showConfirmDialog(
+      'ACCEPT TRADE',
+      'You will trade ${ch.name} for ${_charNameFromId(_fullTradeDetails?['offered_character_id'] as String?)}. '
+          'This action cannot be undone.',
+      confirmText: 'ACCEPT TRADE',
+      confirmColor: _neonGreen,
+    );
+    if (!confirmed) return;
+
+    setState(() => _isTradeActionLoading = true);
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Use RPC to execute the trade atomically (swap ownership)
+      await supabase.rpc('execute_trade', params: {'trade_id': tradeId});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: _deepCharcoal,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: _neonGreen.withValues(alpha: 0.3)),
+            ),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: _neonGreen, size: 18),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Trade completed!',
+                    style: TextStyle(
+                      color: _pureWhite,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        Navigator.of(context).pop({'tradeResolved': true});
+      }
+    } catch (e) {
+      debugPrint('⚠️ Accept trade failed: $e');
+      if (mounted) {
+        setState(() => _isTradeActionLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              'Failed to accept trade: $e',
+              style: const TextStyle(color: _pureWhite),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _declineTrade() async {
+    final tradeId = widget.pendingTradeInfo?['trade_id'];
+    if (tradeId == null) return;
+
+    final confirmed = await _showConfirmDialog(
+      'DECLINE TRADE',
+      'Decline this trade offer? ${ch.name} will be unlocked for other actions.',
+      confirmText: 'DECLINE',
+      confirmColor: const Color(0xFFEF4444),
+    );
+    if (!confirmed) return;
+
+    setState(() => _isTradeActionLoading = true);
+    try {
+      final supabase = Supabase.instance.client;
+      await supabase
+          .from('trades')
+          .update({
+            'status': 'declined',
+            'responded_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', tradeId);
+
+      // Notify proposer
+      final counterpartyEmail =
+          widget.pendingTradeInfo?['counterparty_email'] as String?;
+      if (counterpartyEmail != null) {
+        await supabase.from('trade_notifications').insert({
+          'recipient_email': counterpartyEmail,
+          'type': 'trade_declined',
+          'message': 'Your trade offer for ${ch.name} was declined.',
+          'related_character_id': ch.id,
+          'metadata': {'trade_id': tradeId},
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: _deepCharcoal,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: _ironGrey),
+            ),
+            content: const Text(
+              'Trade declined.',
+              style: TextStyle(color: _pureWhite),
+            ),
+          ),
+        );
+        Navigator.of(context).pop({'tradeResolved': true});
+      }
+    } catch (e) {
+      debugPrint('⚠️ Decline trade failed: $e');
+      if (mounted) {
+        setState(() => _isTradeActionLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              'Failed to decline trade: $e',
+              style: const TextStyle(color: _pureWhite),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Reusable confirmation dialog for destructive actions
+  Future<bool> _showConfirmDialog(
+    String title,
+    String message, {
+    String confirmText = 'CONFIRM',
+    Color confirmColor = _neonGreen,
+  }) async {
+    return await showDialog<bool>(
+          context: context,
+          barrierColor: _voidBlack.withValues(alpha: 0.8),
+          builder: (context) => AlertDialog(
+            backgroundColor: _deepCharcoal,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: _ironGrey),
+            ),
+            title: Text(
+              title,
+              style: const TextStyle(
+                color: _pureWhite,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+              ),
+            ),
+            content: Text(
+              message,
+              style: TextStyle(
+                color: _pureWhite.withValues(alpha: 0.6),
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(
+                  'CANCEL',
+                  style: TextStyle(
+                    color: _pureWhite.withValues(alpha: 0.5),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: confirmColor,
+                  foregroundColor: confirmColor == _neonGreen
+                      ? _voidBlack
+                      : _pureWhite,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  confirmText,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   // ═══════════════════════════════════════════════════════════

@@ -51,6 +51,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   bool _isLoading = true;
   final Set<String> _actedOnIds = {};
   final Map<String, Map<String, dynamic>> _avatarCache = {};
+  List<OGANotification> _syntheticTradeNotifications = [];
 
   static const _categories = [
     {'label': 'ALL', 'value': 'all'},
@@ -62,10 +63,19 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
   /// Client-side filter by selected category tab.
   List<OGANotification> get _filtered {
-    if (_selectedCategory == 'all') return _allNotifications;
-    return _allNotifications
-        .where((n) => n.iconType == _selectedCategory)
-        .toList();
+    // Merge real notifications + synthetic trade entries
+    final merged = [..._allNotifications, ..._syntheticTradeNotifications];
+    // Deduplicate by id (real notifications take priority)
+    final seen = <String>{};
+    final deduped = <OGANotification>[];
+    for (final n in merged) {
+      if (seen.add(n.id)) deduped.add(n);
+    }
+    // Sort newest first
+    deduped.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    if (_selectedCategory == 'all') return deduped;
+    return deduped.where((n) => n.iconType == _selectedCategory).toList();
   }
 
   @override
@@ -103,9 +113,81 @@ class _ActivityScreenState extends State<ActivityScreen> {
         }
       }
 
+      // ── Also fetch pending trades directly from trades table ──
+      // This catches trades where the notification insert failed (RLS)
+      final userEmail = Supabase.instance.client.auth.currentUser?.email;
+      final syntheticTrades = <OGANotification>[];
+      if (userEmail != null) {
+        try {
+          final pendingTrades = await Supabase.instance.client
+              .from('trades')
+              .select('*')
+              .eq('status', 'pending')
+              .or('proposer_email.eq.$userEmail,receiver_email.eq.$userEmail')
+              .order('created_at', ascending: false);
+
+          // Collect existing trade notification reference IDs to avoid dupes
+          final existingTradeRefIds = all
+              .where((n) => n.iconType == 'trade')
+              .map((n) => n.referenceId)
+              .toSet();
+
+          for (final trade in pendingTrades) {
+            final tradeId = trade['id']?.toString() ?? '';
+            // Skip if a real notification already exists for this trade
+            if (existingTradeRefIds.contains(tradeId)) continue;
+
+            final isProposer = trade['proposer_email'] == userEmail;
+            final counterpartyEmail = isProposer
+                ? trade['receiver_email'] as String? ?? ''
+                : trade['proposer_email'] as String? ?? '';
+
+            syntheticTrades.add(
+              OGANotification(
+                id: 'synthetic_trade_$tradeId',
+                recipientEmail: userEmail,
+                type: isProposer ? 'trade_proposed_sent' : 'trade_proposed',
+                referenceId: tradeId,
+                referenceType: 'trade',
+                message: isProposer
+                    ? 'You proposed a trade to $counterpartyEmail'
+                    : '$counterpartyEmail proposed a trade with you',
+                isRead:
+                    isProposer, // proposer's own trades show as "read" (no action needed)
+                createdAt:
+                    DateTime.tryParse(trade['created_at']?.toString() ?? '') ??
+                    DateTime.now(),
+                senderEmail: counterpartyEmail,
+                category: 'trade',
+                priority: 'normal',
+              ),
+            );
+
+            // Cache counterparty email for avatar lookup
+            if (!_avatarCache.containsKey(counterpartyEmail) &&
+                counterpartyEmail.isNotEmpty) {
+              try {
+                final profile = await Supabase.instance.client
+                    .from('profiles')
+                    .select('email, avatar_url, full_name')
+                    .eq('email', counterpartyEmail)
+                    .maybeSingle();
+                if (profile != null) _avatarCache[counterpartyEmail] = profile;
+              } catch (_) {}
+            }
+          }
+          debugPrint(
+            '>>> ACTIVITY: ${syntheticTrades.length} synthetic trade entries added',
+          );
+        } catch (e) {
+          debugPrint('>>> ACTIVITY: pending trades fetch error: $e');
+        }
+      }
+
       if (mounted) {
         setState(() {
           _allNotifications = all;
+          _syntheticTradeNotifications = syntheticTrades;
           _isLoading = false;
         });
       }
