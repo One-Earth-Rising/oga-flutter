@@ -51,6 +51,11 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ─── Sprint 12: Ownership from DB ─────────────────────────
   Set<String> _ownedCharacterIds = {};
 
+  // ─── Sprint 14: Borrowed / Lent-out tracking ──────────────
+  Map<String, Map<String, dynamic>> _borrowedCharacters =
+      {}; // char_id → lend row
+  Set<String> _lentOutCharacterIds = {};
+
   // V2 Brand Colors (Heimdal Aesthetic)
   static const Color neonGreen = Color(0xFF39FF14);
   static const Color voidBlack = Color(0xFF000000);
@@ -77,8 +82,11 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ─── Character list from catalog cache ────────────────────
   List<OGACharacter> get _characters => getAllCharactersSorted();
 
-  // ─── Ownership helpers (Sprint 12) ────────────────────────
+  // ─── Ownership helpers (Sprint 12+14) ─────────────────────
   bool _isCharOwned(OGACharacter ch) => _ownedCharacterIds.contains(ch.id);
+  bool _isCharBorrowed(OGACharacter ch) =>
+      _borrowedCharacters.containsKey(ch.id);
+  bool _isCharLentOut(OGACharacter ch) => _lentOutCharacterIds.contains(ch.id);
 
   @override
   void initState() {
@@ -145,7 +153,6 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
 
       // ─── Sprint 12: Load ownership from DB ───────────────
       try {
-        // NOTE: In a full implementation, you'd want OwnershipService to fetch for _profileUserId, not just "My" characters.
         final owned = await OwnershipService.getMyCharacters();
         _ownedCharacterIds = owned.map((o) => o.characterId).toSet();
         debugPrint(
@@ -155,10 +162,43 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         debugPrint(
           '⚠️ OwnershipService failed: $e — falling back to starter_character',
         );
-        // Fallback: at least mark the starter character as owned
         if (_ownedCharacterId != null) {
           _ownedCharacterIds = {_ownedCharacterId!};
         }
+      }
+
+      // ─── Sprint 14: Load borrowed + lent-out characters ───
+      try {
+        final userEmail = supabase.auth.currentUser?.email;
+        if (userEmail != null) {
+          // Characters I'm borrowing
+          final borrowedRows = await supabase
+              .from('lends')
+              .select('character_id, lender_email, return_due_at, accepted_at')
+              .eq('borrower_email', userEmail)
+              .eq('status', 'active');
+          _borrowedCharacters = {};
+          for (final row in borrowedRows) {
+            _borrowedCharacters[row['character_id'] as String] = row;
+          }
+
+          // Characters I own that are currently lent out
+          final lentRows = await supabase
+              .from('lends')
+              .select('character_id')
+              .eq('lender_email', userEmail)
+              .eq('status', 'active');
+          _lentOutCharacterIds = lentRows
+              .map((r) => r['character_id'] as String)
+              .toSet();
+
+          debugPrint(
+            '✅ Lend state: ${_borrowedCharacters.length} borrowed, '
+            '${_lentOutCharacterIds.length} lent out',
+          );
+        }
+      } catch (e) {
+        debugPrint('⚠️ Lend state load failed: $e');
       }
 
       setState(() => _isLoading = false);
@@ -985,7 +1025,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildSectionHeader(bool isMobile) {
-    final ownedCount = _ownedCharacterIds.length;
+    final ownedCount = _ownedCharacterIds.length + _borrowedCharacters.length;
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -1093,11 +1133,18 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       delegate: SliverChildBuilderDelegate((context, index) {
         final ch = chars[index];
         final owned = _isCharOwned(ch);
+        final borrowed = _isCharBorrowed(ch);
+        final lentOut = _isCharLentOut(ch);
         return GestureDetector(
           onTap: () => _openDetail(ch),
           child: CharacterCard(
             character: ch,
-            isOwned: owned,
+            isOwned: owned || borrowed,
+            isBorrowed: borrowed,
+            isLentOut: lentOut,
+            lendReturnDate: borrowed
+                ? (_borrowedCharacters[ch.id]?['return_due_at'] as String?)
+                : null,
             progress: ch.portalPass?.progressPercent ?? 0.0,
           ),
         );

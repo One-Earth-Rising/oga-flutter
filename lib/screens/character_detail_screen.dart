@@ -2780,10 +2780,11 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
         final avatarUrl = profile?['avatar_url'] as String?;
         final dateStr = event['date'] as String?;
         final via = event['via'] as String? ?? 'acquired';
+        final isCurrent = event['isCurrent'] == true;
 
         return Row(
           children: [
-            _buildHistoryAvatar(avatarUrl, name, isFirst),
+            _buildHistoryAvatar(avatarUrl, name, isCurrent),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -2795,33 +2796,58 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                         child: Text(
                           name,
                           style: TextStyle(
-                            color: _pureWhite,
+                            color: isCurrent
+                                ? _pureWhite
+                                : _pureWhite.withValues(alpha: 0.6),
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _neonGreen.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: const Text(
-                          'CURRENT',
-                          style: TextStyle(
-                            color: _neonGreen,
-                            fontSize: 8,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
+                      if (isCurrent) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _neonGreen.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Text(
+                            'CURRENT',
+                            style: TextStyle(
+                              color: _neonGreen,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
-                      ),
+                      ] else ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _ironGrey.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            'PAST OWNER',
+                            style: TextStyle(
+                              color: _pureWhite.withValues(alpha: 0.3),
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 4),
