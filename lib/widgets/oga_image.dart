@@ -32,10 +32,14 @@ class OgaImage extends StatelessWidget {
   /// Optional color tint for the loading/error gradient.
   final Color? accentColor;
 
+  /// Alignment of the image within its bounds.
+  final Alignment alignment;
+
   const OgaImage({
     super.key,
     required this.path,
     this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
     this.borderRadius,
     this.width,
     this.height,
@@ -57,6 +61,7 @@ class OgaImage extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
+        alignment: alignment,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
           final progress = loadingProgress.expectedTotalBytes != null

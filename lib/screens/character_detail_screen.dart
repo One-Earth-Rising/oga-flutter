@@ -620,6 +620,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 return OgaImage(
                   path: imagePath,
                   fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
                   accentColor: _getRarityColor(),
                   fallbackIcon: Icons.person,
                   fallbackIconSize: 64,
