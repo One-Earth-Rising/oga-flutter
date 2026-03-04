@@ -25,9 +25,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/invite_service.dart';
 import '../services/analytics_service.dart';
 import '../modals/trade_proposal_modal.dart';
-import '../modals/lend_proposal_modal.dart';
+import '../modals/friends_who_own_modal.dart';
 import '../modals/get_character_modal.dart';
 import '../widgets/notification_bell_widget.dart';
+import '../modals/lend_proposal_modal.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -1942,8 +1943,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.of(context).pop({'switchToTab': 'FRIENDS'});
+                  FriendsWhoOwnModal.show(context, ch);
                 },
                 icon: const Icon(Icons.people_outline, size: 16),
                 label: const Text(
