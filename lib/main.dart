@@ -109,9 +109,15 @@ class _OgaAppState extends State<OgaApp> {
             transitionDuration: const Duration(milliseconds: 300),
             pageBuilder: (_, anim, secondAnim) => CharacterDetailScreen(
               character: character,
-              isOwned: isOwned,
-              ownerEmail: ownerEmail,
-              ownerName: ownerName,
+              isOwned: args?['isOwned'] ?? false,
+              isBorrowed: args?['isBorrowed'] ?? false,
+              isLentOut: args?['isLentOut'] ?? false,
+              isPendingTrade: args?['isPendingTrade'] ?? false,
+              lendInfo: args?['lendInfo'] as Map<String, dynamic>?,
+              pendingTradeInfo:
+                  args?['pendingTradeInfo'] as Map<String, dynamic>?,
+              ownerEmail: args?['ownerEmail'] as String?,
+              ownerName: args?['ownerName'] as String?,
             ),
             transitionsBuilder: (_, anim, secondAnim, child) => FadeTransition(
               opacity: anim,

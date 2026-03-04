@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// CHARACTER DETAIL SCREEN — Sprint 8B
+// CHARACTER DETAIL SCREEN — Sprint 14
 // ═══════════════════════════════════════════════════════════════════
 // Full Figma-matching detail view with:
 //   • Dramatic hero section with title overlay
@@ -7,9 +7,10 @@
 //   • Game Variations (Multigameverse) horizontal carousel
 //   • Portal Pass progress + tasks
 //   • Special Rewards carousel
-//   • Ownership History chain
+//   • Ownership History chain (owners-only, expandable)
 //   • Gameplay Media gallery
 //   • CHARACTER LOCKED state for unowned assets
+//   • BORROWED / LENT OUT / TRADE PENDING states
 //
 // Layout:
 //   Desktop (>900px): Split pane — hero left, info right
@@ -39,14 +40,24 @@ class CharacterDetailScreen extends StatefulWidget {
   final OGACharacter character;
   final bool isOwned;
   final bool isGuest;
+  final bool isBorrowed;
+  final bool isLentOut;
+  final bool isPendingTrade;
+  final Map<String, dynamic>? lendInfo;
+  final Map<String, dynamic>? pendingTradeInfo;
   final String? inviterName;
-  final String? ownerEmail; // ← ADD
+  final String? ownerEmail;
   final String? ownerName;
   const CharacterDetailScreen({
     super.key,
     required this.character,
     this.isOwned = false,
     this.isGuest = false,
+    this.isBorrowed = false,
+    this.isLentOut = false,
+    this.isPendingTrade = false,
+    this.lendInfo,
+    this.pendingTradeInfo,
     this.inviterName,
     this.ownerEmail,
     this.ownerName,
@@ -67,6 +78,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   OGACharacter get ch => widget.character;
   bool get owned => widget.isOwned;
   bool get isGuest => widget.isGuest;
+  bool get isBorrowed => widget.isBorrowed;
+  bool get isLentOut => widget.isLentOut;
+  bool get isPendingTrade => widget.isPendingTrade;
+
+  /// True if user can interact with features (owns or borrows)
+  bool get canInteract => owned || isBorrowed;
+
   // Cached invite code for share URL generation
   String? _userInviteCode;
   bool _isFetchingInviteCode = false;
@@ -74,6 +92,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   // ── Real ownership history (from DB) ──
   List<Map<String, dynamic>> _ownershipTimeline = [];
   bool _isLoadingHistory = true;
+  bool _isHistoryExpanded = false;
+
+  // ── Lend counterparty info (loaded from DB) ──
+  Map<String, dynamic>? _lendCounterpartyProfile;
+  Map<String, dynamic>? _tradeCounterpartyProfile;
+  static const Color _lendCyan = Color(0xFF00BCD4);
+  static const Color _tradeAmber = Color(0xFFF59E0B);
 
   @override
   void initState() {
@@ -82,7 +107,11 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
+    );
+    // Only animate glow for owned characters that aren't lent out or pending trade
+    if (owned && !isLentOut && !isPendingTrade) {
+      _glowController.repeat(reverse: true);
+    }
     _glowAnimation = Tween<double>(begin: 0.3, end: 0.8).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
@@ -95,6 +124,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       owned: owned,
     );
     _loadOwnershipHistory();
+    _loadCounterpartyProfiles();
   }
 
   @override
@@ -226,6 +256,85 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     }
   }
 
+  Future<void> _loadCounterpartyProfiles() async {
+    final supabase = Supabase.instance.client;
+
+    // Load lend counterparty
+    if (isBorrowed && widget.lendInfo != null) {
+      final lenderEmail = widget.lendInfo!['lender_email'] as String?;
+      if (lenderEmail != null) {
+        try {
+          final profile = await supabase
+              .from('profiles')
+              .select(
+                'email, full_name, first_name, last_name, username, avatar_url',
+              )
+              .eq('email', lenderEmail)
+              .maybeSingle();
+          if (mounted && profile != null) {
+            setState(() => _lendCounterpartyProfile = profile);
+          }
+        } catch (e) {
+          debugPrint('⚠️ Lend counterparty load failed: $e');
+        }
+      }
+    }
+
+    if (isLentOut) {
+      // For lent-out, we need the borrower — query lends table
+      try {
+        final lend = await supabase
+            .from('lends')
+            .select('borrower_email, return_due_at')
+            .eq('character_id', ch.id)
+            .eq('status', 'active')
+            .maybeSingle();
+        if (lend != null) {
+          final borrowerEmail = lend['borrower_email'] as String;
+          final profile = await supabase
+              .from('profiles')
+              .select(
+                'email, full_name, first_name, last_name, username, avatar_url',
+              )
+              .eq('email', borrowerEmail)
+              .maybeSingle();
+          if (mounted && profile != null) {
+            setState(() {
+              _lendCounterpartyProfile = {
+                ...profile,
+                'return_due_at': lend['return_due_at'],
+              };
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Lent-out counterparty load failed: $e');
+      }
+    }
+
+    // Load trade counterparty
+    if (isPendingTrade && widget.pendingTradeInfo != null) {
+      final counterpartyEmail =
+          widget.pendingTradeInfo!['counterparty_email'] as String?;
+      if (counterpartyEmail != null) {
+        try {
+          final profile = await supabase
+              .from('profiles')
+              .select(
+                'email, full_name, first_name, last_name, username, avatar_url',
+              )
+              .eq('email', counterpartyEmail)
+              .maybeSingle();
+          if (mounted && profile != null) {
+            setState(() => _tradeCounterpartyProfile = profile);
+          }
+        } catch (e) {
+          debugPrint('⚠️ Trade counterparty load failed: $e');
+        }
+      }
+    }
+  }
+
   String get _currentGameLabel {
     if (_selectedVariationIndex >= 0 &&
         _selectedVariationIndex < ch.gameVariations.length) {
@@ -332,7 +441,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           builder: (context, child) {
             return Center(
               child: Container(
-                decoration: owned
+                decoration: owned && !isLentOut && !isPendingTrade
                     ? BoxDecoration(
                         boxShadow: [
                           BoxShadow(
@@ -424,9 +533,21 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   _buildBadge(ch.rarity.toUpperCase(), _getRarityColor()),
                   const SizedBox(width: 8),
                   _buildBadge(ch.ip.toUpperCase(), _ironGrey),
-                  if (owned) ...[
+                  if (owned && !isLentOut && !isPendingTrade) ...[
                     const SizedBox(width: 8),
                     _buildBadge('OWNED', _neonGreen),
+                  ],
+                  if (isBorrowed) ...[
+                    const SizedBox(width: 8),
+                    _buildBadge('BORROWED', _lendCyan),
+                  ],
+                  if (isLentOut) ...[
+                    const SizedBox(width: 8),
+                    _buildBadge('LENT OUT', _ironGrey),
+                  ],
+                  if (isPendingTrade) ...[
+                    const SizedBox(width: 8),
+                    _buildBadge('TRADE PENDING', _tradeAmber),
                   ],
                 ],
               ),
@@ -485,8 +606,8 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             ),
           ),
 
-          // Lock overlay for unowned
-          if (!owned)
+          // Lock overlay — different states
+          if (!canInteract && !isLentOut && !isPendingTrade)
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(15),
@@ -511,6 +632,127 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                         letterSpacing: 3,
                       ),
                     ),
+                  ],
+                ),
+              ),
+            ),
+          // Lent-out overlay
+          if (isLentOut)
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                color: _voidBlack.withValues(alpha: 0.55),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.call_made,
+                      color: _pureWhite.withValues(alpha: 0.5),
+                      size: 40,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'LENT OUT',
+                      style: TextStyle(
+                        color: _pureWhite.withValues(alpha: 0.5),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                    if (_lendCounterpartyProfile != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'To ${_profileDisplayName(_lendCounterpartyProfile)}',
+                        style: TextStyle(
+                          color: _pureWhite.withValues(alpha: 0.35),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          // Trade-pending overlay
+          if (isPendingTrade)
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                color: _voidBlack.withValues(alpha: 0.55),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.swap_horiz,
+                      color: _tradeAmber.withValues(alpha: 0.7),
+                      size: 40,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'TRADE PENDING',
+                      style: TextStyle(
+                        color: _tradeAmber,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // Borrowed badge overlay (top-right)
+          if (isBorrowed)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _lendCyan.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.handshake_outlined,
+                          color: Colors.white,
+                          size: 12,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'BORROWED',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (widget.lendInfo?['return_due_at'] != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatCountdown(
+                          widget.lendInfo!['return_due_at'] as String,
+                        ),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -644,8 +886,11 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           // ── VIEWING INVITER'S CHARACTER BANNER ─────────
           if (widget.inviterName != null) _buildInviterBanner(),
 
-          // ── CHARACTER LOCKED CTA (unowned) ──────────────
-          if (!owned) _buildLockedCTA(),
+          // ── STATE BANNERS ──────────────────────────────
+          if (isBorrowed) _buildBorrowedInfoCard(),
+          if (isLentOut) _buildLentOutInfoCard(),
+          if (isPendingTrade) _buildTradePendingInfoCard(),
+          if (!canInteract && !isLentOut && !isPendingTrade) _buildLockedCTA(),
 
           // ── ABOUT ──────────────────────────────────────
           _buildSectionCard(
@@ -677,16 +922,18 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           ),
           const SizedBox(height: 20),
 
-          // ── TRADE / LEND ACTIONS (owned only) ──────────
-          if (owned && !isGuest) _buildOwnerActions(),
-          if (owned && !isGuest) const SizedBox(height: 20),
+          // ── TRADE / LEND ACTIONS (owned, not lent out, not pending trade) ──
+          if (owned && !isGuest && !isLentOut && !isPendingTrade && !isBorrowed)
+            _buildOwnerActions(),
+          if (owned && !isGuest && !isLentOut && !isPendingTrade && !isBorrowed)
+            const SizedBox(height: 20),
 
           // ── MULTIGAMEVERSE ─────────────────────────────
           _buildSectionCard(
             title: '${ch.name.toUpperCase()} MULTIGAMEVERSE',
             subtitle: '${ch.gameVariations.length} GAMES',
             child: _buildGameVariations(),
-            locked: !owned,
+            locked: !canInteract,
             lockedMessage: 'Own this character to explore all game versions',
           ),
           const SizedBox(height: 20),
@@ -700,7 +947,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             title: 'SPECIAL REWARDS',
             subtitle: '${ch.specialRewards.length} ITEMS',
             child: _buildSpecialRewards(),
-            locked: !owned,
+            locked: !canInteract,
             lockedMessage: 'Own this character to unlock rewards',
           ),
           const SizedBox(height: 20),
@@ -710,7 +957,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             title: 'OWNERSHIP HISTORY',
             subtitle: _isLoadingHistory
                 ? '...'
-                : '${_ownershipTimeline.length} EVENTS',
+                : '${_ownershipTimeline.where((e) => e['type'] == 'owner').length} OWNERS',
             child: _buildOwnershipHistory(),
           ),
           const SizedBox(height: 20),
@@ -720,11 +967,330 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             _buildSectionCard(
               title: 'GAMEPLAY',
               child: _buildGameplayGallery(),
-              locked: !owned,
+              locked: !canInteract,
               lockedMessage: 'Own this character to view gameplay',
             ),
 
           const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // BORROWED / LENT-OUT / TRADE-PENDING INFO CARDS
+  // ═══════════════════════════════════════════════════════════
+
+  Widget _buildBorrowedInfoCard() {
+    final name = _profileDisplayName(_lendCounterpartyProfile);
+    final avatarUrl = _lendCounterpartyProfile?['avatar_url'] as String?;
+    final returnDate = widget.lendInfo?['return_due_at'] as String?;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [_lendCyan.withValues(alpha: 0.08), _deepCharcoal],
+        ),
+        border: Border.all(color: _lendCyan.withValues(alpha: 0.3), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.handshake_outlined, color: _lendCyan, size: 20),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'BORROWED CHARACTER',
+                  style: TextStyle(
+                    color: _lendCyan,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              if (returnDate != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _lendCyan.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _formatCountdown(returnDate),
+                    style: TextStyle(
+                      color: _lendCyan,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Lender info row
+          Row(
+            children: [
+              _buildHistoryAvatar(avatarUrl, name, true),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'LENDER',
+                      style: TextStyle(
+                        color: _lendCyan.withValues(alpha: 0.6),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: _pureWhite,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'You have full access to this character while borrowed. It will return automatically when the timer expires.',
+            style: TextStyle(
+              color: _pureWhite.withValues(alpha: 0.4),
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLentOutInfoCard() {
+    final name = _profileDisplayName(_lendCounterpartyProfile);
+    final avatarUrl = _lendCounterpartyProfile?['avatar_url'] as String?;
+    final returnDate = _lendCounterpartyProfile?['return_due_at'] as String?;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: _deepCharcoal,
+        border: Border.all(color: _ironGrey, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.call_made,
+                color: _pureWhite.withValues(alpha: 0.5),
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'CHARACTER LENT OUT',
+                  style: TextStyle(
+                    color: _pureWhite.withValues(alpha: 0.6),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              if (returnDate != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _ironGrey.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Returns ${_formatCountdown(returnDate)}',
+                    style: TextStyle(
+                      color: _pureWhite.withValues(alpha: 0.5),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _buildHistoryAvatar(avatarUrl, name, false),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'BORROWER',
+                      style: TextStyle(
+                        color: _pureWhite.withValues(alpha: 0.3),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      name,
+                      style: TextStyle(
+                        color: _pureWhite.withValues(alpha: 0.7),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'This character is temporarily lent out. Features are locked until it returns. Trading and re-lending are disabled.',
+            style: TextStyle(
+              color: _pureWhite.withValues(alpha: 0.3),
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTradePendingInfoCard() {
+    final name = _profileDisplayName(_tradeCounterpartyProfile);
+    final avatarUrl = _tradeCounterpartyProfile?['avatar_url'] as String?;
+    final role = widget.pendingTradeInfo?['role'] as String?;
+    final proposedAt = widget.pendingTradeInfo?['proposed_at'] as String?;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [_tradeAmber.withValues(alpha: 0.06), _deepCharcoal],
+        ),
+        border: Border.all(color: _tradeAmber.withValues(alpha: 0.3), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.swap_horiz, color: _tradeAmber, size: 20),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'TRADE PENDING',
+                  style: TextStyle(
+                    color: _tradeAmber,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _buildHistoryAvatar(avatarUrl, name, false),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      role == 'proposer'
+                          ? 'TRADE OFFERED TO'
+                          : 'TRADE PROPOSED BY',
+                      style: TextStyle(
+                        color: _tradeAmber.withValues(alpha: 0.6),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: _pureWhite,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (proposedAt != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Proposed ${_formatDateStr(proposedAt)}',
+              style: TextStyle(
+                color: _pureWhite.withValues(alpha: 0.3),
+                fontSize: 11,
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                // Navigate to activity/notification for this trade
+                Navigator.of(context).pop({'switchToTab': 'ACTIVITY'});
+              },
+              icon: const Icon(Icons.open_in_new, size: 14),
+              label: const Text(
+                'VIEW TRADE DETAILS',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                  fontSize: 12,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _tradeAmber,
+                side: BorderSide(color: _tradeAmber.withValues(alpha: 0.5)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -793,112 +1359,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                         characterName: ch.name,
                       );
                     } else {
-                      // No known owner — marketplace placeholder
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF121212),
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(20),
-                            ),
-                            border: Border(
-                              top: BorderSide(color: Color(0xFF2C2C2C)),
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              Icon(
-                                Icons.lock_outline,
-                                color: const Color(0xFF39FF14),
-                                size: 36,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                '${ch.name.toUpperCase()} IS LOCKED',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'The marketplace is coming soon. In the meantime, find friends who own this character and propose a trade.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.5),
-                                  fontSize: 13,
-                                  height: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    // Pop back to dashboard, switch to friends tab
-                                    Navigator.of(
-                                      context,
-                                    ).pop({'switchToTab': 'FRIENDS'});
-                                  },
-                                  icon: const Icon(
-                                    Icons.people_outline,
-                                    size: 16,
-                                  ),
-                                  label: const Text(
-                                    'FIND FRIENDS WHO OWN THIS',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF39FF14),
-                                    side: const BorderSide(
-                                      color: Color(0xFF39FF14),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'MARKETPLACE COMING SOON',
-                                style: TextStyle(
-                                  color: const Color(
-                                    0xFF39FF14,
-                                  ).withValues(alpha: 0.3),
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-                          ),
-                        ),
-                      );
+                      _showMarketplaceComingSoon();
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -950,6 +1411,96 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       ),
     );
   }
+
+  /// Marketplace coming soon bottom sheet (shared by locked CTA and locked overlays)
+  void _showMarketplaceComingSoon() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF121212),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border(top: BorderSide(color: Color(0xFF2C2C2C))),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Icon(Icons.lock_outline, color: const Color(0xFF39FF14), size: 36),
+            const SizedBox(height: 12),
+            Text(
+              '${ch.name.toUpperCase()} IS LOCKED',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'The marketplace is coming soon. In the meantime, find friends who own this character and propose a trade.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).pop({'switchToTab': 'FRIENDS'});
+                },
+                icon: const Icon(Icons.people_outline, size: 16),
+                label: const Text(
+                  'FIND FRIENDS WHO OWN THIS',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    fontSize: 12,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF39FF14),
+                  side: const BorderSide(color: Color(0xFF39FF14)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'MARKETPLACE COMING SOON',
+              style: TextStyle(
+                color: const Color(0xFF39FF14).withValues(alpha: 0.3),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ═══════════════════════════════════════════════════════════
   // INVITER CONTEXT BANNER
   // ═══════════════════════════════════════════════════════════
@@ -1008,7 +1559,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
-                // TODO: Open trade request flow
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     backgroundColor: _deepCharcoal,
@@ -1049,6 +1599,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       ),
     );
   }
+
   // ═══════════════════════════════════════════════════════════
   // SECTION CARD WRAPPER
   // ═══════════════════════════════════════════════════════════
@@ -1173,112 +1724,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                         characterName: ch.name,
                       );
                     } else {
-                      // No known owner — marketplace placeholder
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.transparent,
-                        builder: (_) => Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF121212),
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(20),
-                            ),
-                            border: Border(
-                              top: BorderSide(color: Color(0xFF2C2C2C)),
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              Icon(
-                                Icons.lock_outline,
-                                color: const Color(0xFF39FF14),
-                                size: 36,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                '${ch.name.toUpperCase()} IS LOCKED',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'The marketplace is coming soon. In the meantime, find friends who own this character and propose a trade.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.5),
-                                  fontSize: 13,
-                                  height: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    // Pop back to dashboard, switch to friends tab
-                                    Navigator.of(
-                                      context,
-                                    ).pop({'switchToTab': 'FRIENDS'});
-                                  },
-                                  icon: const Icon(
-                                    Icons.people_outline,
-                                    size: 16,
-                                  ),
-                                  label: const Text(
-                                    'FIND FRIENDS WHO OWN THIS',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF39FF14),
-                                    side: const BorderSide(
-                                      color: Color(0xFF39FF14),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'MARKETPLACE COMING SOON',
-                                style: TextStyle(
-                                  color: const Color(
-                                    0xFF39FF14,
-                                  ).withValues(alpha: 0.3),
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-                          ),
-                        ),
-                      );
+                      _showMarketplaceComingSoon();
                     }
                   },
                   child: Container(
@@ -1341,7 +1787,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   setState(() {
                     _selectedVariationIndex = isSelected ? -1 : index;
                   });
-                  // Sync hero PageView: index -1 = page 0, index N = page N+1
                   final targetPage = isSelected ? 0 : index + 1;
                   if (_heroPageController.hasClients) {
                     _heroPageController.animateToPage(
@@ -1380,7 +1825,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Game variation image
                       Expanded(
                         child: Stack(
                           children: [
@@ -1396,7 +1840,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                                 fallbackIconSize: 32,
                               ),
                             ),
-                            // Selected indicator arrow
                             if (isSelected)
                               Positioned(
                                 bottom: 4,
@@ -1417,7 +1860,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                           ],
                         ),
                       ),
-                      // Game info
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
@@ -1433,7 +1875,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                           children: [
                             Row(
                               children: [
-                                // Game icon
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(4),
                                   child: variation.gameIcon.isNotEmpty
@@ -1520,8 +1961,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     );
   }
 
-  /// Expanded detail panel for the selected game variation.
-  /// Shows below the carousel with a slide-in animation.
   Widget _buildExpandedVariationDetail(GameVariation variation) {
     return Container(
       key: ValueKey('variation_${variation.gameId}'),
@@ -1542,10 +1981,8 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header row: game name + engine badge + close ──
           Row(
             children: [
-              // Game icon
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: variation.gameIcon.isNotEmpty
@@ -1572,7 +2009,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                       ),
               ),
               const SizedBox(width: 10),
-              // Game name
               Expanded(
                 child: Text(
                   variation.gameName.toUpperCase(),
@@ -1584,7 +2020,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   ),
                 ),
               ),
-              // Engine badge
               if (variation.engineName.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -1607,12 +2042,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   ),
                 ),
               const SizedBox(width: 8),
-              // Close button
               GestureDetector(
                 onTap: () {
-                  setState(() {
-                    _selectedVariationIndex = -1;
-                  });
+                  setState(() => _selectedVariationIndex = -1);
                   if (_heroPageController.hasClients) {
                     _heroPageController.animateToPage(
                       0,
@@ -1636,23 +2068,16 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // ── Character render + info ─────────────────────
           LayoutBuilder(
             builder: (context, constraints) {
-              // Side-by-side on wider panels, stacked on narrow
               final isWide = constraints.maxWidth > 360;
-
               if (isWide) {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Character image
                     _buildVariationRender(variation),
                     const SizedBox(width: 16),
-                    // Info column
                     Expanded(child: _buildVariationInfo(variation)),
                   ],
                 );
@@ -1673,7 +2098,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     );
   }
 
-  /// Large render of the character in this game variation.
   Widget _buildVariationRender(GameVariation variation) {
     return Container(
       width: 160,
@@ -1695,7 +2119,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               fallbackIconSize: 48,
             ),
           ),
-          // Game ID badge at top-left
           Positioned(
             top: 8,
             left: 8,
@@ -1721,12 +2144,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     );
   }
 
-  /// Text info panel for the expanded variation.
   Widget _buildVariationInfo(GameVariation variation) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Character name in this game
         Text(
           '${ch.name.toUpperCase()} IN ${variation.gameName.toUpperCase()}',
           style: TextStyle(
@@ -1737,8 +2158,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           ),
         ),
         const SizedBox(height: 10),
-
-        // Description
         if (variation.description.isNotEmpty)
           Text(
             variation.description,
@@ -1749,8 +2168,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             ),
           ),
         const SizedBox(height: 14),
-
-        // Engine + platform info row
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -1762,14 +2179,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           ],
         ),
         const SizedBox(height: 16),
-
-        // "VIEW IN GAME" CTA (placeholder for future deep-link)
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: () {
-              // TODO: Deep-link to this game variation or show more info
-            },
+            onPressed: () {},
             icon: const Icon(Icons.open_in_new, size: 14),
             label: const Text(
               'VIEW IN GAME',
@@ -1793,7 +2206,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     );
   }
 
-  /// Small info chip for engine/platform details.
   Widget _buildInfoChip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1820,6 +2232,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       ),
     );
   }
+
   // ═══════════════════════════════════════════════════════════
   // TRADE / LEND ACTIONS (owned characters)
   // ═══════════════════════════════════════════════════════════
@@ -1855,12 +2268,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           const SizedBox(height: 16),
           Row(
             children: [
-              // TRADE button
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    TradeProposalModal.show(context, characterId: ch.id);
-                  },
+                  onPressed: () =>
+                      TradeProposalModal.show(context, characterId: ch.id),
                   icon: const Icon(Icons.swap_horiz, size: 18),
                   label: const Text(
                     'TRADE',
@@ -1881,12 +2292,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              // LEND button
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    LendProposalModal.show(context, characterId: ch.id);
-                  },
+                  onPressed: () =>
+                      LendProposalModal.show(context, characterId: ch.id),
                   icon: Icon(
                     Icons.handshake_outlined,
                     size: 18,
@@ -1916,6 +2325,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       ),
     );
   }
+
   // ═══════════════════════════════════════════════════════════
   // PORTAL PASS SECTION
   // ═══════════════════════════════════════════════════════════
@@ -1924,7 +2334,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     final pass = ch.portalPass;
 
     if (pass == null) {
-      // No Portal Pass — show purchase CTA (unchanged)
       return _buildSectionCard(
         title: 'PORTAL PASS',
         child: Container(
@@ -1988,16 +2397,14 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       );
     }
 
-    // Has Portal Pass — interactive version
     return _buildSectionCard(
       title: 'PORTAL PASS',
       subtitle: 'LVL ${pass.currentLevel}/${pass.maxLevel}',
-      locked: !owned,
+      locked: !canInteract,
       lockedMessage: 'Own this character to track Portal Pass progress',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Pass name + description
           Text(
             pass.name.toUpperCase(),
             style: const TextStyle(
@@ -2018,16 +2425,12 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             ),
           ],
           const SizedBox(height: 16),
-
-          // Progress bar
           _buildProgressBar(
             pass.progressPercent,
             pass.currentLevel,
             pass.maxLevel,
           ),
           const SizedBox(height: 20),
-
-          // Expiry
           if (pass.expiresAt != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
@@ -2049,8 +2452,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 ],
               ),
             ),
-
-          // ── Reward Milestones (interactive nodes) ──────
           if (pass.rewards.isNotEmpty) ...[
             Text(
               'MILESTONE REWARDS',
@@ -2065,8 +2466,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             _buildMilestoneTrack(pass),
             const SizedBox(height: 20),
           ],
-
-          // ── Active Tasks (expandable) ─────────────────
           if (pass.tasks.isNotEmpty) ...[
             Row(
               children: [
@@ -2146,9 +2545,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     );
   }
 
-  /// Horizontal milestone track with nodes connected by a progress line.
   Widget _buildMilestoneTrack(PortalPass pass) {
-    // Sort ascending by level so LVL 10 is on the LEFT, LVL 50 on the RIGHT
     final sortedRewards = [...pass.rewards]
       ..sort((a, b) => a.levelRequired.compareTo(b.levelRequired));
     return SizedBox(
@@ -2158,11 +2555,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           final trackWidth = constraints.maxWidth;
           final nodeCount = sortedRewards.length;
           if (nodeCount == 0) return const SizedBox.shrink();
-
           return Stack(
             clipBehavior: Clip.none,
             children: [
-              // Layer 1: Background track line
               Positioned(
                 top: 24,
                 left: 0,
@@ -2175,7 +2570,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   ),
                 ),
               ),
-              // Layer 2: Progress fill line (behind nodes)
               Positioned(
                 top: 24,
                 left: 0,
@@ -2194,15 +2588,12 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   ),
                 ),
               ),
-              // Layer 3: Milestone nodes (on top of everything)
               ...List.generate(nodeCount, (index) {
                 final reward = sortedRewards[index];
                 final position = nodeCount == 1
                     ? trackWidth / 2
                     : (trackWidth - 40) * (index / (nodeCount - 1)) + 20;
-                final nodeLevel = reward.levelRequired;
-                final isReached = pass.currentLevel >= nodeLevel;
-
+                final isReached = pass.currentLevel >= reward.levelRequired;
                 return Positioned(
                   left: position - 20,
                   top: 0,
@@ -2212,9 +2603,8 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                       width: 40,
                       child: Column(
                         children: [
-                          // Level label
                           Text(
-                            'LVL $nodeLevel',
+                            'LVL ${reward.levelRequired}',
                             style: TextStyle(
                               color: isReached
                                   ? _neonGreen
@@ -2224,13 +2614,11 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                             ),
                           ),
                           const SizedBox(height: 4),
-                          // Node circle — solid background so line doesn't show through
                           Container(
                             width: 28,
                             height: 28,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              // Solid background to mask the progress line
                               color: isReached
                                   ? const Color(0xFF1A3A14)
                                   : _deepCharcoal,
@@ -2266,7 +2654,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                             ),
                           ),
                           const SizedBox(height: 6),
-                          // Reward name
                           Text(
                             reward.name,
                             textAlign: TextAlign.center,
@@ -2293,7 +2680,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     );
   }
 
-  /// Shows a bottom sheet with reward details when a milestone node is tapped.
   void _showRewardDetail(
     BuildContext context,
     PortalPassReward reward,
@@ -2302,109 +2688,97 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: _deepCharcoal,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            border: Border.all(
-              color: isUnlocked ? _neonGreen.withValues(alpha: 0.3) : _ironGrey,
-            ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: _deepCharcoal,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border.all(
+            color: isUnlocked ? _neonGreen.withValues(alpha: 0.3) : _ironGrey,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle bar
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: _ironGrey,
-                  borderRadius: BorderRadius.circular(2),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _ironGrey,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: isUnlocked
+                    ? _neonGreen.withValues(alpha: 0.1)
+                    : _voidBlack,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isUnlocked
+                      ? _neonGreen.withValues(alpha: 0.4)
+                      : _ironGrey,
                 ),
               ),
-              const SizedBox(height: 20),
-              // Reward image
-              Container(
+              child: OgaImage(
+                path: reward.image,
                 width: 80,
                 height: 80,
-                decoration: BoxDecoration(
+                fit: BoxFit.contain,
+                borderRadius: BorderRadius.circular(14),
+                accentColor: isUnlocked ? _neonGreen : _pureWhite,
+                fallbackIcon: Icons.card_giftcard,
+                fallbackIconSize: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              reward.name.toUpperCase(),
+              style: const TextStyle(
+                color: _pureWhite,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isUnlocked
+                    ? _neonGreen.withValues(alpha: 0.15)
+                    : _ironGrey.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                isUnlocked
+                    ? 'UNLOCKED'
+                    : 'UNLOCKS AT LEVEL ${reward.levelRequired}',
+                style: TextStyle(
                   color: isUnlocked
-                      ? _neonGreen.withValues(alpha: 0.1)
-                      : _voidBlack,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isUnlocked
-                        ? _neonGreen.withValues(alpha: 0.4)
-                        : _ironGrey,
-                  ),
-                ),
-                child: OgaImage(
-                  path: reward.image,
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.contain,
-                  borderRadius: BorderRadius.circular(14),
-                  accentColor: isUnlocked ? _neonGreen : _pureWhite,
-                  fallbackIcon: Icons.card_giftcard,
-                  fallbackIconSize: 32,
+                      ? _neonGreen
+                      : _pureWhite.withValues(alpha: 0.5),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 16),
-              // Reward name
-              Text(
-                reward.name.toUpperCase(),
-                style: const TextStyle(
-                  color: _pureWhite,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1,
-                ),
-              ),
-              const SizedBox(height: 8),
-              // Status badge
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: isUnlocked
-                      ? _neonGreen.withValues(alpha: 0.15)
-                      : _ironGrey.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  isUnlocked
-                      ? 'UNLOCKED'
-                      : 'UNLOCKS AT LEVEL ${reward.levelRequired}',
-                  style: TextStyle(
-                    color: isUnlocked
-                        ? _neonGreen
-                        : _pureWhite.withValues(alpha: 0.5),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
     );
   }
 
-  /// Interactive task item with expandable detail on tap.
   Widget _buildInteractiveTaskItem(PortalPassTask task) {
     return StatefulBuilder(
       builder: (context, setLocalState) {
         return GestureDetector(
           onTap: () {
-            // For now, tasks show a simple detail snackbar.
-            // Future: expand inline with sub-tasks or tips.
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 backgroundColor: _deepCharcoal,
@@ -2461,7 +2835,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             ),
             child: Row(
               children: [
-                // Completion indicator
                 Container(
                   width: 28,
                   height: 28,
@@ -2480,7 +2853,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                       : null,
                 ),
                 const SizedBox(width: 12),
-                // Task info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2524,7 +2896,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                     ],
                   ),
                 ),
-                // Progress or tap hint
                 if (!task.isCompleted)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -2579,7 +2950,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
         style: TextStyle(color: _pureWhite.withValues(alpha: 0.5)),
       );
     }
-
     return SizedBox(
       height: 140,
       child: ListView.builder(
@@ -2603,7 +2973,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             ),
             child: Column(
               children: [
-                // Reward image
                 Expanded(
                   child: OgaImage(
                     path: reward.image,
@@ -2616,7 +2985,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                     fallbackIconSize: 28,
                   ),
                 ),
-                // Reward info
                 Padding(
                   padding: const EdgeInsets.all(8),
                   child: Column(
@@ -2659,7 +3027,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildOwnershipHistory() {
-    // Loading state
     if (_isLoadingHistory) {
       return const Padding(
         padding: EdgeInsets.all(20),
@@ -2667,7 +3034,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       );
     }
 
-    // No real data — fall back to mock if available
     if (_ownershipTimeline.isEmpty && ch.ownershipHistory.isEmpty) {
       return Text(
         'No ownership history recorded.',
@@ -2675,395 +3041,144 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       );
     }
 
-    // Use real data if available, otherwise fall back to mock
-    if (_ownershipTimeline.isEmpty) {
-      return _buildMockOwnershipHistory();
+    if (_ownershipTimeline.isEmpty) return _buildMockOwnershipHistory();
+
+    // Filter to owners only
+    final owners = _ownershipTimeline
+        .where((e) => e['type'] == 'owner')
+        .toList();
+    final activities = _ownershipTimeline
+        .where((e) => e['type'] != 'owner')
+        .toList();
+
+    if (owners.isEmpty) {
+      return Text(
+        'No ownership history recorded.',
+        style: TextStyle(color: _pureWhite.withValues(alpha: 0.5)),
+      );
+    }
+
+    // Truncation logic: show first 5 + separator + first owner
+    final bool needsTruncation = owners.length > 6 && !_isHistoryExpanded;
+    List<Map<String, dynamic>> displayOwners;
+
+    if (needsTruncation) {
+      displayOwners = [
+        ...owners.sublist(0, 5),
+        {'type': 'separator', 'hiddenCount': owners.length - 6},
+        owners.last,
+      ];
+    } else {
+      displayOwners = owners;
     }
 
     return Column(
-      children: _ownershipTimeline.asMap().entries.map((entry) {
-        final index = entry.key;
-        final event = entry.value;
-        final isLast = index == _ownershipTimeline.length - 1;
-        final type = event['type'] as String;
+      children: [
+        ...displayOwners.asMap().entries.map((entry) {
+          final index = entry.key;
+          final event = entry.value;
+          final isLast = index == displayOwners.length - 1;
 
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Timeline rail ─────────────────────────
-              SizedBox(
-                width: 32,
-                child: Column(
+          if (event['type'] == 'separator') {
+            return GestureDetector(
+              onTap: () => setState(() => _isHistoryExpanded = true),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
                   children: [
-                    Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: index == 0
-                            ? _neonGreen.withValues(alpha: 0.2)
-                            : _voidBlack,
-                        border: Border.all(
-                          color: index == 0
-                              ? _neonGreen
-                              : _ironGrey.withValues(alpha: 0.5),
-                          width: index == 0 ? 2.5 : 1.5,
+                    const SizedBox(width: 12),
+                    Column(
+                      children: List.generate(
+                        3,
+                        (_) => Container(
+                          width: 4,
+                          height: 4,
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _ironGrey.withValues(alpha: 0.5),
+                          ),
                         ),
-                        boxShadow: index == 0
-                            ? [
-                                BoxShadow(
-                                  color: _neonGreen.withValues(alpha: 0.3),
-                                  blurRadius: 8,
-                                ),
-                              ]
-                            : null,
                       ),
-                      child: index == 0
-                          ? Center(
-                              child: Container(
-                                width: 6,
-                                height: 6,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _neonGreen,
-                                ),
-                              ),
-                            )
-                          : null,
                     ),
-                    if (!isLast)
-                      Expanded(
-                        child: Container(
-                          width: 2,
-                          color: _ironGrey.withValues(alpha: 0.25),
-                        ),
+                    const SizedBox(width: 20),
+                    Text(
+                      'SHOW ALL ${owners.length} OWNERS',
+                      style: TextStyle(
+                        color: _neonGreen.withValues(alpha: 0.7),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
                       ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.expand_more,
+                      color: _neonGreen.withValues(alpha: 0.5),
+                      size: 16,
+                    ),
                   ],
                 ),
               ),
-              // ── Event card ────────────────────────────
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.only(bottom: isLast ? 0 : 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: index == 0
-                        ? _neonGreen.withValues(alpha: 0.04)
-                        : _voidBlack.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: index == 0
-                          ? _neonGreen.withValues(alpha: 0.2)
-                          : _ironGrey.withValues(alpha: 0.15),
+            );
+          }
+
+          final isCurrent = event['isCurrent'] == true;
+
+          return _ExpandableOwnerRow(
+            event: event,
+            activities: _getActivitiesForOwner(event, activities),
+            isCurrent: isCurrent,
+            isFirst: index == 0,
+            isLast: isLast,
+          );
+        }),
+        if (_isHistoryExpanded && owners.length > 6)
+          GestureDetector(
+            onTap: () => setState(() => _isHistoryExpanded = false),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.expand_less,
+                    color: _neonGreen.withValues(alpha: 0.5),
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'SHOW LESS',
+                    style: TextStyle(
+                      color: _neonGreen.withValues(alpha: 0.5),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                  child: _buildTimelineEventContent(event, type, index == 0),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        );
-      }).toList(),
+      ],
     );
   }
 
-  Widget _buildTimelineEventContent(
-    Map<String, dynamic> event,
-    String type,
-    bool isFirst,
+  /// Find activities (trades/lends) associated with a specific owner
+  List<Map<String, dynamic>> _getActivitiesForOwner(
+    Map<String, dynamic> ownerEvent,
+    List<Map<String, dynamic>> allActivities,
   ) {
-    switch (type) {
-      case 'owner':
-        final profile = event['profile'] as Map<String, dynamic>?;
-        final name = _profileDisplayName(profile);
-        final avatarUrl = profile?['avatar_url'] as String?;
-        final dateStr = event['date'] as String?;
-        final via = event['via'] as String? ?? 'acquired';
-        final isCurrent = event['isCurrent'] == true;
-
-        return Row(
-          children: [
-            _buildHistoryAvatar(avatarUrl, name, isCurrent),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          name,
-                          style: TextStyle(
-                            color: isCurrent
-                                ? _pureWhite
-                                : _pureWhite.withValues(alpha: 0.6),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (isCurrent) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _neonGreen.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: const Text(
-                            'CURRENT',
-                            style: TextStyle(
-                              color: _neonGreen,
-                              fontSize: 8,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ] else ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _ironGrey.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text(
-                            'PAST OWNER',
-                            style: TextStyle(
-                              color: _pureWhite.withValues(alpha: 0.3),
-                              fontSize: 8,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.verified,
-                        size: 12,
-                        color: _neonGreen.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        dateStr != null
-                            ? '${via[0].toUpperCase()}${via.substring(1)} ${_formatDateStr(dateStr)}'
-                            : via[0].toUpperCase() + via.substring(1),
-                        style: TextStyle(
-                          color: _pureWhite.withValues(alpha: 0.3),
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-
-      case 'trade':
-        final fromProfile = event['fromProfile'] as Map<String, dynamic>?;
-        final toProfile = event['toProfile'] as Map<String, dynamic>?;
-        final fromName = _profileDisplayName(fromProfile);
-        final toName = _profileDisplayName(toProfile);
-        final dateStr = event['date'] as String?;
-
-        return Row(
-          children: [
-            Icon(
-              Icons.swap_horiz,
-              size: 20,
-              color: _neonGreen.withValues(alpha: 0.5),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: fromName,
-                          style: const TextStyle(
-                            color: _pureWhite,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                        TextSpan(
-                          text: '  →  ',
-                          style: TextStyle(
-                            color: _neonGreen.withValues(alpha: 0.5),
-                            fontSize: 12,
-                          ),
-                        ),
-                        TextSpan(
-                          text: toName,
-                          style: const TextStyle(
-                            color: _pureWhite,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _neonGreen.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: const Text(
-                          'TRADE',
-                          style: TextStyle(
-                            color: _neonGreen,
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      if (dateStr != null)
-                        Text(
-                          _formatDateStr(dateStr),
-                          style: TextStyle(
-                            color: _pureWhite.withValues(alpha: 0.3),
-                            fontSize: 10,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-
-      case 'lend':
-        final lenderProfile = event['lenderProfile'] as Map<String, dynamic>?;
-        final borrowerProfile =
-            event['borrowerProfile'] as Map<String, dynamic>?;
-        final lenderName = _profileDisplayName(lenderProfile);
-        final borrowerName = _profileDisplayName(borrowerProfile);
-        final dateStr = event['date'] as String?;
-        final status = event['status'] as String? ?? 'active';
-        final isActive = status == 'active';
-
-        return Row(
-          children: [
-            Icon(
-              Icons.handshake_outlined,
-              size: 20,
-              color: isActive ? const Color(0xFF00BCD4) : _ironGrey,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: lenderName,
-                          style: const TextStyle(
-                            color: _pureWhite,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                        TextSpan(
-                          text: '  →  ',
-                          style: TextStyle(
-                            color: const Color(
-                              0xFF00BCD4,
-                            ).withValues(alpha: 0.5),
-                            fontSize: 12,
-                          ),
-                        ),
-                        TextSpan(
-                          text: borrowerName,
-                          style: const TextStyle(
-                            color: _pureWhite,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              (isActive ? const Color(0xFF00BCD4) : _ironGrey)
-                                  .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text(
-                          isActive ? 'LEND · ACTIVE' : 'LEND · RETURNED',
-                          style: TextStyle(
-                            color: isActive
-                                ? const Color(0xFF00BCD4)
-                                : _ironGrey,
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      if (dateStr != null)
-                        Text(
-                          _formatDateStr(dateStr),
-                          style: TextStyle(
-                            color: _pureWhite.withValues(alpha: 0.3),
-                            fontSize: 10,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-
-      default:
-        return const SizedBox.shrink();
-    }
+    final email = ownerEvent['email'] as String?;
+    if (email == null) return [];
+    return allActivities.where((a) {
+      if (a['type'] == 'trade')
+        return a['fromEmail'] == email || a['toEmail'] == email;
+      if (a['type'] == 'lend')
+        return a['lenderEmail'] == email || a['borrowerEmail'] == email;
+      return false;
+    }).toList();
   }
 
   Widget _buildHistoryAvatar(String? avatarUrl, String name, bool isCurrent) {
@@ -3085,7 +3200,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 width: 36,
                 height: 36,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => _buildInitialCircle(initial),
+                errorBuilder: (_, __, ___) => _buildInitialCircle(initial),
               )
             : _buildInitialCircle(initial),
       ),
@@ -3134,13 +3249,11 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   /// Fallback: renders mock ownership data from OGACharacter model
   Widget _buildMockOwnershipHistory() {
     final owners = ch.ownershipHistory.reversed.toList();
-
     return Column(
       children: owners.asMap().entries.map((entry) {
         final index = entry.key;
         final owner = entry.value;
         final isLast = index == owners.length - 1;
-
         return IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3330,7 +3443,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Screenshot image with play/zoom hint
                   Expanded(
                     child: Stack(
                       fit: StackFit.expand,
@@ -3345,7 +3457,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                           fallbackIcon: Icons.image,
                           fallbackIconSize: 40,
                         ),
-                        // Zoom hint overlay
                         Positioned(
                           top: 8,
                           right: 8,
@@ -3362,7 +3473,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                             ),
                           ),
                         ),
-                        // Image counter badge
                         Positioned(
                           bottom: 8,
                           left: 8,
@@ -3424,7 +3534,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     );
   }
 
-  /// Opens a full-screen lightbox overlay with PageView swipe navigation.
   void _openLightbox(BuildContext context, int initialIndex) {
     Navigator.of(context).push(
       PageRouteBuilder(
@@ -3481,7 +3590,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     );
   }
 
-  // Fetches user's invite code (cached) and copies character share URL to clipboard.
   Future<void> _shareCharacter() async {
     // === INVITE QUOTA CHECK (Sprint 11A) ===
     final quota = await InviteService.getInviteQuota();
@@ -3507,7 +3615,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       }
       return;
     }
-    // Fetch invite code if not cached
     if (_userInviteCode == null && !_isFetchingInviteCode) {
       _isFetchingInviteCode = true;
       try {
@@ -3550,10 +3657,8 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
     final shareUrl =
         'https://oga.oneearthrising.com/invite/$_userInviteCode/${ch.id}';
-
     await Clipboard.setData(ClipboardData(text: shareUrl));
 
-    // === TRACK SHARE (Sprint 11A) ===
     InviteService.recordShare(
       inviteCode: _userInviteCode!,
       characterId: widget.character.id,
@@ -3633,13 +3738,27 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   Color _getRarityColorForString(String rarity) {
     switch (rarity.toLowerCase()) {
       case 'legendary':
-        return const Color(0xFFFFD700); // Gold
+        return const Color(0xFFFFD700);
       case 'epic':
-        return const Color(0xFFAB47BC); // Purple
+        return const Color(0xFFAB47BC);
       case 'rare':
-        return const Color(0xFF42A5F5); // Blue
+        return const Color(0xFF42A5F5);
       default:
         return _ironGrey;
+    }
+  }
+
+  String _formatCountdown(String returnDateStr) {
+    try {
+      final returnDate = DateTime.parse(returnDateStr);
+      final diff = returnDate.difference(DateTime.now());
+      if (diff.isNegative) return 'OVERDUE';
+      if (diff.inDays > 0) return '${diff.inDays}d ${diff.inHours % 24}h left';
+      if (diff.inHours > 0)
+        return '${diff.inHours}h ${diff.inMinutes % 60}m left';
+      return '${diff.inMinutes}m left';
+    } catch (_) {
+      return '';
     }
   }
 
@@ -3665,8 +3784,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 // ═══════════════════════════════════════════════════════════════════
 // ANIMATED BUILDER HELPER
 // ═══════════════════════════════════════════════════════════════════
-// Flutter doesn't have AnimatedBuilder — this is a custom widget
-// that wraps AnimatedWidget pattern for cleaner glow animations.
 
 class AnimatedBuilder extends AnimatedWidget {
   final Widget Function(BuildContext context, Widget? child) builder;
@@ -3684,6 +3801,433 @@ class AnimatedBuilder extends AnimatedWidget {
     return builder(context, child);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// EXPANDABLE OWNER ROW — Ownership History
+// ═══════════════════════════════════════════════════════════════════
+
+class _ExpandableOwnerRow extends StatefulWidget {
+  final Map<String, dynamic> event;
+  final List<Map<String, dynamic>> activities;
+  final bool isCurrent;
+  final bool isFirst;
+  final bool isLast;
+
+  const _ExpandableOwnerRow({
+    required this.event,
+    required this.activities,
+    required this.isCurrent,
+    required this.isFirst,
+    required this.isLast,
+  });
+
+  @override
+  State<_ExpandableOwnerRow> createState() => _ExpandableOwnerRowState();
+}
+
+class _ExpandableOwnerRowState extends State<_ExpandableOwnerRow> {
+  bool _isExpanded = false;
+
+  String _profileName(Map<String, dynamic>? profile) {
+    if (profile == null) return 'Unknown';
+    final first = profile['first_name'] as String? ?? '';
+    final last = profile['last_name'] as String? ?? '';
+    final username = profile['username'] as String? ?? '';
+    final full = profile['full_name'] as String? ?? '';
+    if (first.isNotEmpty || last.isNotEmpty) return '$first $last'.trim();
+    if (username.isNotEmpty) return '@$username';
+    if (full.isNotEmpty) return full;
+    return profile['email'] as String? ?? 'Unknown';
+  }
+
+  String _fmtDate(String? dateStr) {
+    if (dateStr == null) return '';
+    try {
+      final dt = DateTime.parse(dateStr);
+      const m = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      return '${m[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = widget.event['profile'] as Map<String, dynamic>?;
+    final name = _profileName(profile);
+    final avatarUrl = profile?['avatar_url'] as String?;
+    final dateStr = widget.event['date'] as String?;
+    final via = widget.event['via'] as String? ?? 'acquired';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Timeline rail
+          SizedBox(
+            width: 32,
+            child: Column(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: widget.isFirst
+                        ? _neonGreen.withValues(alpha: 0.2)
+                        : _voidBlack,
+                    border: Border.all(
+                      color: widget.isFirst
+                          ? _neonGreen
+                          : _ironGrey.withValues(alpha: 0.5),
+                      width: widget.isFirst ? 2.5 : 1.5,
+                    ),
+                    boxShadow: widget.isFirst
+                        ? [
+                            BoxShadow(
+                              color: _neonGreen.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: widget.isFirst
+                      ? Center(
+                          child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _neonGreen,
+                            ),
+                          ),
+                        )
+                      : null,
+                ),
+                if (!widget.isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: _ironGrey.withValues(alpha: 0.25),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Owner card
+          Expanded(
+            child: Container(
+              margin: EdgeInsets.only(bottom: widget.isLast ? 0 : 12),
+              child: Column(
+                children: [
+                  // Main row (tappable)
+                  GestureDetector(
+                    onTap: widget.activities.isNotEmpty
+                        ? () => setState(() => _isExpanded = !_isExpanded)
+                        : null,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: widget.isCurrent
+                            ? _neonGreen.withValues(alpha: 0.04)
+                            : _voidBlack.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.vertical(
+                          top: const Radius.circular(10),
+                          bottom: _isExpanded
+                              ? Radius.zero
+                              : const Radius.circular(10),
+                        ),
+                        border: Border.all(
+                          color: widget.isCurrent
+                              ? _neonGreen.withValues(alpha: 0.2)
+                              : _ironGrey.withValues(alpha: 0.15),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: widget.isCurrent
+                                    ? _neonGreen
+                                    : _ironGrey,
+                                width: widget.isCurrent ? 1.5 : 1,
+                              ),
+                            ),
+                            child: ClipOval(
+                              child: avatarUrl != null && avatarUrl.isNotEmpty
+                                  ? Image.network(
+                                      avatarUrl,
+                                      width: 36,
+                                      height: 36,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          _initialCircle(initial),
+                                    )
+                                  : _initialCircle(initial),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        name,
+                                        style: TextStyle(
+                                          color: widget.isCurrent
+                                              ? _pureWhite
+                                              : _pureWhite.withValues(
+                                                  alpha: 0.6,
+                                                ),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: widget.isCurrent
+                                            ? _neonGreen.withValues(alpha: 0.15)
+                                            : _ironGrey.withValues(alpha: 0.3),
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                      child: Text(
+                                        widget.isCurrent
+                                            ? 'CURRENT'
+                                            : 'PAST OWNER',
+                                        style: TextStyle(
+                                          color: widget.isCurrent
+                                              ? _neonGreen
+                                              : _pureWhite.withValues(
+                                                  alpha: 0.3,
+                                                ),
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.verified,
+                                      size: 12,
+                                      color: _neonGreen.withValues(alpha: 0.5),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      dateStr != null
+                                          ? '${via[0].toUpperCase()}${via.substring(1)} ${_fmtDate(dateStr)}'
+                                          : '${via[0].toUpperCase()}${via.substring(1)}',
+                                      style: TextStyle(
+                                        color: _pureWhite.withValues(
+                                          alpha: 0.3,
+                                        ),
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (widget.activities.isNotEmpty)
+                            AnimatedRotation(
+                              turns: _isExpanded ? 0.5 : 0,
+                              duration: const Duration(milliseconds: 200),
+                              child: Icon(
+                                Icons.expand_more,
+                                color: _pureWhite.withValues(alpha: 0.3),
+                                size: 18,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Expandable activity detail
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: _isExpanded
+                        ? _buildActivityDetail()
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityDetail() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      decoration: BoxDecoration(
+        color: _deepCharcoal.withValues(alpha: 0.5),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
+        border: Border.all(color: _ironGrey.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(color: _ironGrey, height: 16),
+          Text(
+            'ACTIVITY',
+            style: TextStyle(
+              color: _pureWhite.withValues(alpha: 0.3),
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...widget.activities.map((a) {
+            final type = a['type'] as String;
+            final dateStr = a['date'] as String?;
+            if (type == 'trade') {
+              final from = _profileName(
+                a['fromProfile'] as Map<String, dynamic>?,
+              );
+              final to = _profileName(a['toProfile'] as Map<String, dynamic>?);
+              return _activityRow(
+                Icons.swap_horiz,
+                _neonGreen,
+                'TRADE',
+                '$from → $to',
+                _fmtDate(dateStr),
+              );
+            } else if (type == 'lend') {
+              final lender = _profileName(
+                a['lenderProfile'] as Map<String, dynamic>?,
+              );
+              final borrower = _profileName(
+                a['borrowerProfile'] as Map<String, dynamic>?,
+              );
+              final status = a['status'] as String? ?? 'active';
+              return _activityRow(
+                Icons.handshake_outlined,
+                const Color(0xFF00BCD4),
+                status == 'active' ? 'LEND · ACTIVE' : 'LEND · RETURNED',
+                '$lender → $borrower',
+                _fmtDate(dateStr),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _activityRow(
+    IconData icon,
+    Color color,
+    String label,
+    String detail,
+    String date,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color.withValues(alpha: 0.6)),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 8,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              detail,
+              style: TextStyle(
+                color: _pureWhite.withValues(alpha: 0.5),
+                fontSize: 11,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            date,
+            style: TextStyle(
+              color: _pureWhite.withValues(alpha: 0.25),
+              fontSize: 9,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _initialCircle(String letter) {
+    return Container(
+      width: 36,
+      height: 36,
+      color: _deepCharcoal,
+      child: Center(
+        child: Text(
+          letter,
+          style: const TextStyle(
+            color: _neonGreen,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// GAMEPLAY LIGHTBOX
+// ═══════════════════════════════════════════════════════════════════
 
 class _GameplayLightbox extends StatefulWidget {
   final List<GameplayMedia> media;
@@ -3703,11 +4247,6 @@ class _GameplayLightbox extends StatefulWidget {
 class _GameplayLightboxState extends State<_GameplayLightbox> {
   late PageController _pageController;
   late int _currentIndex;
-
-  static const Color _deepCharcoal = Color(0xFF121212);
-  static const Color _neonGreen = Color(0xFF39FF14);
-  static const Color _ironGrey = Color(0xFF2C2C2C);
-  static const Color _pureWhite = Color(0xFFFFFFFF);
 
   @override
   void initState() {
@@ -3733,13 +4272,10 @@ class _GameplayLightboxState extends State<_GameplayLightbox> {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            // ── Swipeable image pages ─────────────────────
             PageView.builder(
               controller: _pageController,
               itemCount: media.length,
-              onPageChanged: (index) {
-                setState(() => _currentIndex = index);
-              },
+              onPageChanged: (index) => setState(() => _currentIndex = index),
               itemBuilder: (context, index) {
                 final item = media[index];
                 return Center(
@@ -3760,8 +4296,6 @@ class _GameplayLightboxState extends State<_GameplayLightbox> {
                 );
               },
             ),
-
-            // ── Top bar: close + counter ──────────────────
             Positioned(
               top: MediaQuery.of(context).padding.top + 8,
               left: 16,
@@ -3769,7 +4303,6 @@ class _GameplayLightboxState extends State<_GameplayLightbox> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Close button
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     child: Container(
@@ -3788,7 +4321,6 @@ class _GameplayLightboxState extends State<_GameplayLightbox> {
                       ),
                     ),
                   ),
-                  // Image counter
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -3814,8 +4346,6 @@ class _GameplayLightboxState extends State<_GameplayLightbox> {
                 ],
               ),
             ),
-
-            // ── Bottom caption bar ────────────────────────
             Positioned(
               bottom: MediaQuery.of(context).padding.bottom + 16,
               left: 16,
@@ -3849,7 +4379,6 @@ class _GameplayLightboxState extends State<_GameplayLightbox> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    // Page dots
                     if (media.length > 1) ...[
                       const SizedBox(height: 12),
                       Row(

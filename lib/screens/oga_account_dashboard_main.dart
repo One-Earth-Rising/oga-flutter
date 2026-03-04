@@ -51,10 +51,11 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ─── Sprint 12: Ownership from DB ─────────────────────────
   Set<String> _ownedCharacterIds = {};
 
-  // ─── Sprint 14: Borrowed / Lent-out tracking ──────────────
+  // ─── Sprint 14: Borrowed / Lent-out / Trade-pending tracking ─
   Map<String, Map<String, dynamic>> _borrowedCharacters =
       {}; // char_id → lend row
   Set<String> _lentOutCharacterIds = {};
+  Map<String, Map<String, dynamic>> _pendingTrades = {}; // char_id → trade row
 
   // V2 Brand Colors (Heimdal Aesthetic)
   static const Color neonGreen = Color(0xFF39FF14);
@@ -87,6 +88,8 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   bool _isCharBorrowed(OGACharacter ch) =>
       _borrowedCharacters.containsKey(ch.id);
   bool _isCharLentOut(OGACharacter ch) => _lentOutCharacterIds.contains(ch.id);
+  bool _isCharPendingTrade(OGACharacter ch) =>
+      _pendingTrades.containsKey(ch.id);
 
   @override
   void initState() {
@@ -196,6 +199,59 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             '✅ Lend state: ${_borrowedCharacters.length} borrowed, '
             '${_lentOutCharacterIds.length} lent out',
           );
+
+          // Auto-return any expired lends (client-triggered, server-executed)
+          try {
+            await supabase.rpc('auto_return_expired_lends');
+            debugPrint('✅ Auto-return check completed');
+          } catch (e) {
+            debugPrint('⚠️ Auto-return RPC failed: $e (non-blocking)');
+          }
+
+          // Characters I own that are in a pending trade
+          try {
+            final myPendingAsProposer = await supabase
+                .from('trades')
+                .select('offered_character_id, receiver_email, proposed_at, id')
+                .eq('proposer_email', userEmail)
+                .eq('status', 'pending');
+            final myPendingAsReceiver = await supabase
+                .from('trades')
+                .select(
+                  'requested_character_id, proposer_email, proposed_at, id',
+                )
+                .eq('receiver_email', userEmail)
+                .eq('status', 'pending');
+
+            _pendingTrades = {};
+            for (final t in myPendingAsProposer) {
+              final charId = t['offered_character_id'] as String?;
+              if (charId != null) {
+                _pendingTrades[charId] = {
+                  'trade_id': t['id'],
+                  'counterparty_email': t['receiver_email'],
+                  'proposed_at': t['proposed_at'],
+                  'role': 'proposer',
+                };
+              }
+            }
+            for (final t in myPendingAsReceiver) {
+              final charId = t['requested_character_id'] as String?;
+              if (charId != null) {
+                _pendingTrades[charId] = {
+                  'trade_id': t['id'],
+                  'counterparty_email': t['proposer_email'],
+                  'proposed_at': t['proposed_at'],
+                  'role': 'receiver',
+                };
+              }
+            }
+            debugPrint(
+              '✅ Pending trades: ${_pendingTrades.length} characters in trade',
+            );
+          } catch (e) {
+            debugPrint('⚠️ Pending trades load failed: $e');
+          }
         }
       } catch (e) {
         debugPrint('⚠️ Lend state load failed: $e');
@@ -1135,6 +1191,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         final owned = _isCharOwned(ch);
         final borrowed = _isCharBorrowed(ch);
         final lentOut = _isCharLentOut(ch);
+        final pendingTrade = _isCharPendingTrade(ch);
         return GestureDetector(
           onTap: () => _openDetail(ch),
           child: CharacterCard(
@@ -1142,6 +1199,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
             isOwned: owned || borrowed,
             isBorrowed: borrowed,
             isLentOut: lentOut,
+            isPendingTrade: pendingTrade,
             lendReturnDate: borrowed
                 ? (_borrowedCharacters[ch.id]?['return_due_at'] as String?)
                 : null,
@@ -1341,7 +1399,18 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     Navigator.pushNamed(
       context,
       '/character/${ch.id}',
-      arguments: {'isOwned': _isCharOwned(ch)},
+      arguments: {
+        'isOwned': _isCharOwned(ch),
+        'isBorrowed': _isCharBorrowed(ch),
+        'isLentOut': _isCharLentOut(ch),
+        'isPendingTrade': _isCharPendingTrade(ch),
+        'lendInfo':
+            _borrowedCharacters[ch.id] ??
+            (_lentOutCharacterIds.contains(ch.id)
+                ? {'character_id': ch.id}
+                : null),
+        'pendingTradeInfo': _pendingTrades[ch.id],
+      },
     );
   }
 }

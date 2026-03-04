@@ -9,6 +9,7 @@ class CharacterCard extends StatefulWidget {
   final bool isOwned;
   final bool isBorrowed;
   final bool isLentOut;
+  final bool isPendingTrade;
   final String? lendReturnDate;
   final double progress;
 
@@ -18,6 +19,7 @@ class CharacterCard extends StatefulWidget {
     this.isOwned = false,
     this.isBorrowed = false,
     this.isLentOut = false,
+    this.isPendingTrade = false,
     this.lendReturnDate,
     this.progress = 0.0,
   });
@@ -47,7 +49,7 @@ class _CharacterCardState extends State<CharacterCard>
     _glowAnimation = Tween<double>(begin: 0.3, end: 0.7).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
-    if (widget.isOwned && !widget.isLentOut) {
+    if (widget.isOwned && !widget.isLentOut && !widget.isPendingTrade) {
       _glowController.repeat(reverse: true);
     }
   }
@@ -194,8 +196,8 @@ class _CharacterCardState extends State<CharacterCard>
             child: Container(color: Colors.black.withValues(alpha: 0.4)),
           ),
 
-        // Lent-out dimming overlay
-        if (widget.isLentOut)
+        // Lent-out / trade-pending dimming overlay
+        if (widget.isLentOut || widget.isPendingTrade)
           Positioned.fill(
             child: Container(color: Colors.black.withValues(alpha: 0.5)),
           ),
@@ -262,6 +264,36 @@ class _CharacterCardState extends State<CharacterCard>
                     'LENT OUT',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        // TRADE PENDING badge (top-left)
+        if (widget.isPendingTrade)
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.swap_horiz, color: Colors.black, size: 10),
+                  SizedBox(width: 3),
+                  Text(
+                    'TRADE PENDING',
+                    style: TextStyle(
+                      color: Colors.black,
                       fontSize: 8,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
