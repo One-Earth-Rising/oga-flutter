@@ -34,6 +34,7 @@ import 'services/admin_guard_service.dart';
 import 'screens/admin/admin_analytics_screen.dart';
 import 'services/character_service.dart';
 import 'services/notification_service.dart';
+import 'screens/activity_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -230,6 +231,12 @@ class _OgaAppState extends State<OgaApp> {
               builder: (_) => InviteLandingScreen(inviteCode: inviteCode),
             );
           }
+        }
+        // ═══════════════════════════════════════════════════════
+        // ACTIVITY FEED (View All from notification bell)
+        // ═══════════════════════════════════════════════════════
+        if (settings.name == '/activity') {
+          return MaterialPageRoute(builder: (_) => const ActivityScreen());
         }
 
         // ═══════════════════════════════════════════════════════

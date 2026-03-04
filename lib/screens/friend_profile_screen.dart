@@ -5,6 +5,7 @@ import 'character_detail_screen.dart';
 import '../config/oga_storage.dart';
 import '../widgets/character_card.dart';
 import '../widgets/notification_bell_widget.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Authenticated view of a friend's profile and character library.
 /// Navigated to by tapping a friend row in the Friends tab.
@@ -33,6 +34,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   // ── Ownership state (loaded from character_ownership table) ──
   List<String> _ownedCharacterIds = [];
   bool _isLoadingOwnership = true;
+  String? _invitedByName;
 
   FriendProfile get friend => widget.friend;
 
@@ -49,6 +51,34 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     }
 
     final ids = await FriendService.getOwnedCharacterIds(friend.email);
+
+    // Fetch "invited by" info
+    try {
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('invited_by')
+          .eq('email', friend.email)
+          .maybeSingle();
+      final inviteCode = profile?['invited_by'] as String?;
+      if (inviteCode != null && inviteCode.isNotEmpty) {
+        final inviter = await Supabase.instance.client
+            .from('profiles')
+            .select('full_name, first_name, last_name')
+            .eq('invite_code', inviteCode)
+            .maybeSingle();
+        if (inviter != null) {
+          final first = inviter['first_name'] ?? '';
+          final last = inviter['last_name'] ?? '';
+          final full = inviter['full_name'] ?? '';
+          _invitedByName = (first.isNotEmpty || last.isNotEmpty)
+              ? '$first $last'.trim()
+              : full;
+        }
+      }
+    } catch (e) {
+      debugPrint('>>> FriendProfile: invited_by fetch error: $e');
+    }
+
     if (mounted) {
       setState(() {
         _ownedCharacterIds = ids;
@@ -460,6 +490,27 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                               'Joined ${_formatDate(friend.createdAt!)}',
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.25),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (_invitedByName != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.person_add_outlined,
+                              color: neonGreen.withValues(alpha: 0.4),
+                              size: 11,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              'Invited by $_invitedByName',
+                              style: TextStyle(
+                                color: neonGreen.withValues(alpha: 0.4),
                                 fontSize: 11,
                               ),
                             ),

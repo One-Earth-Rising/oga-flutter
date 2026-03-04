@@ -71,6 +71,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   String? _userInviteCode;
   bool _isFetchingInviteCode = false;
 
+  // ── Real ownership history (from DB) ──
+  List<Map<String, dynamic>> _ownershipTimeline = [];
+  bool _isLoadingHistory = true;
+
   @override
   void initState() {
     super.initState();
@@ -90,6 +94,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           : null,
       owned: owned,
     );
+    _loadOwnershipHistory();
   }
 
   @override
@@ -97,6 +102,124 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     _heroPageController.dispose();
     _glowController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadOwnershipHistory() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final events = <Map<String, dynamic>>[];
+      final emails = <String>{};
+
+      // 1. Current owner from character_ownership
+      final ownership = await supabase
+          .from('character_ownership')
+          .select('owner_email, acquired_at, acquired_via')
+          .eq('character_id', ch.id)
+          .maybeSingle();
+
+      if (ownership != null) {
+        emails.add(ownership['owner_email'] as String);
+      }
+
+      // 2. Completed trades involving this character
+      final trades = await supabase
+          .from('trades')
+          .select(
+            'sender_email, receiver_email, offered_character_id, requested_character_id, status, completed_at, created_at',
+          )
+          .or(
+            'offered_character_id.eq.${ch.id},requested_character_id.eq.${ch.id}',
+          )
+          .eq('status', 'completed')
+          .order('completed_at', ascending: false);
+
+      for (final t in trades) {
+        emails.add(t['sender_email'] as String);
+        emails.add(t['receiver_email'] as String);
+      }
+
+      // 3. Lends for this character
+      final lends = await supabase
+          .from('lends')
+          .select(
+            'lender_email, borrower_email, character_id, status, created_at, returned_at',
+          )
+          .eq('character_id', ch.id)
+          .inFilter('status', ['active', 'returned'])
+          .order('created_at', ascending: false);
+
+      for (final l in lends) {
+        emails.add(l['lender_email'] as String);
+        emails.add(l['borrower_email'] as String);
+      }
+
+      // 4. Batch-fetch profiles for all involved users
+      final profileMap = <String, Map<String, dynamic>>{};
+      if (emails.isNotEmpty) {
+        final profiles = await supabase
+            .from('profiles')
+            .select(
+              'email, full_name, first_name, last_name, username, avatar_url',
+            )
+            .inFilter('email', emails.toList());
+        for (final p in profiles) {
+          profileMap[p['email'] as String] = p;
+        }
+      }
+
+      // 5. Build timeline: current owner first
+      if (ownership != null) {
+        final ownerEmail = ownership['owner_email'] as String;
+        events.add({
+          'type': 'owner',
+          'email': ownerEmail,
+          'date': ownership['acquired_at'],
+          'via': ownership['acquired_via'] ?? 'acquired',
+          'isCurrent': true,
+          'profile': profileMap[ownerEmail],
+        });
+      }
+
+      // 6. Add completed trades (most recent first)
+      for (final t in trades) {
+        final fromEmail = t['sender_email'] as String;
+        final toEmail = t['receiver_email'] as String;
+        events.add({
+          'type': 'trade',
+          'fromEmail': fromEmail,
+          'toEmail': toEmail,
+          'date': t['completed_at'] ?? t['created_at'],
+          'fromProfile': profileMap[fromEmail],
+          'toProfile': profileMap[toEmail],
+        });
+      }
+
+      // 7. Add lends
+      for (final l in lends) {
+        final lenderEmail = l['lender_email'] as String;
+        final borrowerEmail = l['borrower_email'] as String;
+        events.add({
+          'type': 'lend',
+          'lenderEmail': lenderEmail,
+          'borrowerEmail': borrowerEmail,
+          'date': l['created_at'],
+          'returnedAt': l['returned_at'],
+          'status': l['status'],
+          'lenderProfile': profileMap[lenderEmail],
+          'borrowerProfile': profileMap[borrowerEmail],
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _ownershipTimeline = events;
+          _isLoadingHistory = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('>>> Ownership history load error: $e');
+      if (mounted) setState(() => _isLoadingHistory = false);
+    }
   }
 
   String get _currentGameLabel {
@@ -581,7 +704,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           // ── OWNERSHIP HISTORY ──────────────────────────
           _buildSectionCard(
             title: 'OWNERSHIP HISTORY',
-            subtitle: '${ch.ownershipHistory.length} OWNERS',
+            subtitle: _isLoadingHistory
+                ? '...'
+                : '${_ownershipTimeline.length} EVENTS',
             child: _buildOwnershipHistory(),
           ),
           const SizedBox(height: 20),
@@ -2530,14 +2655,454 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildOwnershipHistory() {
-    if (ch.ownershipHistory.isEmpty) {
+    // Loading state
+    if (_isLoadingHistory) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Center(child: CircularProgressIndicator(color: _neonGreen)),
+      );
+    }
+
+    // No real data — fall back to mock if available
+    if (_ownershipTimeline.isEmpty && ch.ownershipHistory.isEmpty) {
       return Text(
         'No ownership history recorded.',
         style: TextStyle(color: _pureWhite.withValues(alpha: 0.5)),
       );
     }
 
-    // Reverse so current owner is at top
+    // Use real data if available, otherwise fall back to mock
+    if (_ownershipTimeline.isEmpty) {
+      return _buildMockOwnershipHistory();
+    }
+
+    return Column(
+      children: _ownershipTimeline.asMap().entries.map((entry) {
+        final index = entry.key;
+        final event = entry.value;
+        final isLast = index == _ownershipTimeline.length - 1;
+        final type = event['type'] as String;
+
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Timeline rail ─────────────────────────
+              SizedBox(
+                width: 32,
+                child: Column(
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: index == 0
+                            ? _neonGreen.withValues(alpha: 0.2)
+                            : _voidBlack,
+                        border: Border.all(
+                          color: index == 0
+                              ? _neonGreen
+                              : _ironGrey.withValues(alpha: 0.5),
+                          width: index == 0 ? 2.5 : 1.5,
+                        ),
+                        boxShadow: index == 0
+                            ? [
+                                BoxShadow(
+                                  color: _neonGreen.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: index == 0
+                          ? Center(
+                              child: Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _neonGreen,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                    if (!isLast)
+                      Expanded(
+                        child: Container(
+                          width: 2,
+                          color: _ironGrey.withValues(alpha: 0.25),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // ── Event card ────────────────────────────
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(bottom: isLast ? 0 : 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: index == 0
+                        ? _neonGreen.withValues(alpha: 0.04)
+                        : _voidBlack.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: index == 0
+                          ? _neonGreen.withValues(alpha: 0.2)
+                          : _ironGrey.withValues(alpha: 0.15),
+                    ),
+                  ),
+                  child: _buildTimelineEventContent(event, type, index == 0),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildTimelineEventContent(
+    Map<String, dynamic> event,
+    String type,
+    bool isFirst,
+  ) {
+    switch (type) {
+      case 'owner':
+        final profile = event['profile'] as Map<String, dynamic>?;
+        final name = _profileDisplayName(profile);
+        final avatarUrl = profile?['avatar_url'] as String?;
+        final dateStr = event['date'] as String?;
+        final via = event['via'] as String? ?? 'acquired';
+
+        return Row(
+          children: [
+            _buildHistoryAvatar(avatarUrl, name, isFirst),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            color: _pureWhite,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _neonGreen.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Text(
+                          'CURRENT',
+                          style: TextStyle(
+                            color: _neonGreen,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.verified,
+                        size: 12,
+                        color: _neonGreen.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        dateStr != null
+                            ? '${via[0].toUpperCase()}${via.substring(1)} ${_formatDateStr(dateStr)}'
+                            : via[0].toUpperCase() + via.substring(1),
+                        style: TextStyle(
+                          color: _pureWhite.withValues(alpha: 0.3),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+
+      case 'trade':
+        final fromProfile = event['fromProfile'] as Map<String, dynamic>?;
+        final toProfile = event['toProfile'] as Map<String, dynamic>?;
+        final fromName = _profileDisplayName(fromProfile);
+        final toName = _profileDisplayName(toProfile);
+        final dateStr = event['date'] as String?;
+
+        return Row(
+          children: [
+            Icon(
+              Icons.swap_horiz,
+              size: 20,
+              color: _neonGreen.withValues(alpha: 0.5),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: fromName,
+                          style: const TextStyle(
+                            color: _pureWhite,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                        TextSpan(
+                          text: '  →  ',
+                          style: TextStyle(
+                            color: _neonGreen.withValues(alpha: 0.5),
+                            fontSize: 12,
+                          ),
+                        ),
+                        TextSpan(
+                          text: toName,
+                          style: const TextStyle(
+                            color: _pureWhite,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _neonGreen.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Text(
+                          'TRADE',
+                          style: TextStyle(
+                            color: _neonGreen,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (dateStr != null)
+                        Text(
+                          _formatDateStr(dateStr),
+                          style: TextStyle(
+                            color: _pureWhite.withValues(alpha: 0.3),
+                            fontSize: 10,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+
+      case 'lend':
+        final lenderProfile = event['lenderProfile'] as Map<String, dynamic>?;
+        final borrowerProfile =
+            event['borrowerProfile'] as Map<String, dynamic>?;
+        final lenderName = _profileDisplayName(lenderProfile);
+        final borrowerName = _profileDisplayName(borrowerProfile);
+        final dateStr = event['date'] as String?;
+        final status = event['status'] as String? ?? 'active';
+        final isActive = status == 'active';
+
+        return Row(
+          children: [
+            Icon(
+              Icons.handshake_outlined,
+              size: 20,
+              color: isActive ? const Color(0xFF00BCD4) : _ironGrey,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: lenderName,
+                          style: const TextStyle(
+                            color: _pureWhite,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                        TextSpan(
+                          text: '  →  ',
+                          style: TextStyle(
+                            color: const Color(
+                              0xFF00BCD4,
+                            ).withValues(alpha: 0.5),
+                            fontSize: 12,
+                          ),
+                        ),
+                        TextSpan(
+                          text: borrowerName,
+                          style: const TextStyle(
+                            color: _pureWhite,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              (isActive ? const Color(0xFF00BCD4) : _ironGrey)
+                                  .withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          isActive ? 'LEND · ACTIVE' : 'LEND · RETURNED',
+                          style: TextStyle(
+                            color: isActive
+                                ? const Color(0xFF00BCD4)
+                                : _ironGrey,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (dateStr != null)
+                        Text(
+                          _formatDateStr(dateStr),
+                          style: TextStyle(
+                            color: _pureWhite.withValues(alpha: 0.3),
+                            fontSize: 10,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildHistoryAvatar(String? avatarUrl, String name, bool isCurrent) {
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isCurrent ? _neonGreen : _ironGrey,
+          width: isCurrent ? 1.5 : 1,
+        ),
+      ),
+      child: ClipOval(
+        child: avatarUrl != null && avatarUrl.isNotEmpty
+            ? Image.network(
+                avatarUrl,
+                width: 36,
+                height: 36,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _buildInitialCircle(initial),
+              )
+            : _buildInitialCircle(initial),
+      ),
+    );
+  }
+
+  Widget _buildInitialCircle(String initial) {
+    return Container(
+      width: 36,
+      height: 36,
+      color: _deepCharcoal,
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: _neonGreen,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _profileDisplayName(Map<String, dynamic>? profile) {
+    if (profile == null) return 'Unknown';
+    final first = profile['first_name'] as String? ?? '';
+    final last = profile['last_name'] as String? ?? '';
+    final username = profile['username'] as String? ?? '';
+    final full = profile['full_name'] as String? ?? '';
+    if (first.isNotEmpty || last.isNotEmpty) return '$first $last'.trim();
+    if (username.isNotEmpty) return '@$username';
+    if (full.isNotEmpty) return full;
+    return profile['email'] as String? ?? 'Unknown';
+  }
+
+  String _formatDateStr(String dateStr) {
+    try {
+      final dt = DateTime.parse(dateStr);
+      return _formatDate(dt);
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  /// Fallback: renders mock ownership data from OGACharacter model
+  Widget _buildMockOwnershipHistory() {
     final owners = ch.ownershipHistory.reversed.toList();
 
     return Column(
@@ -2550,12 +3115,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Timeline rail ─────────────────────────
               SizedBox(
                 width: 32,
                 child: Column(
                   children: [
-                    // Node
                     Container(
                       width: 16,
                       height: 16,
@@ -2592,7 +3155,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                             )
                           : null,
                     ),
-                    // Connector line
                     if (!isLast)
                       Expanded(
                         child: Container(
@@ -2603,8 +3165,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   ],
                 ),
               ),
-
-              // ── Owner card ────────────────────────────
               Expanded(
                 child: Container(
                   margin: EdgeInsets.only(bottom: isLast ? 0 : 12),
@@ -2622,7 +3182,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   ),
                   child: Row(
                     children: [
-                      // Avatar
                       OgaAvatarImage(
                         url: owner.avatarUrl,
                         size: 36,
@@ -2633,7 +3192,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                         borderWidth: owner.isCurrent ? 1.5 : 0,
                       ),
                       const SizedBox(width: 12),
-                      // Info
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2680,7 +3238,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                // Event icon
                                 Icon(
                                   owner.isCurrent
                                       ? Icons.verified

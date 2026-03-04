@@ -56,7 +56,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
     {'label': 'ALL', 'value': 'all'},
     {'label': 'TRADES', 'value': 'trade'},
     {'label': 'LENDS', 'value': 'lend'},
-    {'label': 'FRIENDS', 'value': 'friend'},
+    {'label': 'REQUESTS', 'value': 'friend'},
     {'label': 'SYSTEM', 'value': 'system'},
   ];
 
