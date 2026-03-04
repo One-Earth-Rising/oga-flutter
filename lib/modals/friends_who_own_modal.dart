@@ -122,7 +122,7 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
       // Source A: character_ownership table
       final ownershipRows = await supabase
           .from('character_ownership')
-          .select('owner_email, character_id, acquired_at, progress')
+          .select('owner_email, character_id, acquired_at')
           .inFilter('owner_email', friendEmails.toList())
           .ilike('character_id', '$baseId%');
 
@@ -204,7 +204,7 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
             characterId: ownership['character_id'] as String? ?? ch.id,
             acquiredAt: acquiredAt,
             progress:
-                ((ownership['progress'] as num?)?.toDouble() ?? 0.0) / 100,
+                0.0, // TODO: wire to portal_pass or character_ownership once column exists
           ),
         );
       }
