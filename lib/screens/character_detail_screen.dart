@@ -110,16 +110,15 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       final events = <Map<String, dynamic>>[];
       final emails = <String>{};
 
-      // 1. Current owner from character_ownership
-      final ownership = await supabase
+      // 1. All owners from character_ownership
+      final ownershipRows = await supabase
           .from('character_ownership')
           .select('owner_email, acquired_at, acquired_via, status')
           .eq('character_id', ch.id)
-          .eq('status', 'active')
-          .maybeSingle();
+          .order('acquired_at', ascending: false);
 
-      if (ownership != null) {
-        emails.add(ownership['owner_email'] as String);
+      for (final row in ownershipRows) {
+        emails.add(row['owner_email'] as String);
       }
 
       // 2. Completed trades involving this character
@@ -168,15 +167,17 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
         }
       }
 
-      // 5. Build timeline: current owner first
-      if (ownership != null) {
-        final ownerEmail = ownership['owner_email'] as String;
+      // 5. Build timeline: all ownership records
+      for (int i = 0; i < ownershipRows.length; i++) {
+        final row = ownershipRows[i];
+        final ownerEmail = row['owner_email'] as String;
+        final isActive = row['status'] == 'active';
         events.add({
           'type': 'owner',
           'email': ownerEmail,
-          'date': ownership['acquired_at'],
-          'via': ownership['acquired_via'] ?? 'acquired',
-          'isCurrent': true,
+          'date': row['acquired_at'],
+          'via': row['acquired_via'] ?? 'acquired',
+          'isCurrent': i == 0 && isActive,
           'profile': profileMap[ownerEmail],
         });
       }
