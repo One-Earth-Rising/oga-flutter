@@ -1668,7 +1668,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       final supabase = Supabase.instance.client;
 
       // Use RPC to execute the trade atomically (swap ownership)
-      await supabase.rpc('execute_trade', params: {'trade_id': tradeId});
+      await supabase.rpc('execute_trade', params: {'p_trade_id': tradeId});
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2831,8 +2831,12 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () =>
-                      TradeProposalModal.show(context, characterId: ch.id),
+                  onPressed: widget.isBorrowed
+                      ? null
+                      : () => TradeProposalModal.show(
+                          context,
+                          characterId: ch.id,
+                        ),
                   icon: const Icon(Icons.swap_horiz, size: 18),
                   label: const Text(
                     'TRADE',
@@ -2855,8 +2859,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () =>
-                      LendProposalModal.show(context, characterId: ch.id),
+                  onPressed: widget.isBorrowed
+                      ? null
+                      : () =>
+                            LendProposalModal.show(context, characterId: ch.id),
                   icon: Icon(
                     Icons.handshake_outlined,
                     size: 18,

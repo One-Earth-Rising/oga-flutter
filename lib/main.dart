@@ -35,6 +35,7 @@ import 'screens/admin/admin_analytics_screen.dart';
 import 'services/character_service.dart';
 import 'services/notification_service.dart';
 import 'screens/activity_screen.dart';
+import 'dart:math';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -360,6 +361,27 @@ class _OgaAppState extends State<OgaApp> {
     );
   }
 
+  static Future<String> _assignFBSStarterCharacter(String email) async {
+    final fbsCharacters = ['bigwell', 'brumblebutt', 'caustica', 'melsh'];
+    final characterId = fbsCharacters[Random().nextInt(fbsCharacters.length)];
+
+    await Supabase.instance.client
+        .from('profiles')
+        .update({'starter_character': characterId})
+        .eq('email', email);
+
+    await Supabase.instance.client.from('character_ownership').insert({
+      'owner_email': email,
+      'character_id': characterId,
+      'acquired_via': 'invite_signup',
+      'acquired_at': DateTime.now().toIso8601String(),
+      'status': 'active',
+      'is_lent_out': false,
+    });
+
+    debugPrint('🎮 Assigned FBS starter character: $characterId to $email');
+    return characterId;
+  }
   // ═══════════════════════════════════════════════════════════
   // LANDING PAGE LOGIC
   // ═══════════════════════════════════════════════════════════
@@ -524,10 +546,17 @@ class _OgaAppState extends State<OgaApp> {
                 );
                 final inviterName = inviterProfile?.displayName ?? 'a friend';
 
+                // Assign FBS character if user doesn't have one yet
+                final rawStarter = response?['starter_character']?.toString();
+                final assignedCharacter =
+                    (rawStarter == null || rawStarter.isEmpty)
+                    ? await _assignFBSStarterCharacter(user.email!)
+                    : rawStarter;
+
                 debugPrint('🎉 Routing to invite welcome screen');
                 return InviteWelcomeScreen(
                   sessionId: sessionId,
-                  characterId: character,
+                  characterId: assignedCharacter,
                   inviterName: inviterName,
                   inviteCode: pendingInvite,
                 );
@@ -696,12 +725,19 @@ class _OgaAppState extends State<OgaApp> {
               );
               final inviterName = inviterProfile?.displayName ?? 'a friend';
 
+              // Assign FBS character if user doesn't have one yet
+              final rawStarter = response?['starter_character']?.toString();
+              final assignedCharacter =
+                  (rawStarter == null || rawStarter.isEmpty)
+                  ? await _assignFBSStarterCharacter(existingUser.email!)
+                  : rawStarter;
+
               debugPrint(
                 '🎉 Routing to invite welcome screen (existing session)',
               );
               return InviteWelcomeScreen(
                 sessionId: sessionId,
-                characterId: character,
+                characterId: assignedCharacter,
                 inviterName: inviterName,
                 inviteCode: pendingInvite,
               );
