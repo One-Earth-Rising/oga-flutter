@@ -4,6 +4,7 @@ import '../services/friend_service.dart';
 import 'character_detail_screen.dart';
 import '../config/oga_storage.dart';
 import '../widgets/character_card.dart';
+import '../widgets/notification_bell_widget.dart';
 
 /// Authenticated view of a friend's profile and character library.
 /// Navigated to by tapping a friend row in the Friends tab.
@@ -310,6 +311,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          // Notification bell
+          const NotificationBellWidget(),
+          const SizedBox(width: 8),
           // Friend badge / View Friends Button
           GestureDetector(
             onTap: _showFriendsListModal,

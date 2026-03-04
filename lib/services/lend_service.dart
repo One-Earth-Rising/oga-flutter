@@ -118,6 +118,7 @@ class LendService {
             'and(requester_email.eq.$email,receiver_email.eq.$borrowerEmail),'
             'and(requester_email.eq.$borrowerEmail,receiver_email.eq.$email)',
           )
+          .limit(1)
           .maybeSingle();
 
       if (friendship == null) return 'You must be friends to lend';
@@ -129,6 +130,7 @@ class LendService {
           .eq('character_id', characterId)
           .eq('status', 'active')
           .eq('is_lent_out', false)
+          .limit(1)
           .maybeSingle();
 
       if (ownership == null)
@@ -140,6 +142,7 @@ class LendService {
           .eq('lender_email', email)
           .eq('character_id', characterId)
           .inFilter('status', ['pending', 'requested', 'active'])
+          .limit(1)
           .maybeSingle();
 
       if (activeLend != null)
@@ -207,6 +210,7 @@ class LendService {
             'and(requester_email.eq.$email,receiver_email.eq.$ownerEmail),'
             'and(requester_email.eq.$ownerEmail,receiver_email.eq.$email)',
           )
+          .limit(1)
           .maybeSingle();
 
       if (friendship == null) return 'You must be friends to request a lend';
@@ -219,6 +223,7 @@ class LendService {
           .eq('character_id', characterId)
           .eq('status', 'active')
           .eq('is_lent_out', false)
+          .limit(1)
           .maybeSingle();
 
       if (ownership == null) {
@@ -233,6 +238,7 @@ class LendService {
           .eq('borrower_email', email)
           .eq('character_id', characterId)
           .inFilter('status', ['pending', 'requested', 'active'])
+          .limit(1)
           .maybeSingle();
 
       if (existing != null) {

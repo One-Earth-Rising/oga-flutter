@@ -26,6 +26,7 @@ import '../services/analytics_service.dart';
 import '../modals/trade_proposal_modal.dart';
 import '../modals/lend_proposal_modal.dart';
 import '../modals/get_character_modal.dart';
+import '../widgets/notification_bell_widget.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -154,11 +155,16 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           backgroundColor: _voidBlack,
           leading: _buildBackButton(),
           actions: [
-            if (!isGuest)
+            if (!isGuest) ...[
+              const Padding(
+                padding: EdgeInsets.only(right: 4),
+                child: NotificationBellWidget(),
+              ),
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: _buildShareButton(),
               ),
+            ],
           ],
           flexibleSpace: FlexibleSpaceBar(
             background: _buildHeroSection(isDesktop: false),
@@ -489,7 +495,11 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             children: [
               _buildBackButton(),
               const Spacer(),
-              if (!isGuest) _buildShareButton(),
+              if (!isGuest) ...[
+                const NotificationBellWidget(),
+                const SizedBox(width: 8),
+                _buildShareButton(),
+              ],
             ],
           ),
         ),

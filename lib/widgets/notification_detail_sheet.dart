@@ -14,6 +14,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/notification_service.dart';
+import '../models/oga_character.dart';
 
 const Color _voidBlack = Color(0xFF000000);
 const Color _deepCharcoal = Color(0xFF121212);
@@ -567,35 +568,60 @@ class _DetailSheetState extends State<_DetailSheet> {
 
   // ─── SHARED HELPERS ──────────────────────────────────────────────
 
+  /// Resolves a character ID to its OGACharacter data (name + image).
   Widget _buildCharacterRow({
     required String label,
     required String characterId,
     required Color color,
   }) {
-    // Display character ID — in future, resolve to name + image from character data
-    final displayName = characterId.isNotEmpty
-        ? characterId.replaceAll('_', ' ').toUpperCase()
-        : 'UNKNOWN';
+    final character = OGACharacter.fromId(characterId);
+    final displayName = character.name.toUpperCase();
+    final heroImg = character.heroImage;
+    final thumbImg = character.thumbnailImage;
+    // Prefer thumbnail, fall back to hero
+    final imgPath = thumbImg.isNotEmpty ? thumbImg : heroImg;
+    final ipName = character.ip != 'Unknown' ? character.ip : null;
 
     return Row(
       children: [
+        // Character thumbnail or fallback initial
         Container(
-          width: 44,
-          height: 44,
+          width: 52,
+          height: 52,
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: color.withValues(alpha: 0.2)),
           ),
-          child: Center(
-            child: Text(
-              displayName.isNotEmpty ? displayName[0] : '?',
-              style: TextStyle(
-                color: color,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: imgPath.isNotEmpty
+                ? Image.network(
+                    imgPath,
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Text(
+                        displayName.isNotEmpty ? displayName[0] : '?',
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      displayName.isNotEmpty ? displayName[0] : '?',
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
           ),
         ),
         const SizedBox(width: 12),
@@ -612,7 +638,7 @@ class _DetailSheetState extends State<_DetailSheet> {
                   letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 displayName,
                 style: const TextStyle(
@@ -621,6 +647,17 @@ class _DetailSheetState extends State<_DetailSheet> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              if (ipName != null && ipName.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  ipName,
+                  style: TextStyle(
+                    color: _pureWhite.withValues(alpha: 0.3),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

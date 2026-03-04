@@ -208,21 +208,18 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
                         ),
                         if (hasUnread)
                           Positioned(
-                            top: -2, // Adjusted to sit perfectly on the border
-                            right: -2,
+                            top: 0,
+                            right: 0,
                             child: Container(
-                              width: 10,
-                              height: 10,
+                              width: 9,
+                              height: 9,
                               decoration: BoxDecoration(
                                 color: _neonGreen,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: _voidBlack, width: 2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _neonGreen.withValues(alpha: 0.5),
-                                    blurRadius: 4,
-                                  ),
-                                ],
+                                border: Border.all(
+                                  color: _voidBlack,
+                                  width: 1.5,
+                                ),
                               ),
                             ),
                           ),
@@ -305,12 +302,6 @@ class _NotificationDropdownPanelState
         } catch (e) {
           debugPrint('!!! Avatar fetch error: $e');
         }
-      }
-      if (mounted) {
-        setState(() {
-          _notifications = all;
-          _isLoading = false;
-        });
       }
       if (mounted) {
         setState(() {
@@ -494,14 +485,18 @@ class _NotificationDropdownPanelState
     final showButtons = _shouldShowButtons(notification);
 
     if (showButtons) {
-      // ─── ACTIONABLE: no outer tap handler ─────────────────
+      // ─── ACTIONABLE: info row tappable for detail, buttons stay ───
       return Container(
         color: _neonGreen.withValues(alpha: 0.05),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow(notification, isUnread: true),
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => _openDetailSheet(notification),
+              child: _buildInfoRow(notification, isUnread: true),
+            ),
             const SizedBox(height: 8),
             _buildInlineActions(notification),
           ],
@@ -792,6 +787,17 @@ class _NotificationDropdownPanelState
   // ═══════════════════════════════════════════════════════════════
   // ACTIONS
   // ═══════════════════════════════════════════════════════════════
+
+  /// Opens detail sheet WITHOUT marking read (buttons stay visible).
+  void _openDetailSheet(OGANotification notification) {
+    if (!mounted) return;
+    NotificationDetailSheet.show(
+      context,
+      notification: notification,
+      onAccept: () => _handleAccept(notification),
+      onDecline: () => _handleDecline(notification),
+    );
+  }
 
   Future<void> _handleTap(OGANotification notification) async {
     if (!notification.isRead) {

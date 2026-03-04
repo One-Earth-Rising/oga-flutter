@@ -27,6 +27,7 @@ import '../services/trade_service.dart';
 import '../services/lend_service.dart';
 import '../services/friend_service.dart';
 import '../widgets/notification_detail_sheet.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 const Color _voidBlack = Color(0xFF000000);
 const Color _deepCharcoal = Color(0xFF121212);
@@ -49,6 +50,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   String _selectedCategory = 'all';
   bool _isLoading = true;
   final Set<String> _actedOnIds = {};
+  final Map<String, Map<String, dynamic>> _avatarCache = {};
 
   static const _categories = [
     {'label': 'ALL', 'value': 'all'},
@@ -77,6 +79,30 @@ class _ActivityScreenState extends State<ActivityScreen> {
     try {
       final all = await NotificationService.getAll(limit: 50);
       debugPrint('>>> ACTIVITY: Loaded ${all.length} notifications');
+
+      // Batch-fetch sender avatars
+      final senderEmails = all
+          .where((n) => n.senderEmail != null && n.senderEmail!.isNotEmpty)
+          .map((n) => n.senderEmail!)
+          .toSet()
+          .where((e) => !_avatarCache.containsKey(e))
+          .toList();
+
+      if (senderEmails.isNotEmpty) {
+        try {
+          final profiles = await Supabase.instance.client
+              .from('profiles')
+              .select('email, avatar_url, full_name')
+              .inFilter('email', senderEmails);
+          for (final p in profiles) {
+            final email = p['email'] as String?;
+            if (email != null) _avatarCache[email] = p;
+          }
+        } catch (e) {
+          debugPrint('>>> ACTIVITY: avatar fetch error: $e');
+        }
+      }
+
       if (mounted) {
         setState(() {
           _allNotifications = all;
@@ -243,7 +269,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildInfoRow(notification, isUnread: true),
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => _openDetailSheet(notification),
+              child: _buildInfoRow(notification, isUnread: true),
+            ),
             const SizedBox(height: 10),
             _buildInlineActions(notification),
           ],
@@ -378,9 +408,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
     }
 
     if (notification.senderEmail != null &&
-        notification.senderEmail!.isNotEmpty &&
-        _isActionableType(notification.type)) {
-      final initial = notification.senderEmail!.substring(0, 1).toUpperCase();
+        notification.senderEmail!.isNotEmpty) {
+      final profile = _avatarCache[notification.senderEmail];
+      final avatarUrl = profile?['avatar_url'] as String?;
+      final fullName = profile?['full_name'] as String? ?? '';
+      final initial = fullName.isNotEmpty
+          ? fullName[0].toUpperCase()
+          : notification.senderEmail!.substring(0, 1).toUpperCase();
+
       return Container(
         width: 40,
         height: 40,
@@ -389,15 +424,35 @@ class _ActivityScreenState extends State<ActivityScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
-        child: Center(
-          child: Text(
-            initial,
-            style: TextStyle(
-              color: color,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: avatarUrl != null && avatarUrl.isNotEmpty
+              ? Image.network(
+                  avatarUrl,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _err) => Center(
+                    child: Text(
+                      initial,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                )
+              : Center(
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
         ),
       );
     }
@@ -512,6 +567,17 @@ class _ActivityScreenState extends State<ActivityScreen> {
   // ACTIONS
   // ═══════════════════════════════════════════════════════════════
 
+  /// Opens detail sheet WITHOUT marking read (buttons stay visible on return).
+  void _openDetailSheet(OGANotification notification) {
+    if (!mounted) return;
+    NotificationDetailSheet.show(
+      context,
+      notification: notification,
+      onAccept: () => _handleAccept(notification),
+      onDecline: () => _handleDecline(notification),
+    );
+  }
+
   Future<void> _handleTap(OGANotification notification) async {
     if (!notification.isRead) {
       await NotificationService.markRead(notification.id);
@@ -547,6 +613,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
       case 'lend_proposed':
         result = await LendService.acceptLend(notification.referenceId);
         successMsg = 'Lend accepted! Character added to your library.';
+      case 'lend_requested':
+        result = await LendService.acceptLendRequest(notification.referenceId);
+        successMsg = 'Lend request approved! Character sent to borrower.';
       case 'friend_request':
         final ok = await FriendService.acceptRequest(notification.referenceId);
         result = ok ? 'success' : 'Failed to accept friend request';
@@ -588,6 +657,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
       case 'lend_proposed':
         result = await LendService.declineLend(notification.referenceId);
         successMsg = 'Lend declined.';
+      case 'lend_requested':
+        result = await LendService.declineLendRequest(notification.referenceId);
+        successMsg = 'Lend request declined.';
       case 'friend_request':
         final ok = await FriendService.declineRequest(notification.referenceId);
         result = ok ? 'success' : 'Failed to decline friend request';

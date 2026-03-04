@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/friend_service.dart';
 import '../services/analytics_service.dart';
+import '../widgets/notification_bell_widget.dart';
 
 /// Share Profile / Recruit Agents screen.
 /// Shows QR code, invite code, share link, and referral reward.
@@ -78,6 +79,12 @@ class _ShareProfileScreenState extends State<ShareProfileScreen> {
             letterSpacing: 2,
           ),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: NotificationBellWidget(),
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: neonGreen))
