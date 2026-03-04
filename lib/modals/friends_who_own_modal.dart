@@ -114,10 +114,12 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
         return;
       }
 
-      // Step 2: Find friends who own this character (match base character name)
-      // character_id may be 'guggimon', 'guggimon_fortnite', etc.
-      // Use ilike to match any version of this character
+      // Step 2: Find friends who own this character from TWO sources:
+      //   A) character_ownership table (trades, grants)
+      //   B) profiles.starter_character (onboarding acquisition)
       final baseId = ch.id.toLowerCase();
+
+      // Source A: character_ownership table
       final ownershipRows = await supabase
           .from('character_ownership')
           .select('owner_email, character_id, acquired_at, is_active')
@@ -125,8 +127,34 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
           .inFilter('owner_email', friendEmails.toList())
           .ilike('character_id', '$baseId%');
 
+      // Source B: profiles.starter_character (friends whose starter matches)
+      final starterProfiles = await supabase
+          .from('profiles')
+          .select('email, starter_character, created_at')
+          .inFilter('email', friendEmails.toList())
+          .ilike('starter_character', '$baseId%');
+
+      // Merge: build a unified list, deduplicating by email
+      final ownerEmailsFromTable = ownershipRows
+          .map((r) => r['owner_email'] as String)
+          .toSet();
+
+      // Add starter_character owners as synthetic ownership rows
+      final allOwnershipRows = [...ownershipRows];
+      for (final sp in starterProfiles) {
+        final email = sp['email'] as String? ?? '';
+        if (email.isNotEmpty && !ownerEmailsFromTable.contains(email)) {
+          allOwnershipRows.add({
+            'owner_email': email,
+            'character_id': sp['starter_character'] as String? ?? baseId,
+            'acquired_at': sp['created_at']?.toString() ?? '',
+            'is_active': true,
+          });
+        }
+      }
+
       // Step 3: Batch-fetch profiles for those friends
-      final ownerEmails = ownershipRows
+      final ownerEmails = allOwnershipRows
           .map((r) => r['owner_email'] as String)
           .toSet();
       final profileMap = <String, Map<String, dynamic>>{};
@@ -146,7 +174,7 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
 
       // Step 4: Build display rows
       final rows = <_FriendOwnerRow>[];
-      for (final ownership in ownershipRows) {
+      for (final ownership in allOwnershipRows) {
         final email = ownership['owner_email'] as String;
         final profile = profileMap[email];
         final acquiredStr = ownership['acquired_at']?.toString() ?? '';
