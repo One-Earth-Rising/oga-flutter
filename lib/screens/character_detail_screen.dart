@@ -113,8 +113,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       // 1. Current owner from character_ownership
       final ownership = await supabase
           .from('character_ownership')
-          .select('owner_email, acquired_at, acquired_via')
+          .select('owner_email, acquired_at, acquired_via, status')
           .eq('character_id', ch.id)
+          .eq('status', 'active')
           .maybeSingle();
 
       if (ownership != null) {
@@ -125,16 +126,16 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       final trades = await supabase
           .from('trades')
           .select(
-            'sender_email, receiver_email, offered_character_id, requested_character_id, status, completed_at, created_at',
+            'proposer_email, receiver_email, offered_character_id, requested_character_id, status, proposed_at, responded_at',
           )
           .or(
             'offered_character_id.eq.${ch.id},requested_character_id.eq.${ch.id}',
           )
-          .eq('status', 'completed')
-          .order('completed_at', ascending: false);
+          .eq('status', 'accepted')
+          .order('responded_at', ascending: false);
 
       for (final t in trades) {
-        emails.add(t['sender_email'] as String);
+        emails.add(t['proposer_email'] as String);
         emails.add(t['receiver_email'] as String);
       }
 
@@ -142,11 +143,11 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       final lends = await supabase
           .from('lends')
           .select(
-            'lender_email, borrower_email, character_id, status, created_at, returned_at',
+            'lender_email, borrower_email, character_id, status, proposed_at, accepted_at, returned_at',
           )
           .eq('character_id', ch.id)
           .inFilter('status', ['active', 'returned'])
-          .order('created_at', ascending: false);
+          .order('proposed_at', ascending: false);
 
       for (final l in lends) {
         emails.add(l['lender_email'] as String);
@@ -182,13 +183,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
       // 6. Add completed trades (most recent first)
       for (final t in trades) {
-        final fromEmail = t['sender_email'] as String;
+        final fromEmail = t['proposer_email'] as String;
         final toEmail = t['receiver_email'] as String;
         events.add({
           'type': 'trade',
           'fromEmail': fromEmail,
           'toEmail': toEmail,
-          'date': t['completed_at'] ?? t['created_at'],
+          'date': t['responded_at'] ?? t['proposed_at'],
           'fromProfile': profileMap[fromEmail],
           'toProfile': profileMap[toEmail],
         });
@@ -202,13 +203,15 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           'type': 'lend',
           'lenderEmail': lenderEmail,
           'borrowerEmail': borrowerEmail,
-          'date': l['created_at'],
+          'date': l['accepted_at'] ?? l['proposed_at'],
           'returnedAt': l['returned_at'],
           'status': l['status'],
           'lenderProfile': profileMap[lenderEmail],
           'borrowerProfile': profileMap[borrowerEmail],
         });
       }
+
+      debugPrint('>>> Ownership history: ${events.length} events for ${ch.id}');
 
       if (mounted) {
         setState(() {
