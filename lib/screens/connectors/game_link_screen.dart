@@ -33,6 +33,15 @@ class GameLinkScreen extends StatefulWidget {
 
   const GameLinkScreen({super.key, this.prefillCode});
 
+  static Future<void> show(BuildContext context, {String? prefillCode}) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => GameLinkScreen(prefillCode: prefillCode),
+    );
+  }
+
   @override
   State<GameLinkScreen> createState() => _GameLinkScreenState();
 }
@@ -221,90 +230,98 @@ class _GameLinkScreenState extends State<GameLinkScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.6),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
-          child: Container(
-            margin: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: _void,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _iron),
+    final screenHeight = MediaQuery.of(context).size.height;
+    return Container(
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.88),
+      decoration: const BoxDecoration(
+        color: _void,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(
+          top: BorderSide(color: _iron),
+          left: BorderSide(color: _iron),
+          right: BorderSide(color: _iron),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 4),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _iron,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+          ),
+          // Top bar: logo + label + X
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 16, 0),
+            child: Row(
               children: [
-                // ── Top bar ──
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 16, 0),
-                  child: Row(
-                    children: [
-                      // OGA logo
-                      Image.network(
-                        'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/campaign-assets/fbs_launch/oga_logo.png',
-                        height: 32,
-                        errorBuilder: (_, __, ___) => const Text(
-                          'OGA',
-                          style: TextStyle(
-                            color: _neonGreen,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 4,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        'LINK ACCOUNT',
-                        style: TextStyle(
-                          color: _white.withValues(alpha: 0.3),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.close,
-                          color: Colors.white38,
-                          size: 20,
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(color: _iron, height: 1),
-                // ── Tab bar ──
-                if (_linkState != _LinkState.success)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                    child: Row(
-                      children: [
-                        _buildTab(0, Icons.keyboard, 'ENTER CODE'),
-                        const SizedBox(width: 8),
-                        _buildTab(1, Icons.qr_code_scanner, 'SCAN QR'),
-                      ],
+                Image.network(
+                  'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-filles/oga_logo.png',
+                  height: 28,
+                  errorBuilder: (_, __, _e) => const Text(
+                    'OGA',
+                    style: TextStyle(
+                      color: _neonGreen,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 4,
                     ),
                   ),
-                // ── Content ──
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: _linkState == _LinkState.success
-                        ? _buildSuccessState()
-                        : (_activeTab == 0
-                              ? _buildEntryState()
-                              : _buildQrScanState()),
+                ),
+                const Spacer(),
+                Text(
+                  'LINK ACCOUNT',
+                  style: TextStyle(
+                    color: _white.withValues(alpha: 0.3),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2,
                   ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.white38,
+                    size: 20,
+                  ),
+                  onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
           ),
-        ),
+          const Divider(color: _iron, height: 1),
+          // Tab bar (hidden on success)
+          if (_linkState != _LinkState.success)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+              child: Row(
+                children: [
+                  _buildTab(0, Icons.keyboard, 'ENTER CODE'),
+                  const SizedBox(width: 8),
+                  _buildTab(1, Icons.qr_code_scanner, 'SCAN QR'),
+                ],
+              ),
+            ),
+          // Content
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: _linkState == _LinkState.success
+                  ? _buildSuccessState()
+                  : (_activeTab == 0
+                        ? _buildEntryState()
+                        : _buildQrScanState()),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -9,6 +9,7 @@ import '../../services/analytics_service.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import '../connectors/playstation_connector_modal.dart';
+import '../connectors/game_link_screen.dart';
 
 /// Account settings modal.
 /// Desktop: Centered overlay with sidebar navigation + content panel.
@@ -607,7 +608,7 @@ class _SettingsModalState extends State<SettingsModal> {
           name: 'Link a Game',
           status: 'Enter in-game code or scan QR code',
           isConnected: false,
-          onTap: () => Navigator.pushNamed(context, '/link'),
+          onTap: () => GameLinkScreen.show(context),
         ),
         _buildConnectRow(
           icon: Icons.sports_esports,
