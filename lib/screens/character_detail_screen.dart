@@ -391,6 +391,37 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     }
   }
 
+  Future<void> _returnBorrowed() async {
+    final lendId = widget.lendInfo?['id'] as String?;
+    if (lendId == null) {
+      _showSnackError('Lend record not found.');
+      return;
+    }
+
+    final confirmed = await _showConfirmDialog(
+      'RETURN CHARACTER',
+      'Return ${ch.name} early to ${_profileDisplayName(_lendCounterpartyProfile)}? '
+          'You will lose access immediately.',
+      confirmText: 'RETURN',
+      confirmColor: _lendCyan,
+    );
+    if (!confirmed) return;
+
+    final result = await LendService.returnEarly(lendId);
+    if (result == 'success' && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${ch.name} returned successfully.'),
+          backgroundColor: _lendCyan,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.of(context).pop({'lendResolved': true});
+    } else {
+      _showSnackError(result);
+    }
+  }
+
   Future<void> _recallLend() async {
     final confirmed = await _showConfirmDialog(
       'RECALL CHARACTER',
@@ -1181,6 +1212,30 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               color: _pureWhite.withValues(alpha: 0.4),
               fontSize: 12,
               height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _returnBorrowed(),
+              icon: Icon(Icons.keyboard_return, size: 16, color: _lendCyan),
+              label: const Text(
+                'RETURN EARLY',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _lendCyan,
+                side: BorderSide(color: _lendCyan.withValues(alpha: 0.5)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
           ),
         ],
