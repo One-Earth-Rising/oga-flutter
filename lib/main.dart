@@ -116,9 +116,9 @@ class _OgaAppState extends State<OgaApp> {
               isBorrowed: args?['isBorrowed'] ?? false,
               isLentOut: args?['isLentOut'] ?? false,
               isPendingTrade: args?['isPendingTrade'] ?? false,
-              lendInfo: args?['lendInfo'] as Map<String, dynamic>?,
-              pendingTradeInfo:
-                  args?['pendingTradeInfo'] as Map<String, dynamic>?,
+              lendInfo: args?['lendInfo'],
+              pendingTradeInfo: args?['pendingTradeInfo'],
+              assetId: args?['assetId'] as String?,
               ownerEmail: args?['ownerEmail'] as String?,
               ownerName: args?['ownerName'] as String?,
             ),

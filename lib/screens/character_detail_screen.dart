@@ -51,6 +51,7 @@ class CharacterDetailScreen extends StatefulWidget {
   final String? inviterName;
   final String? ownerEmail;
   final String? ownerName;
+  final String? assetId;
   const CharacterDetailScreen({
     super.key,
     required this.character,
@@ -64,6 +65,7 @@ class CharacterDetailScreen extends StatefulWidget {
     this.inviterName,
     this.ownerEmail,
     this.ownerName,
+    this.assetId,
   });
 
   @override
@@ -91,6 +93,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   // Cached invite code for share URL generation
   String? _userInviteCode;
   bool _isFetchingInviteCode = false;
+
+  // ── Asset ID for this specific OGA instance ──
+  String? _assetId;
 
   // ── Real ownership history (from DB) ──
   List<Map<String, dynamic>> _ownershipTimeline = [];
@@ -129,6 +134,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           : null,
       owned: owned,
     );
+    _assetId = widget.assetId;
     _loadOwnershipHistory();
     _loadCounterpartyProfiles();
   }
@@ -149,8 +155,8 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       // 1. All owners from character_ownership
       final ownershipRows = await supabase
           .from('character_ownership')
-          .select('owner_email, acquired_at, acquired_via, status')
-          .eq('character_id', ch.id)
+          .select('owner_email, acquired_at, acquired_via, status, asset_id')
+          .eq('asset_id', _assetId ?? '')
           .order('acquired_at', ascending: false);
 
       for (final row in ownershipRows) {
