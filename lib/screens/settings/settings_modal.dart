@@ -605,7 +605,7 @@ class _SettingsModalState extends State<SettingsModal> {
         _buildConnectRow(
           icon: Icons.link,
           name: 'Link a Game',
-          status: 'Enter in-game code or scan QR',
+          status: 'Enter in-game code or scan QR code',
           isConnected: false,
           onTap: () => Navigator.pushNamed(context, '/link'),
         ),

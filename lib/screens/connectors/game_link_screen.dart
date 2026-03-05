@@ -26,6 +26,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class GameLinkScreen extends StatefulWidget {
   final String? prefillCode;
@@ -51,9 +52,9 @@ class _GameLinkScreenState extends State<GameLinkScreen>
   bool _isSubmitting = false;
   String? _error;
   _LinkState _linkState = _LinkState.entry;
-  Map<String, dynamic>? _linkedSession; // game session data on success
-
-  // ─── Deployed OGAs (loaded after link) ───────────────
+  int _activeTab = 0; // 0 = enter code, 1 = scan QR
+  bool _qrScanning = false;
+  Map<String, dynamic>? _linkedSession;
   List<Map<String, dynamic>> _deployedOgas = [];
 
   late AnimationController _glowController;
@@ -220,28 +221,130 @@ class _GameLinkScreenState extends State<GameLinkScreen>
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
-
     return Scaffold(
-      backgroundColor: _void,
+      backgroundColor: Colors.black.withValues(alpha: 0.6),
       body: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 24 : 0,
-            vertical: 40,
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
+          child: Container(
+            margin: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: _void,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _iron),
+            ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _buildHeader(),
-                const SizedBox(height: 40),
-                _linkState == _LinkState.success
-                    ? _buildSuccessState()
-                    : _buildEntryState(),
+                // ── Top bar ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 16, 0),
+                  child: Row(
+                    children: [
+                      // OGA logo
+                      Image.network(
+                        'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/campaign-assets/fbs_launch/oga_logo.png',
+                        height: 32,
+                        errorBuilder: (_, __, ___) => const Text(
+                          'OGA',
+                          style: TextStyle(
+                            color: _neonGreen,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 4,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'LINK ACCOUNT',
+                        style: TextStyle(
+                          color: _white.withValues(alpha: 0.3),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white38,
+                          size: 20,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: _iron, height: 1),
+                // ── Tab bar ──
+                if (_linkState != _LinkState.success)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                    child: Row(
+                      children: [
+                        _buildTab(0, Icons.keyboard, 'ENTER CODE'),
+                        const SizedBox(width: 8),
+                        _buildTab(1, Icons.qr_code_scanner, 'SCAN QR'),
+                      ],
+                    ),
+                  ),
+                // ── Content ──
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: _linkState == _LinkState.success
+                        ? _buildSuccessState()
+                        : (_activeTab == 0
+                              ? _buildEntryState()
+                              : _buildQrScanState()),
+                  ),
+                ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTab(int index, IconData icon, String label) {
+    final isActive = _activeTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() {
+          _activeTab = index;
+          if (index == 1) _startQrScanner();
+        }),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? _neonGreen.withValues(alpha: 0.1) : _charcoal,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isActive ? _neonGreen.withValues(alpha: 0.5) : _iron,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isActive ? _neonGreen : Colors.white38,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isActive ? _neonGreen : Colors.white38,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -833,6 +936,92 @@ class _GameLinkScreenState extends State<GameLinkScreen>
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _startQrScanner() {
+    setState(() => _qrScanning = true);
+  }
+
+  void _onQrDetected(String code) {
+    if (!_qrScanning) return;
+    setState(() {
+      _qrScanning = false;
+      _activeTab = 0;
+      _codeController.text = code;
+    });
+    // Small delay so user sees the code filled in, then auto-submit
+    Future.delayed(const Duration(milliseconds: 400), _submitCode);
+  }
+
+  Widget _buildQrScanState() {
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Container(
+          height: 280,
+          decoration: BoxDecoration(
+            color: _charcoal,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _iron),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(13),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // QR Scanner (mobile_scanner package)
+                MobileScanner(
+                  onDetect: (capture) {
+                    final code = capture.barcodes.firstOrNull?.rawValue;
+                    if (code != null && code.isNotEmpty) {
+                      // QR encodes the raw code or the full URL
+                      // e.g. "3SYVK" or "https://oga.games/link?code=3SYVK"
+                      final extracted =
+                          Uri.tryParse(code)?.queryParameters['code'] ?? code;
+                      _onQrDetected(extracted.toUpperCase());
+                    }
+                  },
+                ),
+                // Scan frame overlay
+                Container(
+                  width: 180,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: _neonGreen.withValues(alpha: 0.7),
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Point your camera at the QR code shown in your game.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: _white.withValues(alpha: 0.45),
+            fontSize: 12,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: () => setState(() => _activeTab = 0),
+          child: Text(
+            'ENTER CODE MANUALLY INSTEAD',
+            style: TextStyle(
+              color: _white.withValues(alpha: 0.3),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),

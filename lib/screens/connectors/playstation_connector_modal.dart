@@ -15,6 +15,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 enum PlayStationConnectorMode { signIn, link }
 
@@ -111,13 +113,40 @@ class _PlayStationConnectorModalState extends State<PlayStationConnectorModal>
     setState(() => _state = _ConnectorState.connecting);
     _pulseController.repeat(reverse: true);
 
-    // ── TODO: Replace with real PSN OAuth flow ──────────
-    // 1. Open PSN OAuth URL in webview/browser
-    // 2. Capture redirect with PSN code
-    // 3. Exchange for access token server-side via n8n/edge function
-    // 4. Store PSN ID + tokens in playstation_connections table
-    // For now: simulate a 2s network call
-    await Future.delayed(const Duration(seconds: 2));
+    // ── PSN OAuth via FusionAuth ─────────────────────────
+    // Flow: Our app → FusionAuth → Sony login page (Sony handles credentials)
+    // → Sony redirects to FusionAuth → FusionAuth redirects to our callback
+    // → Callback exchanges code for token → stores in playstation_connections
+    //
+    // Replace these constants with your FusionAuth values:
+    const fusionAuthBaseUrl =
+        'https://auth.oneearthrising.com'; // your FA instance
+    const clientId = 'YOUR_FUSIONAUTH_CLIENT_ID';
+    const redirectUri = 'https://oga.oneearthrising.com/auth/psn/callback';
+    const psnProviderId =
+        'YOUR_SONY_PSN_IDENTITY_PROVIDER_ID'; // from FA dashboard
+
+    final oauthUrl = Uri.parse('$fusionAuthBaseUrl/oauth2/authorize').replace(
+      queryParameters: {
+        'client_id': clientId,
+        'response_type': 'code',
+        'redirect_uri': redirectUri,
+        'identity_provider_id': psnProviderId,
+        'scope': [
+          'openid',
+          'profile',
+          if (_allowGameLibrary) 'psn:games',
+          if (_allowFriendsList) 'psn:friends_list',
+        ].join(' '),
+      },
+    );
+
+    // Open Sony login in same tab — Sony handles all credential entry
+    html.window.location.href = oauthUrl.toString();
+
+    // ↑ Page navigates away; when it returns via callback the
+    //   backend will have stored tokens in playstation_connections.
+    // The connecting animation shows while redirect is in progress.
 
     final simulatedAccount = {
       'psn_id': 'PSN-${_randomCode()}',
