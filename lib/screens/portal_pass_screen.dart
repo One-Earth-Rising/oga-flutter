@@ -5,6 +5,7 @@
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/fbs_service.dart';
 import '../modals/fbs_redeem_modal.dart';
 
@@ -15,8 +16,7 @@ class PortalPassScreen extends StatefulWidget {
   State<PortalPassScreen> createState() => _PortalPassScreenState();
 }
 
-class _PortalPassScreenState extends State<PortalPassScreen>
-    with SingleTickerProviderStateMixin {
+class _PortalPassScreenState extends State<PortalPassScreen> {
   // ─── Colors ─────────────────────────────────────────────────
   static const _black = Color(0xFF000000);
   static const _charcoal = Color(0xFF121212);
@@ -33,18 +33,14 @@ class _PortalPassScreenState extends State<PortalPassScreen>
   bool _loading = true;
   String? _successCharacterId;
 
-  late TabController _tabController;
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadData();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -114,11 +110,20 @@ class _PortalPassScreenState extends State<PortalPassScreen>
               icon: const Icon(Icons.arrow_back, color: _white),
               onPressed: () => Navigator.of(context).pop(),
             ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Image.network(
+                  'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-filles/fbsxoga_logo.png',
+                  height: 32,
+                  errorBuilder: (_, __, _) => const SizedBox.shrink(),
+                ),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Green glow hero
                   Container(
                     decoration: const BoxDecoration(color: _black),
                     child: Center(
@@ -138,7 +143,6 @@ class _PortalPassScreenState extends State<PortalPassScreen>
                       ),
                     ),
                   ),
-                  // Title content
                   Positioned(
                     bottom: 0,
                     left: 0,
@@ -203,70 +207,10 @@ class _PortalPassScreenState extends State<PortalPassScreen>
                 ],
               ),
             ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(44),
-              child: Container(
-                color: _black,
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: _neonGreen,
-                  indicatorWeight: 2,
-                  labelColor: _neonGreen,
-                  unselectedLabelColor: _white.withValues(alpha: 0.4),
-                  labelStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.5,
-                    fontFamily: 'Helvetica Neue',
-                  ),
-                  tabs: const [
-                    Tab(text: 'PROGRESSION'),
-                    Tab(text: 'FBS UNLOCK'),
-                  ],
-                ),
-              ),
-            ),
           ),
 
           // ── Body ────────────────────────────────────────────
-          SliverFillRemaining(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildProgressionTab(isDesktop),
-                _buildFbsUnlockTab(isDesktop),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Tab 1: Progression ──────────────────────────────────────
-  Widget _buildProgressionTab(bool isDesktop) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(
-        horizontal: isDesktop ? 48 : 20,
-        vertical: 24,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionLabel('ACTIVE GAMES'),
-          const SizedBox(height: 14),
-          // Game progress cards
-          ...[
-            'FORTNITE',
-            'STREET FIGHTER 6',
-            'DRAGON BALL XENOVERSE 2',
-          ].map((game) => _gameProgressCard(game)),
-          const SizedBox(height: 32),
-          _sectionLabel('CROSS-GAME STATS'),
-          const SizedBox(height: 14),
-          _statsGrid(),
-          const SizedBox(height: 32),
-          _comingSoonCard(),
+          SliverToBoxAdapter(child: _buildFbsUnlockTab(isDesktop)),
         ],
       ),
     );
@@ -750,14 +694,12 @@ class _PortalPassScreenState extends State<PortalPassScreen>
             child: SizedBox(
               width: double.infinity,
               height: 140,
-              child: isUnlocked
-                  ? Image.asset(
-                      char.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          _fbsPlaceholder(char, locked: false),
-                    )
-                  : _fbsPlaceholder(char, locked: true),
+              child: Image.network(
+                'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/${char.id}.png',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, _) =>
+                    _fbsPlaceholder(char, locked: !isUnlocked),
+              ),
             ),
           ),
 
@@ -774,10 +716,10 @@ class _PortalPassScreenState extends State<PortalPassScreen>
                 ),
                 child: Container(
                   color: _black.withValues(alpha: 0.6),
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       Icons.lock_outline,
-                      color: Color(0xFF444444),
+                      color: _neonGreen.withValues(alpha: 0.6),
                       size: 32,
                     ),
                   ),
@@ -893,25 +835,26 @@ class _PortalPassScreenState extends State<PortalPassScreen>
 
   Widget _whereToFindCard() {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: _charcoal,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _ironGrey),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             children: [
               const Icon(Icons.storefront_outlined, color: _white, size: 18),
               const SizedBox(width: 10),
               const Text(
-                'WHERE TO FIND FBS CANDY',
+                'FIND US IN STORE & PLAY TODAY',
                 style: TextStyle(
                   color: _white,
                   fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: 0.5,
                   fontFamily: 'Helvetica Neue',
                 ),
@@ -919,49 +862,154 @@ class _PortalPassScreenState extends State<PortalPassScreen>
             ],
           ),
           const SizedBox(height: 14),
-          _storeRow('Walmart', 'Candy aisle, nationwide'),
-          const SizedBox(height: 10),
-          _storeRow('finalbosssour.com', 'Online — ships to US & Canada'),
+
+          // Walmart callout
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _deepSurface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _ironGrey.withValues(alpha: 0.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0071CE),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'WALMART',
+                        style: TextStyle(
+                          color: _white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1,
+                          fontFamily: 'Helvetica Neue',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'FROM CANDY AISLE TO CONSOLE',
+                      style: TextStyle(
+                        color: _white.withValues(alpha: 0.5),
+                        fontSize: 10,
+                        letterSpacing: 1,
+                        fontFamily: 'Helvetica Neue',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Text(
+                      '\$2.98',
+                      style: const TextStyle(
+                        color: _neonGreen,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'Helvetica Neue',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'NOW AVAILABLE AT OVER 1,900 LOCATIONS',
+                        style: TextStyle(
+                          color: _white.withValues(alpha: 0.6),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                          fontFamily: 'Helvetica Neue',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Text(
+            'Each bag contains a unique code. Unlock up to four minibosses — one per flavor purchased.',
+            style: TextStyle(
+              color: _white.withValues(alpha: 0.45),
+              fontSize: 12,
+              height: 1.5,
+              fontFamily: 'Helvetica Neue',
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // CTA buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => launchUrl(
+                    Uri.parse('https://finalbosssour.com/pages/store-locator'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  icon: const Icon(Icons.store_outlined, size: 15),
+                  label: const Text('STORE LOCATOR'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _white,
+                    side: const BorderSide(color: _ironGrey),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      fontFamily: 'Helvetica Neue',
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => launchUrl(
+                    Uri.parse(
+                      'https://finalbosssour.com/collections/shop-all-flavors',
+                    ),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  icon: const Icon(Icons.shopping_bag_outlined, size: 15),
+                  label: const Text('SHOP ONLINE'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _neonGreen,
+                    foregroundColor: _black,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                      fontFamily: 'Helvetica Neue',
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _storeRow(String store, String detail) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-            color: _neonGreen,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              store,
-              style: const TextStyle(
-                color: _white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Helvetica Neue',
-              ),
-            ),
-            Text(
-              detail,
-              style: TextStyle(
-                color: _white.withValues(alpha: 0.4),
-                fontSize: 12,
-                fontFamily: 'Helvetica Neue',
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 

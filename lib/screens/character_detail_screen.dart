@@ -745,31 +745,29 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
           // Lock overlay — different states
           if (!canInteract && !isLentOut && !isPendingTrade)
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
-                color: _voidBlack.withValues(alpha: 0.6),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.lock_outline,
-                      color: _pureWhite.withValues(alpha: 0.5),
-                      size: 48,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'LOCKED',
-                      style: TextStyle(
-                        color: _pureWhite.withValues(alpha: 0.5),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 3,
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(15),
+                  color: _voidBlack.withValues(alpha: 0.6),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_outline, color: _neonGreen, size: 48),
+                      const SizedBox(height: 8),
+                      Text(
+                        'LOCKED',
+                        style: TextStyle(
+                          color: _neonGreen,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 3,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -2419,11 +2417,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.lock_outline,
-                  color: _pureWhite.withValues(alpha: 0.4),
-                  size: 28,
-                ),
+                Icon(Icons.lock_outline, color: _neonGreen, size: 28),
                 const SizedBox(height: 8),
                 Text(
                   message,
@@ -3379,7 +3373,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                                     )
                                   : Icon(
                                       Icons.lock_outline,
-                                      color: _ironGrey.withValues(alpha: 0.6),
+                                      color: _neonGreen.withValues(alpha: 0.5),
                                       size: 12,
                                     ),
                             ),
