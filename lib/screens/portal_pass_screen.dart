@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/fbs_service.dart';
 import '../modals/fbs_redeem_modal.dart';
+import 'fbs_qr_scanner_screen.dart';
 
 class PortalPassScreen extends StatefulWidget {
   const PortalPassScreen({super.key});
@@ -576,22 +577,16 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
 
   Widget _scanQrButton() {
     return OutlinedButton.icon(
-      onPressed: () {
-        // Web: QR scan redirect (URL encoded in QR → same validate flow)
-        // Mobile: future camera integration
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: _charcoal,
-            behavior: SnackBarBehavior.floating,
-            content: Text(
-              'Point your phone camera at the QR code on the packaging',
-              style: TextStyle(
-                color: _white.withValues(alpha: 0.8),
-                fontFamily: 'Helvetica Neue',
-              ),
-            ),
+      onPressed: () async {
+        final code = await Navigator.of(context).push<String>(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) => const FbsQrScannerScreen(),
           ),
         );
+        if (code != null && mounted) {
+          FbsRedeemModal.show(context, onSuccess: _onCodeRedeemed);
+        }
       },
       icon: const Icon(Icons.qr_code_scanner, size: 18),
       label: const Text('SCAN QR CODE'),

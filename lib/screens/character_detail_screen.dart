@@ -2412,8 +2412,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
         // Lock overlay
         Positioned.fill(
           child: Container(
-            margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+              color: _voidBlack.withValues(alpha: 0.75),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -2423,7 +2425,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                   message,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: _pureWhite.withValues(alpha: 0.5),
+                    color: _pureWhite.withValues(alpha: 0.7),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
