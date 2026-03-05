@@ -119,14 +119,12 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
           ),
           // Dropdown panel
           Positioned(
-            width: MediaQuery.of(context).size.width < 600
-                ? MediaQuery.of(context).size.width - 16
-                : 360,
+            width: MediaQuery.of(context).size.width < 600 ? 300 : 360,
             child: CompositedTransformFollower(
               link: _layerLink,
               showWhenUnlinked: false,
               offset: MediaQuery.of(context).size.width < 600
-                  ? Offset(-(MediaQuery.of(context).size.width - 60), 48)
+                  ? const Offset(-252, 48)
                   : const Offset(-308, 48),
               child: GestureDetector(
                 onTap: () {}, // absorb taps — prevent scrim from firing
@@ -817,7 +815,9 @@ class _NotificationDropdownPanelState
       onAccept: () => _handleAccept(notification),
       onDecline: () => _handleDecline(notification),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) => widget.onClose());
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) widget.onClose();
+    });
   }
 
   Future<void> _handleTap(OGANotification notification) async {
