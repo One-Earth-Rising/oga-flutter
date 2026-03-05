@@ -152,11 +152,38 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       final events = <Map<String, dynamic>>[];
       final emails = <String>{};
 
+      // ── Resolve asset_id if not passed from dashboard ──────
+      // This happens when the user owns this character and
+      // _assetId wasn't forwarded through route args.
+      if (_assetId == null) {
+        final userEmail = supabase.auth.currentUser?.email;
+        if (userEmail != null) {
+          final row = await supabase
+              .from('character_ownership')
+              .select('asset_id')
+              .eq('character_id', ch.id)
+              .eq('owner_email', userEmail)
+              .eq('status', 'active')
+              .maybeSingle();
+          if (row != null) {
+            _assetId = row['asset_id'] as String?;
+            debugPrint('✅ Resolved asset_id from DB: $_assetId');
+          }
+        }
+      }
+
+      // If still null, nothing to show
+      if (_assetId == null || _assetId!.isEmpty) {
+        debugPrint('⚠️ asset_id still null after resolution — no history');
+        if (mounted) setState(() => _isLoadingHistory = false);
+        return;
+      }
+
       // 1. All owners from character_ownership
       final ownershipRows = await supabase
           .from('character_ownership')
           .select('owner_email, acquired_at, acquired_via, status, asset_id')
-          .eq('asset_id', _assetId ?? '')
+          .eq('asset_id', _assetId!)
           .order('acquired_at', ascending: false);
 
       for (final row in ownershipRows) {
