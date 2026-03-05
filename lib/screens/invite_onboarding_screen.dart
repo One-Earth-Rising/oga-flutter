@@ -210,6 +210,29 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
           .update(updates)
           .eq('email', user.email!);
 
+      // Create ownership row so character is actually unlocked in dashboard
+      if (_selectedCharacter != null) {
+        // Check if row already exists first
+        final existing = await Supabase.instance.client
+            .from('character_ownership')
+            .select('id')
+            .eq('owner_email', user.email!)
+            .eq('character_id', _selectedCharacter!)
+            .maybeSingle();
+
+        if (existing == null) {
+          await Supabase.instance.client.from('character_ownership').insert({
+            'owner_email': user.email!,
+            'character_id': _selectedCharacter,
+            'acquired_via': 'onboarding',
+            'acquired_at': DateTime.now().toIso8601String(),
+            'status': 'active',
+            'is_lent_out': false,
+          });
+          debugPrint('✅ Ownership row created for $_selectedCharacter');
+        }
+      }
+
       debugPrint('✅ Onboarding complete: $fullName, char=$_selectedCharacter');
 
       if (mounted) {

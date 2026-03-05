@@ -30,6 +30,7 @@ import '../modals/get_character_modal.dart';
 import '../widgets/notification_bell_widget.dart';
 import '../modals/lend_proposal_modal.dart';
 import '../config/oga_storage.dart';
+import '../services/lend_service.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -354,6 +355,55 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           debugPrint('⚠️ Full trade details load failed: $e');
         }
       }
+    }
+  }
+
+  Future<void> _recallLend() async {
+    final confirmed = await _showConfirmDialog(
+      'RECALL CHARACTER',
+      'Recall ${ch.name} early? ${_profileDisplayName(_lendCounterpartyProfile)} will be notified.',
+      confirmText: 'RECALL',
+      confirmColor: Colors.orange.shade400,
+    );
+    if (!confirmed) return;
+
+    try {
+      final supabase = Supabase.instance.client;
+      final lend = await supabase
+          .from('lends')
+          .select('id')
+          .eq('character_id', ch.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+      if (lend == null) {
+        _showSnackError('Active lend not found.');
+        return;
+      }
+
+      final result = await LendService.recallLend(lend['id'] as String);
+      if (result == 'success' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Character recalled!'),
+            backgroundColor: Colors.orange.shade400,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pop({'lendResolved': true});
+      } else {
+        _showSnackError(result ?? 'Recall failed.');
+      }
+    } catch (e) {
+      _showSnackError('Error: $e');
+    }
+  }
+
+  void _showSnackError(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.red.shade400),
+      );
     }
   }
 
@@ -1239,6 +1289,30 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               color: _pureWhite.withValues(alpha: 0.3),
               fontSize: 12,
               height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _recallLend(),
+              icon: Icon(Icons.replay, size: 16, color: Colors.orange.shade400),
+              label: Text(
+                'RECALL EARLY',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                  color: Colors.orange.shade400,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.orange.shade400),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
           ),
         ],
