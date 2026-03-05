@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/oga_image.dart';
+import '../config/oga_storage.dart';
 
 /// Profile setup screen shown after invite signup flow.
 /// 3-step onboarding: Identity → Pick Starter → Preferences
@@ -53,7 +55,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
       'name': 'RYU',
       'ip': 'Street Fighter',
       'color': Color(0xFFDC2626),
-      'image': 'assets/images/characters/ryu_main.png',
+      'image': 'heroes/ryu.png',
       'description': 'The Eternal Warrior',
     },
     {
@@ -61,7 +63,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
       'name': 'VEGETA',
       'ip': 'Dragon Ball Z',
       'color': Color(0xFF2563EB),
-      'image': 'assets/images/characters/vegeta_main.png',
+      'image': 'heroes/vegeta.png',
       'description': 'The Saiyan Prince',
     },
     {
@@ -69,8 +71,40 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
       'name': 'GUGGIMON',
       'ip': 'Superplastic',
       'color': Color(0xFF7C3AED),
-      'image': 'assets/images/characters/guggimon_main.png',
+      'image': 'heroes/guggimon.png',
       'description': 'The Fashion Horror',
+    },
+    {
+      'id': 'caustica',
+      'name': 'CAUSTICA',
+      'ip': 'Final Boss Sour',
+      'color': Color(0xFF00E5FF),
+      'image': 'heroes/caustica.png',
+      'description': 'Level 1 Strawberry Lemonade Miniboss',
+    },
+    {
+      'id': 'brumblebutt',
+      'name': 'BRUMBLEBUTT',
+      'ip': 'Final Boss Sour',
+      'color': Color(0xFF9B59B6),
+      'image': 'heroes/brumblebutt.png',
+      'description': 'Level 2 Strawberry Mango Miniboss',
+    },
+    {
+      'id': 'melsh',
+      'name': 'MELSH',
+      'ip': 'Final Boss Sour',
+      'color': Color(0xFF39FF14),
+      'image': 'heroes/melsh.png',
+      'description': 'Level 3 Watermelon Kiwi Miniboss',
+    },
+    {
+      'id': 'bigwell',
+      'name': 'BIGWELL',
+      'ip': 'Final Boss Sour',
+      'color': Color(0xFFFF6B00),
+      'image': 'heroes/bigwell.png',
+      'description': 'Level 4 Sour Apples Guardian',
     },
   ];
 
@@ -562,16 +596,13 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
                       ),
                     ),
                     // Character image
-                    Image.asset(
-                      imagePath,
+                    OgaImage(
+                      path: imagePath,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Center(
-                        child: Icon(
-                          Icons.person,
-                          color: color.withValues(alpha: 0.5),
-                          size: 48,
-                        ),
-                      ),
+                      alignment: Alignment.topCenter,
+                      accentColor: color,
+                      fallbackIcon: Icons.person,
+                      fallbackIconSize: 48,
                     ),
                     // Selected checkmark
                     if (isSelected)
