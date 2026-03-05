@@ -36,6 +36,8 @@ import 'services/character_service.dart';
 import 'services/notification_service.dart';
 import 'screens/activity_screen.dart';
 import 'dart:math';
+import 'screens/connectors/game_link_screen.dart';
+import 'screens/connectors/playstation_connector_modal.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -353,6 +355,16 @@ class _OgaAppState extends State<OgaApp> {
                 return const BetaWaitlistScreen();
               },
             ),
+          );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // GAME LINK SCREEN — oga.games/link or /#/link?code=XXXXX
+        // ═══════════════════════════════════════════════════════
+        if (uri.path == '/link') {
+          final code = uri.queryParameters['code'];
+          return MaterialPageRoute(
+            builder: (_) => GameLinkScreen(prefillCode: code),
           );
         }
 

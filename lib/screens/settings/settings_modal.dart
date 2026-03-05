@@ -8,6 +8,7 @@ import '../../services/analytics_service.dart';
 // For web file picking
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import '../connectors/playstation_connector_modal.dart';
 
 /// Account settings modal.
 /// Desktop: Centered overlay with sidebar navigation + content panel.
@@ -589,34 +590,43 @@ class _SettingsModalState extends State<SettingsModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('OGA ACCOUNT'),
+        _sectionTitle('CONNECTED ACCOUNTS'),
         const SizedBox(height: 20),
         _buildConnectRow(
           icon: Icons.videogame_asset,
-          name: 'Playstation Network',
-          status: 'Connected',
-          isConnected: true,
+          name: 'PlayStation Network',
+          status: 'Manage Connection',
+          isConnected: false, // real status loaded inside modal
+          onTap: () => PlayStationConnectorModal.show(
+            context,
+            mode: PlayStationConnectorMode.link,
+          ).then((_) => widget.onProfileUpdated?.call()),
+        ),
+        _buildConnectRow(
+          icon: Icons.link,
+          name: 'Link a Game',
+          status: 'Enter in-game code or scan QR',
+          isConnected: false,
+          onTap: () => Navigator.pushNamed(context, '/link'),
         ),
         _buildConnectRow(
           icon: Icons.sports_esports,
           name: 'Xbox Network',
-          status: 'Connect Account',
+          status: 'Coming Soon',
           isConnected: false,
         ),
         _buildConnectRow(
           icon: Icons.gamepad,
           name: 'Nintendo Network',
-          status: 'Connect Account',
+          status: 'Coming Soon',
           isConnected: false,
         ),
         _buildConnectRow(
           icon: Icons.account_balance_wallet,
           name: 'Wallet Connect',
-          status: 'Connect Account',
+          status: 'Coming Soon',
           isConnected: false,
         ),
-        const SizedBox(height: 24),
-        _buildOutlinedButton('DISCONNECT ALL MY ACCOUNTS'),
       ],
     );
   }
@@ -784,62 +794,70 @@ class _SettingsModalState extends State<SettingsModal> {
     required String name,
     required String status,
     required bool isConnected,
+    VoidCallback? onTap,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: deepCharcoal,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: ironGrey),
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: deepCharcoal,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: ironGrey),
+              ),
+              child: Icon(icon, color: Colors.white54, size: 20),
             ),
-            child: Icon(icon, color: Colors.white54, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                Text(
-                  status,
-                  style: TextStyle(
-                    color: isConnected ? neonGreen : Colors.white38,
-                    fontSize: 12,
+                  Text(
+                    status,
+                    style: TextStyle(
+                      color: isConnected ? neonGreen : Colors.white38,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          isConnected
-              ? Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4),
+            isConnected
+                ? Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.black,
+                      size: 16,
+                    ),
+                  )
+                : const Icon(
+                    Icons.arrow_forward,
+                    color: Colors.white38,
+                    size: 20,
                   ),
-                  child: const Icon(Icons.check, color: Colors.black, size: 16),
-                )
-              : const Icon(
-                  Icons.arrow_forward,
-                  color: Colors.white38,
-                  size: 20,
-                ),
-        ],
+          ],
+        ),
       ),
-    );
+    ); // GestureDetector + Padding
   }
 
   // ═══════════════════════════════════════════════════════════

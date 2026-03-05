@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'connectors/playstation_connector_modal.dart';
 
 /// Main OGA Sign-In Screen (for returning users)
 /// Sends magic link and redirects to confirm screen
@@ -232,7 +233,72 @@ class _OGASignInScreenState extends State<OGASignInScreen> {
                           ),
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 16),
+
+                // ── OR divider ──
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: Colors.white.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'OR',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: Colors.white.withValues(alpha: 0.1),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // ── PSN sign-in ──
+                SizedBox(
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: () => PlayStationConnectorModal.show(
+                      context,
+                      mode: PlayStationConnectorMode.signIn,
+                    ),
+                    icon: const Text(
+                      'PS',
+                      style: TextStyle(
+                        color: Color(0xFF0070D1),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
+                    ),
+                    label: const Text(
+                      'SIGN IN WITH PLAYSTATION',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                        color: const Color(0xFF0070D1).withValues(alpha: 0.4),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
 
                 // Back to home
                 Center(
