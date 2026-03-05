@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/oga_image.dart';
 import '../config/oga_storage.dart';
+import 'dart:math';
 
 /// Profile setup screen shown after invite signup flow.
 /// 3-step onboarding: Identity → Pick Starter → Preferences
@@ -29,6 +30,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
 
   // ─── State ────────────────────────────────────────────────
   int _currentStep = 0; // 0=Identity, 1=Character, 2=Preferences
+  late final List<Map<String, dynamic>> _displayCharacters;
 
   // Step 1: Identity
   final _firstNameController = TextEditingController();
@@ -130,6 +132,10 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
   @override
   void initState() {
     super.initState();
+    // Pick 3 random FBS characters
+    final fbs = _characters.where((c) => c['ip'] == 'Final Boss Sour').toList()
+      ..shuffle();
+    _displayCharacters = fbs.take(3).toList();
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -505,7 +511,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
         // Character cards
         isMobile
             ? Column(
-                children: _characters
+                children: _displayCharacters
                     .map(
                       (c) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -515,7 +521,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
                     .toList(),
               )
             : Row(
-                children: _characters
+                children: _displayCharacters
                     .map(
                       (c) => Expanded(
                         child: Padding(
