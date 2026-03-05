@@ -233,14 +233,13 @@ class OwnershipService {
 
   /// Get ownership history for a character (all owners, past and present).
   static Future<List<OwnershipRecord>> getCharacterHistory(
-    String characterId,
+    String assetId,
   ) async {
     try {
-      // Get all ownership records for this character (any status)
       final rows = await _supabase
           .from('character_ownership')
-          .select('owner_email, acquired_via, acquired_at, status')
-          .eq('character_id', characterId)
+          .select('owner_email, acquired_via, acquired_at, status, asset_id')
+          .eq('asset_id', assetId)
           .order('acquired_at');
 
       if (rows.isEmpty) return [];

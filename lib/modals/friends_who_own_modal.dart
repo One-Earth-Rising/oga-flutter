@@ -119,12 +119,24 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
       //   B) profiles.starter_character (onboarding acquisition)
       final baseId = ch.id.toLowerCase();
 
-      // Source A: character_ownership table
-      final ownershipRows = await supabase
+      // Source A: character_ownership table — one row per friend (most recent)
+      final ownershipRaw = await supabase
           .from('character_ownership')
-          .select('owner_email, character_id, acquired_at')
+          .select('owner_email, character_id, acquired_at, asset_id')
           .inFilter('owner_email', friendEmails.toList())
-          .ilike('character_id', '$baseId%');
+          .ilike('character_id', '$baseId%')
+          .eq('status', 'active')
+          .order('acquired_at', ascending: false);
+
+      // Deduplicate: keep only the most recent active row per friend
+      final seenEmails = <String>{};
+      final ownershipRows = <Map<String, dynamic>>[];
+      for (final row in ownershipRaw) {
+        final email = row['owner_email'] as String;
+        if (seenEmails.add(email)) {
+          ownershipRows.add(row); // first occurrence = most recent
+        }
+      }
 
       // Source B: profiles.starter_character (friends whose starter matches)
       final starterProfiles = await supabase
