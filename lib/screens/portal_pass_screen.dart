@@ -38,6 +38,16 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
   void initState() {
     super.initState();
     _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final code = ModalRoute.of(context)?.settings.arguments as String?;
+      if (code != null && mounted) {
+        FbsRedeemModal.show(
+          context,
+          onSuccess: _onCodeRedeemed,
+          initialCode: code,
+        );
+      }
+    });
   }
 
   @override
@@ -397,7 +407,7 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
           // ── Unlock CTAs ────────────────────────────────────
           _sectionLabel('UNLOCK OPTIONS'),
           const SizedBox(height: 14),
-          kIsWeb
+          MediaQuery.of(context).size.width > 600
               ? _enterCodeButton()
               : Row(
                   children: [
@@ -577,17 +587,81 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
 
   Widget _scanQrButton() {
     return OutlinedButton.icon(
-      onPressed: () async {
-        final code = await Navigator.of(context).push<String>(
-          MaterialPageRoute(
-            fullscreenDialog: true,
-            builder: (_) => const FbsQrScannerScreen(),
+      onPressed: () => showDialog(
+        context: context,
+        builder: (_) => Dialog(
+          backgroundColor: _charcoal,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: _ironGrey),
           ),
-        );
-        if (code != null && mounted) {
-          FbsRedeemModal.show(context, onSuccess: _onCodeRedeemed);
-        }
-      },
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: _neonGreen.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.qr_code_scanner,
+                    color: _neonGreen,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'HOW TO SCAN',
+                  style: TextStyle(
+                    color: _white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'Helvetica Neue',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Open your phone\'s default camera app and point it at the QR code on the FBS candy packaging.\n\nIt will automatically open this page with your code pre-filled.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _white.withValues(alpha: 0.55),
+                    fontSize: 13,
+                    height: 1.6,
+                    fontFamily: 'Helvetica Neue',
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _neonGreen,
+                      foregroundColor: _black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text(
+                      'GOT IT',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                        fontFamily: 'Helvetica Neue',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
       icon: const Icon(Icons.qr_code_scanner, size: 18),
       label: const Text('SCAN QR CODE'),
       style: OutlinedButton.styleFrom(

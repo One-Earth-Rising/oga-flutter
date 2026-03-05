@@ -5,24 +5,30 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/fbs_service.dart';
 
 class FbsRedeemModal extends StatefulWidget {
   /// Called on successful redemption with the unlocked character ID.
   final void Function(String characterId) onSuccess;
 
-  const FbsRedeemModal({super.key, required this.onSuccess});
+  /// Optional pre-filled code (e.g. from QR scanner).
+  final String? initialCode;
+
+  const FbsRedeemModal({super.key, required this.onSuccess, this.initialCode});
 
   static Future<void> show(
     BuildContext context, {
     required void Function(String characterId) onSuccess,
+    String? initialCode,
   }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       useRootNavigator: true,
-      builder: (_) => FbsRedeemModal(onSuccess: onSuccess),
+      builder: (_) =>
+          FbsRedeemModal(onSuccess: onSuccess, initialCode: initialCode),
     );
   }
 
@@ -60,6 +66,9 @@ class _FbsRedeemModalState extends State<FbsRedeemModal>
   @override
   void initState() {
     super.initState();
+    if (widget.initialCode != null) {
+      _codeController.text = widget.initialCode!;
+    }
     _successAnim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -343,7 +352,10 @@ class _FbsRedeemModalState extends State<FbsRedeemModal>
           // Buy link
           Center(
             child: TextButton(
-              onPressed: () {},
+              onPressed: () => launchUrl(
+                Uri.parse('https://finalbosssour.com/pages/store-locator'),
+                mode: LaunchMode.externalApplication,
+              ),
               child: Text(
                 'Buy FBS candy at Walmart →',
                 style: TextStyle(

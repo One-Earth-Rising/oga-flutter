@@ -370,6 +370,18 @@ class _OgaAppState extends State<OgaApp> {
         }
 
         // ═══════════════════════════════════════════════════════
+        // FBS REDEEM — oga.oneearthrising.com/redeem?code=FBS-XXXX
+        // Triggered when user scans QR code on FBS candy packaging
+        // ═══════════════════════════════════════════════════════
+        if (uri.path == '/redeem') {
+          final code = uri.queryParameters['code'];
+          return MaterialPageRoute(
+            builder: (_) => const PortalPassScreen(),
+            settings: RouteSettings(name: '/redeem', arguments: code),
+          );
+        }
+
+        // ═══════════════════════════════════════════════════════
         // GAME LINK SCREEN — oga.games/link or /#/link?code=XXXXX
         // ═══════════════════════════════════════════════════════
         if (uri.path == '/link') {
