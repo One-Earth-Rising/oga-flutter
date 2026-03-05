@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../modals/fbs_redeem_modal.dart';
 
 /// FBS Campaign Dashboard - Shows the 3 starter characters (Caustica, Bigwell, Brumblebutt)
 /// Eventually merges with main dashboard bringing all collected assets over
@@ -28,7 +29,7 @@ class _FBSCampaignDashboardState extends State<FBSCampaignDashboard> {
       name: 'CAUSTICA',
       subtitle: 'The Toxic Bee',
       imagePath:
-          'https://mlpinkcxdsmxicipseux.supabase.co/storage/v1/object/public/campaign-assets/fbs_launch/caustica.png',
+          'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/caustica.png',
       glowColor: const Color(0xFFFFD700),
       rotation: -5.0,
     ),
@@ -37,7 +38,7 @@ class _FBSCampaignDashboardState extends State<FBSCampaignDashboard> {
       name: 'BIGWELL',
       subtitle: 'The Gentle Giant',
       imagePath:
-          'https://mlpinkcxdsmxicipseux.supabase.co/storage/v1/object/public/campaign-assets/fbs_launch/bigwell.png',
+          'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/bigwell.png',
       glowColor: const Color(0xFF00FF00),
       rotation: 0.0,
     ),
@@ -46,7 +47,7 @@ class _FBSCampaignDashboardState extends State<FBSCampaignDashboard> {
       name: 'BRUMBLEBUTT',
       subtitle: 'The Grumpy Bear',
       imagePath:
-          'https://mlpinkcxdsmxicipseux.supabase.co/storage/v1/object/public/campaign-assets/fbs_launch/brumblebutt.png',
+          'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/brumblebutt.png',
       glowColor: const Color(0xFFFF6B35),
       rotation: 5.0,
     ),
@@ -55,7 +56,7 @@ class _FBSCampaignDashboardState extends State<FBSCampaignDashboard> {
       name: 'MELSH',
       subtitle: 'Final Boss Sour',
       imagePath:
-          'https://mlpinkcxdsmxicipseux.supabase.co/storage/v1/object/public/campaign-assets/fbs_launch/melsh.png',
+          'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/melsh.png',
       glowColor: const Color(0xFF00C8FF),
       rotation: -3.0,
     ),
@@ -90,8 +91,17 @@ class _FBSCampaignDashboardState extends State<FBSCampaignDashboard> {
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.north_east, color: ogaGreen),
-                onPressed: () {},
+                icon: const Icon(
+                  Icons.confirmation_number_outlined,
+                  color: ogaGreen,
+                ),
+                tooltip: 'Redeem Code',
+                onPressed: () => FbsRedeemModal.show(
+                  context,
+                  onSuccess: (characterId) {
+                    setState(() {});
+                  },
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.bolt, color: Colors.white),

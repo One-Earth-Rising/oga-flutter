@@ -2108,9 +2108,8 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               ),
               const SizedBox(width: 12),
               OutlinedButton(
-                onPressed: () {
-                  // TODO: Navigate to Portal Pass purchase
-                },
+                onPressed: () =>
+                    Navigator.of(context).pushNamed('/portal-pass'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _pureWhite,
                   side: const BorderSide(color: _ironGrey),
@@ -3103,7 +3102,8 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed('/portal-pass'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _neonGreen,
                     side: BorderSide(color: _neonGreen.withValues(alpha: 0.5)),

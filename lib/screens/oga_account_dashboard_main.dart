@@ -16,6 +16,7 @@ import '../services/character_service.dart';
 import '../services/ownership_service.dart';
 import '../widgets/notification_bell_widget.dart';
 import 'activity_screen.dart';
+import '../modals/fbs_redeem_modal.dart';
 
 class OGAAccountDashboard extends StatefulWidget {
   final String? sessionId;
@@ -640,6 +641,14 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
           case 'contact':
             ContactModal.show(context);
             break;
+          case 'redeem':
+            FbsRedeemModal.show(
+              context,
+              onSuccess: (characterId) {
+                _loadUserData();
+              },
+            );
+            break;
           case 'admin':
             Navigator.pushNamed(context, '/admin');
             break;
@@ -689,6 +698,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         _dropItem('about', 'About OGA'),
         _dropItem('faq', 'FAQ'),
         _dropItem('contact', 'Contact'),
+        _dropItem('redeem', 'Redeem Code'),
         if (_isAdmin) ...[
           const PopupMenuDivider(height: 1),
           _dropItem('admin', '\u26a1 Command Center', isAdmin: true),

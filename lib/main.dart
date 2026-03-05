@@ -38,6 +38,7 @@ import 'screens/activity_screen.dart';
 import 'dart:math';
 import 'screens/connectors/game_link_screen.dart';
 import 'screens/connectors/playstation_connector_modal.dart';
+import 'screens/portal_pass_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -355,6 +356,16 @@ class _OgaAppState extends State<OgaApp> {
                 return const BetaWaitlistScreen();
               },
             ),
+          );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // PORTAL PASS
+        // ═══════════════════════════════════════════════════════
+        if (uri.path == '/portal-pass') {
+          return MaterialPageRoute(
+            builder: (_) => const PortalPassScreen(),
+            settings: settings,
           );
         }
 
