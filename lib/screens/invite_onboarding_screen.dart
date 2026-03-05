@@ -47,6 +47,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
   final Set<String> _selectedPlatforms = {};
 
   bool _isSaving = false;
+  static bool _saveInProgress = false;
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
 
@@ -162,8 +163,9 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
 
   // ─── Save All Data ────────────────────────────────────────
   Future<void> _saveAndFinish() async {
+    if (_saveInProgress) return;
+    _saveInProgress = true;
     setState(() => _isSaving = true);
-
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) {
@@ -260,6 +262,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
         );
       }
     } finally {
+      _saveInProgress = false;
       if (mounted) setState(() => _isSaving = false);
     }
   }

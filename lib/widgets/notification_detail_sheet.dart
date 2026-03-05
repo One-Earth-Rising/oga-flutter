@@ -37,6 +37,7 @@ class NotificationDetailSheet {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useRootNavigator: true,
       builder: (ctx) => _DetailSheet(
         notification: notification,
         onAccept: onAccept,
