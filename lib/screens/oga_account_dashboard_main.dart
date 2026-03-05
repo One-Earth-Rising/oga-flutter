@@ -52,8 +52,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   Set<String> _ownedCharacterIds = {};
 
   // ─── Sprint 14: Borrowed / Lent-out / Trade-pending tracking ─
-  Map<String, Map<String, dynamic>> _borrowedCharacters =
-      {}; // char_id → lend row
+  List<Map<String, dynamic>> _activeBorrows = []; // one entry per active borrow
   Set<String> _lentOutCharacterIds = {};
   Map<String, Map<String, dynamic>> _pendingTrades = {}; // char_id → trade row
 
@@ -86,10 +85,15 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ─── Ownership helpers (Sprint 12+14) ─────────────────────
   bool _isCharOwned(OGACharacter ch) => _ownedCharacterIds.contains(ch.id);
   bool _isCharBorrowed(OGACharacter ch) =>
-      _borrowedCharacters.containsKey(ch.id);
+      _activeBorrows.any((b) => b['character_id'] == ch.id);
   bool _isCharLentOut(OGACharacter ch) => _lentOutCharacterIds.contains(ch.id);
   bool _isCharPendingTrade(OGACharacter ch) =>
       _pendingTrades.containsKey(ch.id);
+
+  /// Returns all active borrow records for a given character_id.
+  /// Usually 0 or 1, but the list supports edge cases.
+  List<Map<String, dynamic>> _borrowsForChar(String charId) =>
+      _activeBorrows.where((b) => b['character_id'] == charId).toList();
 
   @override
   void initState() {
@@ -174,16 +178,18 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
       try {
         final userEmail = supabase.auth.currentUser?.email;
         if (userEmail != null) {
-          // Characters I'm borrowing
+          // Characters I'm borrowing — keep as list (may borrow same char_id
+          // that I also own, e.g. Brigette lends me her Ryu while I own mine)
           final borrowedRows = await supabase
               .from('lends')
-              .select('character_id, lender_email, return_due_at, accepted_at')
+              .select(
+                'id, character_id, lender_email, return_due_at, accepted_at',
+              )
               .eq('borrower_email', userEmail)
               .eq('status', 'active');
-          _borrowedCharacters = {};
-          for (final row in borrowedRows) {
-            _borrowedCharacters[row['character_id'] as String] = row;
-          }
+          _activeBorrows = borrowedRows
+              .map<Map<String, dynamic>>((r) => Map<String, dynamic>.from(r))
+              .toList();
 
           // Characters I own that are currently lent out
           final lentRows = await supabase
@@ -196,7 +202,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
               .toSet();
 
           debugPrint(
-            '✅ Lend state: ${_borrowedCharacters.length} borrowed, '
+            '✅ Lend state: ${_activeBorrows.length} borrowed, '
             '${_lentOutCharacterIds.length} lent out',
           );
 
@@ -1081,7 +1087,7 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ═══════════════════════════════════════════════════════════
 
   Widget _buildSectionHeader(bool isMobile) {
-    final ownedCount = _ownedCharacterIds.length + _borrowedCharacters.length;
+    final ownedCount = _ownedCharacterIds.length + _activeBorrows.length;
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -1175,10 +1181,60 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
     );
   }
 
+  /// Builds the ordered list of items to display in the library.
+  /// Owned + locked characters come from the catalog (one card each).
+  /// Borrowed characters where the user ALSO owns that character_id
+  /// get an EXTRA card appended at the end of the owned section.
+  List<({OGACharacter character, String mode, Map<String, dynamic>? lendInfo})>
+  _buildDisplayItems() {
+    final items =
+        <
+          ({
+            OGACharacter character,
+            String mode,
+            Map<String, dynamic>? lendInfo,
+          })
+        >[];
+
+    // 1. All catalog characters (owned / lent-out / locked)
+    for (final ch in _characters) {
+      final owned = _isCharOwned(ch);
+      final lentOut = _isCharLentOut(ch);
+      final borrowed = _isCharBorrowed(ch) && !owned; // only if NOT also owned
+      String mode;
+      if (owned && lentOut) {
+        mode = 'lent_out';
+      } else if (owned) {
+        mode = 'owned';
+      } else if (borrowed) {
+        mode = 'borrowed';
+      } else {
+        mode = 'locked';
+      }
+      final lendInfo = borrowed ? _borrowsForChar(ch.id).firstOrNull : null;
+      items.add((character: ch, mode: mode, lendInfo: lendInfo));
+    }
+
+    // 2. Extra cards for borrows where user ALSO owns that character_id
+    //    (e.g. Jan owns his Ryu AND borrows Brigette's Ryu)
+    for (final borrow in _activeBorrows) {
+      final charId = borrow['character_id'] as String;
+      if (_ownedCharacterIds.contains(charId)) {
+        // Already have an owned card — add a separate BORROWED card
+        final ch = CharacterService.cachedById(charId);
+        if (ch != null) {
+          items.add((character: ch, mode: 'borrowed', lendInfo: borrow));
+        }
+      }
+    }
+
+    return items;
+  }
+
   // ─── GRID VIEW ────────────────────────────────────────────
 
   Widget _buildCharacterGrid(bool isMobile) {
-    final chars = _characters;
+    final items = _buildDisplayItems();
     return SliverGrid(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: isMobile ? 2 : 5,
@@ -1187,26 +1243,23 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         childAspectRatio: 0.72,
       ),
       delegate: SliverChildBuilderDelegate((context, index) {
-        final ch = chars[index];
-        final owned = _isCharOwned(ch);
-        final borrowed = _isCharBorrowed(ch);
-        final lentOut = _isCharLentOut(ch);
-        final pendingTrade = _isCharPendingTrade(ch);
+        final item = items[index];
+        final ch = item.character;
+        final mode = item.mode;
+        final lendInfo = item.lendInfo;
         return GestureDetector(
-          onTap: () => _openDetail(ch),
+          onTap: () => _openDetailWithMode(ch, mode, lendInfo),
           child: CharacterCard(
             character: ch,
-            isOwned: owned || borrowed,
-            isBorrowed: borrowed,
-            isLentOut: lentOut,
-            isPendingTrade: pendingTrade,
-            lendReturnDate: borrowed
-                ? (_borrowedCharacters[ch.id]?['return_due_at'] as String?)
-                : null,
+            isOwned: mode == 'owned' || mode == 'lent_out',
+            isBorrowed: mode == 'borrowed',
+            isLentOut: mode == 'lent_out',
+            isPendingTrade: _isCharPendingTrade(ch) && mode == 'owned',
+            lendReturnDate: lendInfo?['return_due_at'] as String?,
             progress: ch.portalPass?.progressPercent ?? 0.0,
           ),
         );
-      }, childCount: chars.length),
+      }, childCount: items.length),
     );
   }
 
@@ -1396,19 +1449,31 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
   // ─── DETAIL NAVIGATION ────────────────────────────────────
 
   void _openDetail(OGACharacter ch) {
+    final mode = _isCharLentOut(ch)
+        ? 'lent_out'
+        : _isCharOwned(ch)
+        ? 'owned'
+        : _isCharBorrowed(ch)
+        ? 'borrowed'
+        : 'locked';
+    _openDetailWithMode(ch, mode, _borrowsForChar(ch.id).firstOrNull);
+  }
+
+  void _openDetailWithMode(
+    OGACharacter ch,
+    String mode,
+    Map<String, dynamic>? lendInfo,
+  ) {
     Navigator.pushNamed(
       context,
       '/character/${ch.id}',
       arguments: {
-        'isOwned': _isCharOwned(ch),
-        'isBorrowed': _isCharBorrowed(ch),
-        'isLentOut': _isCharLentOut(ch),
-        'isPendingTrade': _isCharPendingTrade(ch),
+        'isOwned': mode == 'owned' || mode == 'lent_out',
+        'isBorrowed': mode == 'borrowed',
+        'isLentOut': mode == 'lent_out',
+        'isPendingTrade': _isCharPendingTrade(ch) && mode == 'owned',
         'lendInfo':
-            _borrowedCharacters[ch.id] ??
-            (_lentOutCharacterIds.contains(ch.id)
-                ? {'character_id': ch.id}
-                : null),
+            lendInfo ?? (mode == 'lent_out' ? {'character_id': ch.id} : null),
         'pendingTradeInfo': _pendingTrades[ch.id],
       },
     );

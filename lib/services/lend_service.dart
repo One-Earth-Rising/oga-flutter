@@ -590,4 +590,34 @@ class LendService {
   }
 
   static Future<String> returnLend(String lendId) => returnEarly(lendId);
+
+  /// Returns active borrows enriched with character catalog data.
+  /// Use this to populate the borrower's dashboard cards.
+  static Future<List<Map<String, dynamic>>>
+  getActiveBorrowedWithCharacters() async {
+    final email = _currentEmail;
+    if (email == null) return [];
+    try {
+      final rows = await _supabase
+          .from('lends')
+          .select('''
+            id, lender_email, borrower_email, character_id,
+            duration_hours, status, accepted_at, return_due_at
+          ''')
+          .eq('borrower_email', email)
+          .eq('status', 'active');
+
+      return rows
+          .map<Map<String, dynamic>>(
+            (row) => {
+              ...row,
+              'display_mode': 'borrowed', // flag for dashboard card rendering
+            },
+          )
+          .toList();
+    } catch (e) {
+      debugPrint('❌ LendService.getActiveBorrowedWithCharacters error: $e');
+      return [];
+    }
+  }
 }
