@@ -800,15 +800,21 @@ class _NotificationDropdownPanelState
   // ACTIONS
   // ═══════════════════════════════════════════════════════════════
 
-  /// Opens detail sheet WITHOUT marking read (buttons stay visible).
+  /// Closes dropdown first, then opens detail sheet.
   void _openDetailSheet(OGANotification notification) {
     if (!mounted) return;
-    NotificationDetailSheet.show(
-      context,
-      notification: notification,
-      onAccept: () => _handleAccept(notification),
-      onDecline: () => _handleDecline(notification),
-    );
+    widget.onClose(); // Close dropdown so sheet is not obscured on mobile
+    // Small delay to let overlay remove before sheet animates in
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted) {
+        NotificationDetailSheet.show(
+          context,
+          notification: notification,
+          onAccept: () => _handleAccept(notification),
+          onDecline: () => _handleDecline(notification),
+        );
+      }
+    });
   }
 
   Future<void> _handleTap(OGANotification notification) async {
@@ -817,7 +823,21 @@ class _NotificationDropdownPanelState
       NotificationService.decrementUnread();
       _updateLocalReadState(notification.id);
     }
-    // Open detail sheet
+
+    // Handle system notifications: navigate directly, don't open detail sheet
+    if (notification.type == 'system') {
+      widget.onClose();
+      if (notification.actionUrl == '/admin') {
+        Future.delayed(const Duration(milliseconds: 50), () {
+          Navigator.pushNamed(context, '/admin', arguments: {'initialTab': 1});
+        });
+      }
+      return;
+    }
+
+    // Close dropdown first so sheet is not obscured on mobile
+    widget.onClose();
+    await Future.delayed(const Duration(milliseconds: 50));
     if (mounted) {
       NotificationDetailSheet.show(
         context,

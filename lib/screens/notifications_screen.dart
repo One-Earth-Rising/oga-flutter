@@ -105,6 +105,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         context,
         MaterialPageRoute(builder: (_) => const LendInboxScreen()),
       );
+    } else if (type == 'system') {
+      final actionUrl = notif['action_url'] as String? ?? '';
+      if (actionUrl == '/admin') {
+        Navigator.pushNamed(
+          context,
+          '/admin',
+          arguments: {'initialTab': 1}, // Opens directly to USERS tab
+        );
+      }
     }
   }
 
@@ -182,6 +191,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           icon: Icons.campaign_outlined,
           color: Colors.white70,
           label: 'ANNOUNCEMENT',
+        );
+      case 'system':
+        return _NotifDisplay(
+          icon: Icons.manage_accounts_outlined,
+          color: Colors.orange.shade400,
+          label: 'SYSTEM',
         );
       default:
         return _NotifDisplay(
@@ -391,7 +406,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
     );
   }
-}
+} // closes _NotificationsScreenState
 
 class _NotifDisplay {
   final IconData icon;

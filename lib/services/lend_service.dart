@@ -494,6 +494,13 @@ class LendService {
 
   static Future<String> recallLend(String lendId) async {
     try {
+      // Fetch lend details before RPC so we can notify borrower
+      final lend = await _supabase
+          .from('lends')
+          .select('borrower_email, character_id, lender_email')
+          .eq('id', lendId)
+          .maybeSingle();
+
       final result = await _supabase.rpc(
         'return_lend',
         params: {'p_lend_id': lendId},
@@ -501,6 +508,22 @@ class LendService {
       final message = result?.toString() ?? 'Unknown error';
       if (message == 'success') {
         debugPrint('✅ LendService: recalled → $lendId');
+        if (lend != null) {
+          final borrowerEmail = lend['borrower_email'] as String;
+          final characterId = lend['character_id'] as String;
+          final lenderEmail = lend['lender_email'] as String;
+          await _supabase.from('notifications').insert({
+            'recipient_email': borrowerEmail,
+            'type': 'lend_recalled',
+            'reference_id': lendId,
+            'reference_type': 'lend',
+            'message':
+                '${lenderEmail.split('@').first} recalled $characterId — it has been removed from your library.',
+            'sender_email': lenderEmail,
+            'category': 'lend',
+            'action_url': '/dashboard',
+          });
+        }
       }
       return message;
     } catch (e) {

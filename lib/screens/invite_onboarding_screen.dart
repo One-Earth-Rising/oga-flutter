@@ -221,6 +221,9 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
             .maybeSingle();
 
         if (existing == null) {
+          debugPrint(
+            '>>> Inserting ownership: email=${user.email!} char=$_selectedCharacter',
+          );
           await Supabase.instance.client.from('character_ownership').insert({
             'owner_email': user.email!,
             'character_id': _selectedCharacter,
@@ -232,6 +235,14 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
           debugPrint('✅ Ownership row created for $_selectedCharacter');
         }
       }
+      // Auto-approve invited users into beta
+      await Supabase.instance.client.from('beta_access').upsert({
+        'email': user.email!,
+        'granted_by': 'invite_flow',
+        'granted_at': DateTime.now().toIso8601String(),
+        'revoked_at': null,
+      }, onConflict: 'email');
+      debugPrint('✅ Beta access granted via invite flow');
 
       debugPrint('✅ Onboarding complete: $fullName, char=$_selectedCharacter');
 
