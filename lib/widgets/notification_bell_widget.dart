@@ -119,11 +119,15 @@ class _NotificationBellWidgetState extends State<NotificationBellWidget>
           ),
           // Dropdown panel
           Positioned(
-            width: 360,
+            width: MediaQuery.of(context).size.width < 600
+                ? MediaQuery.of(context).size.width - 16
+                : 360,
             child: CompositedTransformFollower(
               link: _layerLink,
               showWhenUnlinked: false,
-              offset: const Offset(-308, 48),
+              offset: MediaQuery.of(context).size.width < 600
+                  ? Offset(-(MediaQuery.of(context).size.width - 60), 48)
+                  : const Offset(-308, 48),
               child: GestureDetector(
                 onTap: () {}, // absorb taps — prevent scrim from firing
                 behavior: HitTestBehavior.opaque,
@@ -813,6 +817,7 @@ class _NotificationDropdownPanelState
       onAccept: () => _handleAccept(notification),
       onDecline: () => _handleDecline(notification),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) => widget.onClose());
   }
 
   Future<void> _handleTap(OGANotification notification) async {
@@ -826,7 +831,10 @@ class _NotificationDropdownPanelState
     if (notification.type == 'system') {
       widget.onClose();
       if (notification.actionUrl == '/admin') {
-        Navigator.pushNamed(context, '/admin', arguments: {'initialTab': 1});
+        Navigator.of(
+          context,
+          rootNavigator: false,
+        ).pushNamed('/admin', arguments: {'initialTab': 1});
       }
       return;
     }

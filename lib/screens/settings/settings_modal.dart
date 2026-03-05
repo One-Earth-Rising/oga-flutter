@@ -91,7 +91,7 @@ class _SettingsModalState extends State<SettingsModal> {
     'December',
   ];
 
-  final _tabs = ['Profile', 'Account', 'Password', 'Payment Method', 'Connect'];
+  final _tabs = ['Profile', 'Account', 'Payment Method', 'Connect'];
   int _selectedTabIndex = 0; // Default to Profile
 
   // Editable controllers - Profile tab
@@ -574,7 +574,7 @@ class _SettingsModalState extends State<SettingsModal> {
         const SizedBox(height: 40),
         Center(
           child: Text(
-            'No payment methods added yet.',
+            '💳  Relax. Your wallet is safe... for now.',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.3),
               fontSize: 14,
