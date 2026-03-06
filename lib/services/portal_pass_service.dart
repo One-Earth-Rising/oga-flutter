@@ -126,6 +126,7 @@ class PortalPassService {
           .eq('target_character_id', characterId)
           .limit(1)
           .maybeSingle();
+      debugPrint('🎫 assignRow for $characterId: $assignRow');
       if (assignRow == null) {
         _cache[characterId] = null;
         return null;
