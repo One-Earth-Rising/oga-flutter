@@ -125,7 +125,7 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
               Padding(
                 padding: const EdgeInsets.only(right: 16),
                 child: Image.network(
-                  'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-filles/fbsxoga_logo.png',
+                  'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-files/fbs_season_1_cobrand_logo.png',
                   height: 32,
                   errorBuilder: (_, __, _) => const SizedBox.shrink(),
                 ),

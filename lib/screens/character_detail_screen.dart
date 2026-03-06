@@ -31,6 +31,8 @@ import '../widgets/notification_bell_widget.dart';
 import '../modals/lend_proposal_modal.dart';
 import '../config/oga_storage.dart';
 import '../services/lend_service.dart';
+import '../services/friend_service.dart';
+import '../widgets/portal_pass_section.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -691,6 +693,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           ),
         ),
 
+        // ── Brand logo badge (top-right, responsive) ──────────
+        BrandLogoBadge(characterId: ch.id),
+
         // Back button (desktop only — mobile uses SliverAppBar)
         if (isDesktop) Positioned(top: 16, left: 16, child: _buildBackButton()),
       ],
@@ -1073,11 +1078,24 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           ),
           const SizedBox(height: 20),
 
-          // ── PORTAL PASS ────────────────────────────────
-          _buildPortalPassSection(),
+          // ── PORTAL PASS ────────────────────────────────────────
+          PortalPassSection(
+            characterId: ch.id,
+            characterName: ch.name,
+            isOwned: owned,
+            onViewPass: () => Navigator.pushNamed(
+              context,
+              '/portal-pass',
+              arguments: {'characterId': ch.id},
+            ),
+          ),
           const SizedBox(height: 20),
 
-          // ── SPECIAL REWARDS ────────────────────────────
+          // ── PORTAL PASS SPECIAL REWARD (completion prize) ──────
+          SpecialRewardSection(characterId: ch.id, isOwned: owned),
+          const SizedBox(height: 20),
+
+          // ── SPECIAL REWARDS ────────────────────────────────────
           _buildSectionCard(
             title: 'SPECIAL REWARDS',
             subtitle: '${ch.specialRewards.length} ITEMS',
@@ -3052,188 +3070,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // PORTAL PASS SECTION
-  // ═══════════════════════════════════════════════════════════
-
-  Widget _buildPortalPassSection() {
-    final pass = ch.portalPass;
-
-    if (pass == null) {
-      return _buildSectionCard(
-        title: 'PORTAL PASS',
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _ironGrey, width: 1),
-          ),
-          child: Column(
-            children: [
-              Icon(
-                Icons.rocket_launch,
-                color: _neonGreen.withValues(alpha: 0.5),
-                size: 36,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'NO PORTAL PASS ATTACHED',
-                style: TextStyle(
-                  color: _pureWhite,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Unlock cross-game challenges and exclusive rewards.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: _pureWhite.withValues(alpha: 0.5),
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () =>
-                      Navigator.of(context).pushNamed('/portal-pass'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _neonGreen,
-                    side: BorderSide(color: _neonGreen.withValues(alpha: 0.5)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    'BROWSE PORTAL PASSES',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return _buildSectionCard(
-      title: 'PORTAL PASS',
-      subtitle: 'LVL ${pass.currentLevel}/${pass.maxLevel}',
-      locked: !canInteract,
-      lockedMessage: 'Own this character to track Portal Pass progress',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            pass.name.toUpperCase(),
-            style: const TextStyle(
-              color: _neonGreen,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1,
-            ),
-          ),
-          if (pass.description.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              pass.description,
-              style: TextStyle(
-                color: _pureWhite.withValues(alpha: 0.5),
-                fontSize: 12,
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          _buildProgressBar(
-            pass.progressPercent,
-            pass.currentLevel,
-            pass.maxLevel,
-          ),
-          const SizedBox(height: 20),
-          if (pass.expiresAt != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.timer_outlined,
-                    size: 14,
-                    color: _pureWhite.withValues(alpha: 0.4),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Expires: ${_formatDate(pass.expiresAt!)}',
-                    style: TextStyle(
-                      color: _pureWhite.withValues(alpha: 0.4),
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          if (pass.rewards.isNotEmpty) ...[
-            Text(
-              'MILESTONE REWARDS',
-              style: TextStyle(
-                color: _pureWhite.withValues(alpha: 0.6),
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildMilestoneTrack(pass),
-            const SizedBox(height: 20),
-          ],
-          if (pass.tasks.isNotEmpty) ...[
-            Row(
-              children: [
-                Text(
-                  'ACTIVE TASKS',
-                  style: TextStyle(
-                    color: _pureWhite.withValues(alpha: 0.6),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _neonGreen.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '${pass.tasks.where((t) => t.isCompleted).length}/${pass.tasks.length}',
-                    style: TextStyle(
-                      color: _neonGreen,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            ...pass.tasks.map((task) => _buildInteractiveTaskItem(task)),
-          ],
         ],
       ),
     );

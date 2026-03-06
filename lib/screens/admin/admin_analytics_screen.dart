@@ -40,6 +40,12 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   @override
   void initState() {
     super.initState();
+    // Read initialTab from route arguments (e.g. deep link from notification)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map?;
+      final tab = args?['initialTab'] as int?;
+      if (tab != null && mounted) setState(() => _selectedTab = tab);
+    });
     _loadAllData();
   }
 

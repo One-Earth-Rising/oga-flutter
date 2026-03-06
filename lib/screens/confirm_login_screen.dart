@@ -200,7 +200,7 @@ class _ConfirmLoginScreenState extends State<ConfirmLoginScreen> {
                 children: [
                   // Logo from Supabase Storage
                   Image.network(
-                    'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-filles/oga_logo.png',
+                    'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-files/oga_logo.png',
                     height: 80,
                     errorBuilder: (context, error, stackTrace) {
                       // Fallback to text if logo fails to load

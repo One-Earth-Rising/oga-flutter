@@ -266,7 +266,7 @@ class _GameLinkScreenState extends State<GameLinkScreen>
             child: Row(
               children: [
                 Image.network(
-                  'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-filles/oga_logo.png',
+                  'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-files/oga_logo.png',
                   height: 28,
                   errorBuilder: (_, __, _e) => const Text(
                     'OGA',

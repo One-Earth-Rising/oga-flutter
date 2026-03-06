@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // Replace with your actual verified sender email in Mailtrap
 const SENDER_EMAIL = "hello@oneearthrising.com"; 
 const ADMIN_EMAIL = "jan@oneearthrising.com"; 
-const LOGO_URL = "https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-filles/oga_logo.png";
+const LOGO_URL = "https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-files/oga_logo.png";
 const DISCORD_LINK = "https://discord.gg/G9mbqyNhYD";
 
 serve(async (req: Request) => {
