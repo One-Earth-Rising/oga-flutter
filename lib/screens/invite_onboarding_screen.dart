@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/oga_image.dart';
-import '../config/oga_storage.dart';
-import 'dart:math';
 
 /// Profile setup screen shown after invite signup flow.
 /// 3-step onboarding: Identity → Pick Starter → Preferences
@@ -40,6 +38,8 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
   String? _usernameError;
 
   // Step 2: Character
+  late final PageController _charPageController;
+  int _charPageIndex = 0;
   String? _selectedCharacter;
 
   // Step 3: Preferences
@@ -137,6 +137,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
     final fbs = _characters.where((c) => c['ip'] == 'Final Boss Sour').toList()
       ..shuffle();
     _displayCharacters = fbs.take(3).toList();
+    _charPageController = PageController(viewportFraction: 0.88);
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -150,6 +151,7 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
     _firstNameController.dispose();
     _lastNameController.dispose();
     _usernameController.dispose();
+    _charPageController.dispose();
     _animController.dispose();
     super.dispose();
   }
@@ -252,14 +254,10 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
         Navigator.of(context).pushReplacementNamed('/dashboard');
       }
     } catch (e) {
-      debugPrint('❌ Error saving onboarding: $e');
+      debugPrint('⚠️ Onboarding save error (non-blocking): $e');
+      // Data was already saved — navigate anyway, don't block the user
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to save. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Navigator.of(context).pushReplacementNamed('/dashboard');
       }
     } finally {
       _saveInProgress = false;
@@ -423,8 +421,9 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
             label: 'FIRST NAME',
             hint: 'Enter your first name',
             validator: (v) {
-              if (v == null || v.trim().isEmpty)
+              if (v == null || v.trim().isEmpty) {
                 return 'First name is required';
+              }
               return null;
             },
             textCapitalization: TextCapitalization.words,
@@ -546,36 +545,77 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
         const SizedBox(height: 32),
 
         // Character cards
-        isMobile
-            ? Column(
-                children: _displayCharacters
-                    .map(
-                      (c) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _buildCharacterCard(c),
-                      ),
-                    )
-                    .toList(),
-              )
-            : Row(
-                children: _displayCharacters
-                    .map(
-                      (c) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: _buildCharacterCard(c),
-                        ),
-                      ),
-                    )
-                    .toList(),
+        if (isMobile) ...[
+          // Carousel — one card at a time, full viewport height
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.42,
+            child: PageView.builder(
+              controller: _charPageController,
+              itemCount: _displayCharacters.length,
+              onPageChanged: (i) {
+                setState(() {
+                  _charPageIndex = i;
+                  // Auto-select whichever card is centered
+                  _selectedCharacter = _displayCharacters[i]['id'] as String;
+                });
+              },
+              itemBuilder: (_, i) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: _buildCharacterCard(_displayCharacters[i]),
               ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Dot indicators
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_displayCharacters.length, (i) {
+              final isActive = i == _charPageIndex;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: isActive ? 20 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: isActive ? neonGreen : ironGrey,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 24),
+          // SELECT button — acts on current card
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 0),
+            child: _buildPrimaryButton(
+              label: _selectedCharacter != null
+                  ? 'SELECT ${(_displayCharacters[_charPageIndex]['name'] as String)}'
+                  : 'SWIPE TO CHOOSE',
+              onTap: _selectedCharacter != null ? () => _goToStep(2) : null,
+            ),
+          ),
+        ] else ...[
+          Row(
+            children: _displayCharacters
+                .map(
+                  (c) => Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: _buildCharacterCard(c),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
 
-        const SizedBox(height: 36),
-
-        _buildPrimaryButton(
-          label: 'CONTINUE',
-          onTap: _selectedCharacter != null ? () => _goToStep(2) : null,
-        ),
+        if (!isMobile) ...[
+          const SizedBox(height: 36),
+          _buildPrimaryButton(
+            label: 'CONTINUE',
+            onTap: _selectedCharacter != null ? () => _goToStep(2) : null,
+          ),
+        ],
 
         const SizedBox(height: 12),
         _buildSkipButton(onTap: () => _goToStep(2)),
@@ -617,13 +657,16 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
               : null,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(15),
+            bottomRight: Radius.circular(15),
+          ),
           child: Column(
             children: [
               // Character image area
               AspectRatio(
                 aspectRatio: MediaQuery.of(context).size.width < 600
-                    ? 2.5
+                    ? 1.4
                     : 0.85,
                 child: Stack(
                   fit: StackFit.expand,

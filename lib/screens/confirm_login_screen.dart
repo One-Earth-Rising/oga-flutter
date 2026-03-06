@@ -142,6 +142,49 @@ class _ConfirmLoginScreenState extends State<ConfirmLoginScreen> {
     }
   }
 
+  Widget _buildFixStep(String number, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: const Color(0xFF39FF14).withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFF39FF14).withValues(alpha: 0.4),
+            ),
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: const TextStyle(
+                color: Color(0xFF39FF14),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -157,7 +200,7 @@ class _ConfirmLoginScreenState extends State<ConfirmLoginScreen> {
                 children: [
                   // Logo from Supabase Storage
                   Image.network(
-                    'https://mlpinkcxdsmxicipseux.supabase.co/storage/v1/object/public/campaign-assets/fbs_launch/oga_logo.png',
+                    'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-filles/oga_logo.png',
                     height: 80,
                     errorBuilder: (context, error, stackTrace) {
                       // Fallback to text if logo fails to load
@@ -198,7 +241,7 @@ class _ConfirmLoginScreenState extends State<ConfirmLoginScreen> {
                   Text(
                     _confirmationUrl != null
                         ? 'Click the button below to complete your login securely.'
-                        : 'Invalid confirmation link. Please request a new magic link.',
+                        : 'This link was opened in a different browser than where you signed up.',
                     style: const TextStyle(color: Colors.white70, fontSize: 16),
                     textAlign: TextAlign.center,
                   ),
@@ -237,6 +280,97 @@ class _ConfirmLoginScreenState extends State<ConfirmLoginScreen> {
                               ),
                       ),
                     ),
+
+                  // Error state — PKCE browser mismatch instructions
+                  if (_confirmationUrl == null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A1A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF39FF14).withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Color(0xFF39FF14),
+                                size: 18,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'HOW TO FIX THIS',
+                                style: TextStyle(
+                                  color: Color(0xFF39FF14),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Your sign-in link must be opened in the same browser where you started. Gmail and Mail apps use a built-in browser that breaks this.',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildFixStep('1', 'Go back to your email'),
+                          const SizedBox(height: 8),
+                          _buildFixStep('2', 'Tap ••• or the share icon'),
+                          const SizedBox(height: 8),
+                          _buildFixStep(
+                            '3',
+                            'Choose "Open in Safari" or "Open in Chrome"',
+                          ),
+                          const SizedBox(height: 16),
+                          const Divider(color: Color(0xFF2C2C2C)),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'OR — copy the link from your email and paste it directly into Safari or Chrome:',
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton(
+                        onPressed: () =>
+                            Navigator.pushReplacementNamed(context, '/signin'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Color(0xFF2C2C2C)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'REQUEST A NEW LINK',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 60),
 
                   // Security note

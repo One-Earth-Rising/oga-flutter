@@ -212,7 +212,7 @@ class _FbsQrScannerSheetState extends State<FbsQrScannerSheet> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16 + MediaQuery.of(context).viewPadding.bottom),
         ],
       ),
     );

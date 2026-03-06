@@ -139,7 +139,9 @@ class _FbsRedeemModalState extends State<FbsRedeemModal>
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom:
+            MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).viewPadding.bottom,
       ),
       child: Container(
         decoration: const BoxDecoration(

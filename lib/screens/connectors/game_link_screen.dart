@@ -233,6 +233,9 @@ class _GameLinkScreenState extends State<GameLinkScreen>
     final screenHeight = MediaQuery.of(context).size.height;
     return Container(
       constraints: BoxConstraints(maxHeight: screenHeight * 0.88),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewPadding.bottom,
+      ),
       decoration: const BoxDecoration(
         color: _void,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
