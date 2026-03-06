@@ -119,13 +119,13 @@ class PortalPassService {
     try {
       final userEmail = _supabase.auth.currentUser?.email;
 
-      // 1. Resolve pass_id for this character
+      // 1. Resolve pass_id for this character via portal_pass_tasks
       final assignRow = await _supabase
-          .from('character_portal_passes')
+          .from('portal_pass_tasks')
           .select('pass_id')
-          .eq('character_id', characterId)
+          .eq('target_character_id', characterId)
+          .limit(1)
           .maybeSingle();
-
       if (assignRow == null) {
         _cache[characterId] = null;
         return null;
