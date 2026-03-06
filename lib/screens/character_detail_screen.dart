@@ -2483,11 +2483,16 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
   Widget _buildGameVariations() {
     if (ch.gameVariations.isEmpty) {
-      return Text(
-        'No game variations available yet.',
-        style: TextStyle(color: _pureWhite.withValues(alpha: 0.5)),
+      return Container(
+        height: 200, // <-- Added height to match the carousel
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'No game variations available yet.',
+          style: TextStyle(color: _pureWhite.withValues(alpha: 0.5)),
+        ),
       );
     }
+    // ... rest of your existing code
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3672,11 +3677,16 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
   Widget _buildSpecialRewards() {
     if (ch.specialRewards.isEmpty) {
-      return Text(
-        'No special rewards yet.',
-        style: TextStyle(color: _pureWhite.withValues(alpha: 0.5)),
+      return Container(
+        height: 140, // <-- Added height to match the list view below
+        alignment: Alignment.centerLeft, // Keeps text aligned properly
+        child: Text(
+          'No special rewards yet.',
+          style: TextStyle(color: _pureWhite.withValues(alpha: 0.5)),
+        ),
       );
     }
+
     return SizedBox(
       height: 140,
       child: ListView.builder(

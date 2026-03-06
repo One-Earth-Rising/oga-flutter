@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/fbs_service.dart';
 import '../modals/fbs_redeem_modal.dart';
-import 'fbs_qr_scanner_screen.dart';
+import 'fbs_qr_scanner_screen.dart' show FbsQrScannerSheet;
 
 class PortalPassScreen extends StatefulWidget {
   const PortalPassScreen({super.key});
@@ -587,81 +587,17 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
 
   Widget _scanQrButton() {
     return OutlinedButton.icon(
-      onPressed: () => showDialog(
-        context: context,
-        builder: (_) => Dialog(
-          backgroundColor: _charcoal,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: _ironGrey),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: _neonGreen.withValues(alpha: 0.08),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.qr_code_scanner,
-                    color: _neonGreen,
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'HOW TO SCAN',
-                  style: TextStyle(
-                    color: _white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                    fontFamily: 'Helvetica Neue',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Open your phone\'s default camera app and point it at the QR code on the FBS candy packaging.\n\nIt will automatically open this page with your code pre-filled.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: _white.withValues(alpha: 0.55),
-                    fontSize: 13,
-                    height: 1.6,
-                    fontFamily: 'Helvetica Neue',
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _neonGreen,
-                      foregroundColor: _black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: const Text(
-                      'GOT IT',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1,
-                        fontFamily: 'Helvetica Neue',
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      onPressed: () async {
+        final code = await FbsQrScannerSheet.show(context);
+        if (code != null && mounted) {
+          FbsRedeemModal.show(
+            context,
+            onSuccess: _onCodeRedeemed,
+            initialCode: code,
+          );
+        }
+      },
+
       icon: const Icon(Icons.qr_code_scanner, size: 18),
       label: const Text('SCAN QR CODE'),
       style: OutlinedButton.styleFrom(
