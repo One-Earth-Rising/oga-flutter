@@ -329,8 +329,10 @@ class _CharacterCardState extends State<CharacterCard>
           ),
 
         // Brand logo badge (portal pass co-branding)
-        if (widget.character.brandCardLogoUrl != null)
-          BrandLogoBadge(logoUrl: widget.character.brandCardLogoUrl),
+        BrandLogoBadge(
+          logoUrl: widget.character.brandCardLogoUrl,
+          characterId: widget.character.id,
+        ),
 
         // Countdown badge for borrowed (top-right)
         if (widget.isBorrowed && widget.lendReturnDate != null)

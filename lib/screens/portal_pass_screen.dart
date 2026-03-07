@@ -145,7 +145,8 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
                   padding: const EdgeInsets.only(right: 16),
                   child: Image.network(
                     _cobrandLogoUrl!,
-                    height: 32,
+                    height: 100,
+                    fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   ),
                 ),
