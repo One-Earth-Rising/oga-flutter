@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/fbs_service.dart';
 import '../modals/fbs_redeem_modal.dart';
 import 'fbs_qr_scanner_screen.dart' show FbsQrScannerSheet;
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 class PortalPassScreen extends StatefulWidget {
   const PortalPassScreen({super.key});
@@ -487,8 +488,6 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
           else
             isDesktop ? _fbsCharacterGridDesktop() : _fbsCharacterGridMobile(),
 
-          const SizedBox(height: 32),
-          _buildGameplaySection(),
           const SizedBox(height: 32),
           _whereToFindCard(),
           const SizedBox(height: 40),
@@ -1265,8 +1264,8 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
 // VIDEO LIGHTBOX — shared widget (mirrors character_detail_screen.dart)
 // ═══════════════════════════════════════════════════════════════════
 
-class _VideoLightbox extends StatelessWidget {
-  final String videoUrl;
+class _VideoLightbox extends StatefulWidget {
+  final String videoUrl; // youtu.be/XXXX or youtube.com/watch?v=XXXX
   final String label;
   final String? thumbnailUrl;
 
@@ -1277,115 +1276,72 @@ class _VideoLightbox extends StatelessWidget {
   });
 
   @override
+  State<_VideoLightbox> createState() => _VideoLightboxState();
+}
+
+class _VideoLightboxState extends State<_VideoLightbox> {
+  late YoutubePlayerController _controller;
+
+  String _extractVideoId(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return '';
+    // youtu.be/XXXX
+    if (uri.host.contains('youtu.be')) return uri.pathSegments.first;
+    // youtube.com/watch?v=XXXX
+    return uri.queryParameters['v'] ?? '';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final videoId = _extractVideoId(widget.videoUrl);
+    _controller = YoutubePlayerController.fromVideoId(
+      videoId: videoId,
+      autoPlay: true,
+      params: const YoutubePlayerParams(
+        showControls: true,
+        showFullscreenButton: true,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) Navigator.of(context).pop();
+      },
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         body: Stack(
-          fit: StackFit.expand,
           children: [
-            if (thumbnailUrl != null)
-              Image.network(
-                thumbnailUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Container(color: const Color(0xFF121212)),
-              )
-            else
-              Container(color: const Color(0xFF121212)),
-            Container(color: Colors.black.withValues(alpha: 0.6)),
             Center(
-              child: GestureDetector(
-                onTap: () => launchUrl(
-                  Uri.parse(videoUrl),
-                  mode: LaunchMode.externalApplication,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF39FF14),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFF39FF14,
-                            ).withValues(alpha: 0.4),
-                            blurRadius: 32,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        color: Colors.black,
-                        size: 48,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF121212).withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF2C2C2C)),
-                      ),
-                      child: const Text(
-                        'TAP TO WATCH ON YOUTUBE',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              child: YoutubePlayer(
+                controller: _controller,
+                aspectRatio: 16 / 9,
               ),
             ),
             Positioned(
               top: MediaQuery.of(context).padding.top + 12,
               left: 16,
-              right: 16,
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF121212).withValues(alpha: 0.9),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFF2C2C2C).withValues(alpha: 0.5),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF121212).withValues(alpha: 0.9),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF2C2C2C)),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
+                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                ),
               ),
             ),
           ],

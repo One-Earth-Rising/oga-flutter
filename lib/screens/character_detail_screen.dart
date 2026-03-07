@@ -34,6 +34,7 @@ import '../config/oga_storage.dart';
 import '../services/lend_service.dart';
 import '../services/friend_service.dart';
 import '../widgets/portal_pass_section.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 // ─── Brand Colors (Heimdal V2) ──────────────────────────────
 const Color _voidBlack = Color(0xFF000000);
@@ -1098,8 +1099,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             title: '${ch.name.toUpperCase()} MULTIGAMEVERSE',
             subtitle: '${ch.gameVariations.length} GAMES',
             child: _buildGameVariations(),
-            locked: !canInteract,
-            lockedMessage: 'Own this character to explore all game versions',
+            locked: false,
           ),
           const SizedBox(height: 20),
 
@@ -1118,16 +1118,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
           // ── PORTAL PASS SPECIAL REWARD (completion prize) ──────
           SpecialRewardSection(characterId: ch.id, isOwned: owned),
-          const SizedBox(height: 20),
-
-          // ── SPECIAL REWARDS ────────────────────────────────────
-          _buildSectionCard(
-            title: 'SPECIAL REWARDS',
-            subtitle: '${ch.specialRewards.length} ITEMS',
-            child: _buildSpecialRewards(),
-            locked: !canInteract,
-            lockedMessage: 'Own this character to unlock rewards',
-          ),
           const SizedBox(height: 20),
 
           // ── OWNERSHIP HISTORY ──────────────────────────
@@ -4994,8 +4984,8 @@ class _ExpandableOwnerRowState extends State<_ExpandableOwnerRow> {
 // VIDEO LIGHTBOX — thumbnail + play button, taps open YouTube
 // ═══════════════════════════════════════════════════════════════════
 
-class _VideoLightbox extends StatelessWidget {
-  final String videoUrl;
+class _VideoLightbox extends StatefulWidget {
+  final String videoUrl; // youtu.be/XXXX or youtube.com/watch?v=XXXX
   final String label;
   final String? thumbnailUrl;
 
@@ -5006,122 +4996,72 @@ class _VideoLightbox extends StatelessWidget {
   });
 
   @override
+  State<_VideoLightbox> createState() => _VideoLightboxState();
+}
+
+class _VideoLightboxState extends State<_VideoLightbox> {
+  late YoutubePlayerController _controller;
+
+  String _extractVideoId(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return '';
+    // youtu.be/XXXX
+    if (uri.host.contains('youtu.be')) return uri.pathSegments.first;
+    // youtube.com/watch?v=XXXX
+    return uri.queryParameters['v'] ?? '';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final videoId = _extractVideoId(widget.videoUrl);
+    _controller = YoutubePlayerController.fromVideoId(
+      videoId: videoId,
+      autoPlay: true,
+      params: const YoutubePlayerParams(
+        showControls: true,
+        showFullscreenButton: true,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) Navigator.of(context).pop();
+      },
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.black,
         body: Stack(
-          fit: StackFit.expand,
           children: [
-            // Thumbnail background
-            if (thumbnailUrl != null)
-              Image.network(
-                thumbnailUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Container(color: const Color(0xFF121212)),
-              )
-            else
-              Container(color: const Color(0xFF121212)),
-
-            // Dark overlay
-            Container(color: Colors.black.withValues(alpha: 0.6)),
-
-            // Play button — taps open YouTube in browser tab
             Center(
-              child: GestureDetector(
-                onTap: () => launchUrl(
-                  Uri.parse(videoUrl),
-                  mode: LaunchMode.externalApplication,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF39FF14),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFF39FF14,
-                            ).withValues(alpha: 0.4),
-                            blurRadius: 32,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        color: Colors.black,
-                        size: 48,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF121212).withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF2C2C2C)),
-                      ),
-                      child: const Text(
-                        'TAP TO WATCH ON YOUTUBE',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              child: YoutubePlayer(
+                controller: _controller,
+                aspectRatio: 16 / 9,
               ),
             ),
-
-            // Label + close
             Positioned(
               top: MediaQuery.of(context).padding.top + 12,
               left: 16,
-              right: 16,
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF121212).withValues(alpha: 0.9),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFF2C2C2C).withValues(alpha: 0.5),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF121212).withValues(alpha: 0.9),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF2C2C2C)),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
+                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                ),
               ),
             ),
           ],
