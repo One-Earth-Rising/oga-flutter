@@ -3,7 +3,6 @@
 // Shows cross-game progression and FBS candy unlock flow.
 // Replaces/extends the existing portal pass section from the character detail screen.
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -147,7 +146,7 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
                     _cobrandLogoUrl!,
                     height: 100,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
                   ),
                 ),
             ],
@@ -465,6 +464,8 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
             isDesktop ? _fbsCharacterGridDesktop() : _fbsCharacterGridMobile(),
 
           const SizedBox(height: 32),
+          _buildGameplaySection(),
+          const SizedBox(height: 32),
           _whereToFindCard(),
           const SizedBox(height: 40),
         ],
@@ -722,7 +723,7 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
               child: Image.network(
                 'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/${char.id}.png',
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, _) =>
+                errorBuilder: (_, _, _) =>
                     _fbsPlaceholder(char, locked: !isUnlocked),
               ),
             ),
@@ -838,18 +839,19 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
             ),
           ),
 
-          // Tap to unlock (locked cards)
-          if (!isUnlocked)
-            Positioned.fill(
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () =>
-                      FbsRedeemModal.show(context, onSuccess: _onCodeRedeemed),
+          // Tap → character detail (multigameverse, portal pass, FOMO)
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => Navigator.of(context).pushNamed(
+                  '/character-detail',
+                  arguments: {'characterId': char.id},
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
@@ -1050,6 +1052,128 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // ─── Gameplay Videos ─────────────────────────────────────────
+  Widget _buildGameplaySection() {
+    // Only show characters that have a video — hide section entirely if none do
+    final withVideo = _fbsCharacters
+        .where((c) => c.gameplayVideoUrl != null)
+        .toList();
+    if (withVideo.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionLabel('GAMEPLAY'),
+        const SizedBox(height: 14),
+        ...withVideo.map(_gameplayCard),
+      ],
+    );
+  }
+
+  Widget _gameplayCard(FbsCharacter char) {
+    final title = char.name.toUpperCase();
+    final videoUrl = char.gameplayVideoUrl ?? '';
+    final thumbUrl = char.gameplayThumbnailUrl;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: GestureDetector(
+        onTap: () => launchUrl(
+          Uri.parse(videoUrl),
+          mode: LaunchMode.externalApplication,
+        ),
+        child: Container(
+          height: 200,
+          decoration: BoxDecoration(
+            color: _charcoal,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _ironGrey),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Thumbnail
+              if (thumbUrl != null)
+                Image.network(
+                  thumbUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(color: _charcoal),
+                )
+              else
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        _neonGreen.withValues(alpha: 0.08),
+                        Colors.black,
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Dark gradient overlay
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.7),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Play button
+              Center(
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: _neonGreen,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _neonGreen.withValues(alpha: 0.4),
+                        blurRadius: 24,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.black,
+                    size: 36,
+                  ),
+                ),
+              ),
+
+              // Title
+              Positioned(
+                bottom: 14,
+                left: 16,
+                right: 16,
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                    fontFamily: 'Helvetica Neue',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
