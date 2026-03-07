@@ -694,7 +694,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
         ),
 
         // ── Brand logo badge (top-right, responsive) ──────────
-        BrandLogoBadge(characterId: ch.id),
+        CoBrandLogoBadge(characterId: ch.id),
 
         // Back button (desktop only — mobile uses SliverAppBar)
         if (isDesktop) Positioned(top: 16, left: 16, child: _buildBackButton()),
@@ -771,6 +771,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                           letterSpacing: 3,
                         ),
                       ),
+                      // Brand logo overlay on hero card
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        child: BrandLogoBadge(characterId: ch.id),
+                      ),
+                      BrandLogoBadge(characterId: ch.id),
                     ],
                   ),
                 ),

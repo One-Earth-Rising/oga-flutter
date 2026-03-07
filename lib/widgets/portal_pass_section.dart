@@ -198,15 +198,9 @@ class _PassCard extends StatelessWidget {
           // Brand logo — top-right, larger on web
           if (pass.brandLogoUrl != null) ...[
             const SizedBox(width: 16),
-            Container(
+            SizedBox(
               width: logoSize,
               height: logoSize,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: Colors.black,
-                border: Border.all(color: _ironGrey),
-              ),
-              clipBehavior: Clip.antiAlias,
               child: Image.network(
                 pass.brandLogoUrl!,
                 fit: BoxFit.contain,
@@ -782,16 +776,22 @@ class _SpecialRewardCard extends StatelessWidget {
 // Reads brand logo URL from the character's portal pass.
 // ═══════════════════════════════════════════════════════════════
 
-class BrandLogoBadge extends StatefulWidget {
+// ═══════════════════════════════════════════════════════════════
+// CO-BRAND LOGO BADGE
+// Pane edge + portal pass section header.
+// Shows the brand × OGA cobrand logo (brand_logo_url).
+// ═══════════════════════════════════════════════════════════════
+
+class CoBrandLogoBadge extends StatefulWidget {
   final String characterId;
 
-  const BrandLogoBadge({super.key, required this.characterId});
+  const CoBrandLogoBadge({super.key, required this.characterId});
 
   @override
-  State<BrandLogoBadge> createState() => _BrandLogoBadgeState();
+  State<CoBrandLogoBadge> createState() => _CoBrandLogoBadgeState();
 }
 
-class _BrandLogoBadgeState extends State<BrandLogoBadge> {
+class _CoBrandLogoBadgeState extends State<CoBrandLogoBadge> {
   PortalPassData? _pass;
 
   @override
@@ -815,24 +815,59 @@ class _BrandLogoBadgeState extends State<BrandLogoBadge> {
     return Positioned(
       top: padding,
       right: padding,
-      child: Container(
+      child: SizedBox(
         width: size,
         height: size,
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.75),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _ironGrey),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
         child: Image.network(
           _pass!.brandLogoUrl!,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BRAND LOGO BADGE
+// Hero card corner overlay.
+// Shows the solo brand logo (brand_card_logo_url).
+// ═══════════════════════════════════════════════════════════════
+
+class BrandLogoBadge extends StatefulWidget {
+  final String characterId;
+
+  const BrandLogoBadge({super.key, required this.characterId});
+
+  @override
+  State<BrandLogoBadge> createState() => _BrandLogoBadgeState();
+}
+
+class _BrandLogoBadgeState extends State<BrandLogoBadge> {
+  PortalPassData? _pass;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final p = await PortalPassService.getForCharacter(widget.characterId);
+    if (mounted && p?.brandCardLogoUrl != null) setState(() => _pass = p);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_pass?.brandCardLogoUrl == null) return const SizedBox.shrink();
+    return Positioned(
+      top: 12,
+      right: 12,
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: Image.network(
+          _pass!.brandCardLogoUrl!,
           fit: BoxFit.contain,
           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
         ),

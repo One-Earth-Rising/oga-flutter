@@ -12,6 +12,7 @@ class PortalPassData {
   final String type; // brand_campaign | external_ip | game_asset
   final String? brandName;
   final String? brandLogoUrl;
+  final String? brandCardLogoUrl;
   final String? seasonName;
   final String? description;
   final DateTime? expiresAt;
@@ -28,6 +29,7 @@ class PortalPassData {
     required this.type,
     this.brandName,
     this.brandLogoUrl,
+    this.brandCardLogoUrl,
     this.seasonName,
     this.description,
     this.expiresAt,
@@ -188,6 +190,7 @@ class PortalPassService {
         type: passRow['type'] as String,
         brandName: passRow['brand_name'] as String?,
         brandLogoUrl: passRow['brand_logo_url'] as String?,
+        brandCardLogoUrl: passRow['brand_card_logo_url'] as String?,
         seasonName: passRow['season_name'] as String?,
         description: passRow['description'] as String?,
         expiresAt: passRow['expires_at'] != null
