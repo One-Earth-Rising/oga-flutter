@@ -29,8 +29,6 @@ class FbsCharacter {
   final String name;
   final String flavor;
   final String imageUrl;
-  final String? gameplayVideoUrl;
-  final String? gameplayThumbnailUrl;
   bool isOwned;
 
   FbsCharacter({
@@ -38,8 +36,6 @@ class FbsCharacter {
     required this.name,
     required this.flavor,
     required this.imageUrl,
-    this.gameplayVideoUrl,
-    this.gameplayThumbnailUrl,
     this.isOwned = false,
   });
 }
@@ -121,36 +117,7 @@ class FbsService {
     final user = _supabase.auth.currentUser;
     final ids = allFbsCharacters.map((c) => c.id).toList();
 
-    // Fetch gameplay data from characters table (always, regardless of auth)
-    final Map<String, Map<String, dynamic>> gameplayData = {};
-    try {
-      final rows = await _supabase
-          .from('characters')
-          .select('id, gameplay_video_url, gameplay_thumbnail_url')
-          .inFilter('id', ids);
-      for (final row in rows as List) {
-        gameplayData[row['id'] as String] = row;
-      }
-    } catch (e) {
-      debugPrint('[FbsService] gameplay fetch error: $e');
-    }
-
-    FbsCharacter _merge(FbsCharacter c, {bool owned = false}) {
-      final gd = gameplayData[c.id];
-      return FbsCharacter(
-        id: c.id,
-        name: c.name,
-        flavor: c.flavor,
-        imageUrl: c.imageUrl,
-        gameplayVideoUrl: gd?['gameplay_video_url'] as String?,
-        gameplayThumbnailUrl: gd?['gameplay_thumbnail_url'] as String?,
-        isOwned: owned,
-      );
-    }
-
-    if (user == null) {
-      return allFbsCharacters.map((c) => _merge(c)).toList();
-    }
+    if (user == null) return allFbsCharacters;
 
     try {
       final owned = await _supabase
@@ -164,12 +131,13 @@ class FbsService {
           .map((row) => row['character_id'] as String)
           .toSet();
 
-      return allFbsCharacters
-          .map((c) => _merge(c, owned: ownedIds.contains(c.id)))
-          .toList();
+      return allFbsCharacters.map((c) {
+        c.isOwned = ownedIds.contains(c.id);
+        return c;
+      }).toList();
     } catch (e) {
       debugPrint('[FbsService] loadFbsCharactersForUser error: $e');
-      return allFbsCharacters.map((c) => _merge(c)).toList();
+      return allFbsCharacters;
     }
   }
 

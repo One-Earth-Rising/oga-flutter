@@ -31,6 +31,8 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
 
   // ─── State ───────────────────────────────────────────────────
   List<FbsCharacter> _fbsCharacters = [];
+  // character_id → list of gameplay video rows
+  Map<String, List<Map<String, dynamic>>> _gameplayByChar = {};
   bool _loading = true;
   String? _successCharacterId;
   String? _cobrandLogoUrl;
@@ -72,9 +74,31 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
       debugPrint('⚠️ Portal pass logo load failed: $e');
     }
 
+    // Load gameplay videos for all FBS characters
+    final Map<String, List<Map<String, dynamic>>> gameplayMap = {};
+    try {
+      final fbsIds = chars.map((c) => c.id).toList();
+      final rows = await Supabase.instance.client
+          .from('character_gameplay_videos')
+          .select(
+            'character_id, game_name, video_url, thumbnail_url, sort_order',
+          )
+          .inFilter('character_id', fbsIds)
+          .order('sort_order');
+      for (final row in rows as List) {
+        final charId = row['character_id'] as String;
+        gameplayMap
+            .putIfAbsent(charId, () => [])
+            .add(Map<String, dynamic>.from(row));
+      }
+    } catch (e) {
+      debugPrint('⚠️ Gameplay videos load failed: $e');
+    }
+
     if (mounted) {
       setState(() {
         _fbsCharacters = chars;
+        _gameplayByChar = gameplayMap;
         _cobrandLogoUrl = passRow?['brand_logo_url'] as String?;
         _brandLogoUrl = passRow?['brand_card_logo_url'] as String?;
         _loading = false;
@@ -1058,32 +1082,51 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
 
   // ─── Gameplay Videos ─────────────────────────────────────────
   Widget _buildGameplaySection() {
-    // Only show characters that have a video — hide section entirely if none do
-    final withVideo = _fbsCharacters
-        .where((c) => c.gameplayVideoUrl != null)
-        .toList();
-    if (withVideo.isEmpty) return const SizedBox.shrink();
+    // Collect all videos across all FBS characters, preserving character context
+    final allVideos = <Map<String, dynamic>>[];
+    for (final char in _fbsCharacters) {
+      final videos = _gameplayByChar[char.id] ?? [];
+      for (final v in videos) {
+        allVideos.add({...v, '_charName': char.name});
+      }
+    }
+    if (allVideos.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionLabel('GAMEPLAY'),
         const SizedBox(height: 14),
-        ...withVideo.map(_gameplayCard),
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: allVideos.length,
+            itemBuilder: (context, index) {
+              final v = allVideos[index];
+              return _gameplayCard(v, isLast: index == allVideos.length - 1);
+            },
+          ),
+        ),
       ],
     );
   }
 
-  Widget _gameplayCard(FbsCharacter char) {
-    final title = char.name.toUpperCase();
-    final videoUrl = char.gameplayVideoUrl ?? '';
-    final thumbUrl = char.gameplayThumbnailUrl;
+  Widget _gameplayCard(Map<String, dynamic> video, {bool isLast = false}) {
+    final charName = (video['_charName'] as String? ?? '').toUpperCase();
+    final gameName = (video['game_name'] as String? ?? '').toUpperCase();
+    final title = charName.isNotEmpty ? '$charName · $gameName' : gameName;
+    final videoUrl = video['video_url'] as String? ?? '';
+    final thumbUrl = video['thumbnail_url'] as String?;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: GestureDetector(
-        onTap: () => launchUrl(
-          Uri.parse(videoUrl),
-          mode: LaunchMode.externalApplication,
+        onTap: () => _openVideoLightbox(
+          context,
+          videoUrl,
+          title,
+          thumbnailUrl: video['thumbnail_url'] as String?,
         ),
         child: Container(
           height: 200,
@@ -1178,6 +1221,31 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
     );
   }
 
+  // ─── Video Lightbox ──────────────────────────────────────────
+  void _openVideoLightbox(
+    BuildContext context,
+    String videoUrl,
+    String label, {
+    String? thumbnailUrl,
+  }) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withValues(alpha: 0.95),
+        barrierDismissible: true,
+        transitionDuration: const Duration(milliseconds: 250),
+        pageBuilder: (context, animation, _) => FadeTransition(
+          opacity: animation,
+          child: _VideoLightbox(
+            videoUrl: videoUrl,
+            label: label,
+            thumbnailUrl: thumbnailUrl,
+          ),
+        ),
+      ),
+    );
+  }
+
   // ─── Helpers ─────────────────────────────────────────────────
   Widget _sectionLabel(String label) {
     return Text(
@@ -1188,6 +1256,140 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
         fontWeight: FontWeight.w700,
         letterSpacing: 2,
         fontFamily: 'Helvetica Neue',
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VIDEO LIGHTBOX — shared widget (mirrors character_detail_screen.dart)
+// ═══════════════════════════════════════════════════════════════════
+
+class _VideoLightbox extends StatelessWidget {
+  final String videoUrl;
+  final String label;
+  final String? thumbnailUrl;
+
+  const _VideoLightbox({
+    required this.videoUrl,
+    required this.label,
+    this.thumbnailUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (thumbnailUrl != null)
+              Image.network(
+                thumbnailUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Container(color: const Color(0xFF121212)),
+              )
+            else
+              Container(color: const Color(0xFF121212)),
+            Container(color: Colors.black.withValues(alpha: 0.6)),
+            Center(
+              child: GestureDetector(
+                onTap: () => launchUrl(
+                  Uri.parse(videoUrl),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF39FF14),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF39FF14,
+                            ).withValues(alpha: 0.4),
+                            blurRadius: 32,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.black,
+                        size: 48,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF121212).withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF2C2C2C)),
+                      ),
+                      child: const Text(
+                        'TAP TO WATCH ON YOUTUBE',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 12,
+              left: 16,
+              right: 16,
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF121212).withValues(alpha: 0.9),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF2C2C2C).withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

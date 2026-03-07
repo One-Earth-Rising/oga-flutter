@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import '../models/oga_character.dart';
 import '../widgets/oga_image.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/invite_service.dart';
 import '../services/analytics_service.dart';
@@ -92,6 +93,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
   /// True if user can interact with features (owns or borrows)
   bool get canInteract => owned || isBorrowed;
 
+  // Gameplay videos loaded from character_gameplay_videos table
+  List<Map<String, dynamic>> _gameplayVideos = [];
+
   // Cached invite code for share URL generation
   String? _userInviteCode;
   bool _isFetchingInviteCode = false;
@@ -139,6 +143,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     _assetId = widget.assetId;
     _loadOwnershipHistory();
     _loadCounterpartyProfiles();
+    _loadGameplayVideos();
   }
 
   @override
@@ -294,6 +299,23 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     } catch (e) {
       debugPrint('>>> Ownership history load error: $e');
       if (mounted) setState(() => _isLoadingHistory = false);
+    }
+  }
+
+  Future<void> _loadGameplayVideos() async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('character_gameplay_videos')
+          .select('game_name, video_url, thumbnail_url, sort_order')
+          .eq('character_id', ch.id)
+          .order('sort_order');
+      if (mounted) {
+        setState(() {
+          _gameplayVideos = List<Map<String, dynamic>>.from(rows);
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ Gameplay videos load failed for ${ch.id}: $e');
     }
   }
 
@@ -1119,12 +1141,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           const SizedBox(height: 20),
 
           // ── GAMEPLAY ───────────────────────────────────
-          if (ch.gameplayMedia.isNotEmpty)
+          if (_gameplayVideos.isNotEmpty)
             _buildSectionCard(
               title: 'GAMEPLAY',
-              child: _buildGameplayGallery(),
-              locked: !canInteract,
-              lockedMessage: 'Own this character to view gameplay',
+              child: _buildGameplayCarousel(),
             ),
 
           const SizedBox(height: 40),
@@ -3992,9 +4012,178 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // GAMEPLAY GALLERY
-  // ═══════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
+  // GAMEPLAY — per-game video carousel
+  // ═══════════════════════════════════════════════════════════════════
+
+  Widget _buildGameplayCarousel() {
+    return SizedBox(
+      height: 180,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _gameplayVideos.length,
+        itemBuilder: (context, index) {
+          final video = _gameplayVideos[index];
+          final gameName = (video['game_name'] as String? ?? '').toUpperCase();
+          final videoUrl = video['video_url'] as String? ?? '';
+          final thumbUrl = video['thumbnail_url'] as String?;
+          final isLast = index == _gameplayVideos.length - 1;
+
+          return GestureDetector(
+            onTap: () => _openVideoLightbox(
+              context,
+              videoUrl,
+              gameName,
+              thumbnailUrl: thumbUrl,
+            ),
+            child: Container(
+              width: 260,
+              margin: EdgeInsets.only(right: isLast ? 0 : 12),
+              decoration: BoxDecoration(
+                color: _voidBlack,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _ironGrey.withValues(alpha: 0.3)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Thumbnail
+                  if (thumbUrl != null)
+                    Image.network(
+                      thumbUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          Container(color: _deepCharcoal),
+                    )
+                  else
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            _neonGreen.withValues(alpha: 0.08),
+                            _voidBlack,
+                          ],
+                        ),
+                      ),
+                    ),
+                  // Dark gradient overlay
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          _voidBlack.withValues(alpha: 0.75),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Play button
+                  Center(
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: _neonGreen,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: _neonGreen.withValues(alpha: 0.4),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.black,
+                        size: 32,
+                      ),
+                    ),
+                  ),
+                  // Game label bottom-left
+                  Positioned(
+                    bottom: 12,
+                    left: 14,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          gameName,
+                          style: const TextStyle(
+                            color: _pureWhite,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${ch.name.toUpperCase()} GAMEPLAY',
+                          style: TextStyle(
+                            color: _neonGreen,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Fullscreen icon top-right
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: _voidBlack.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Icon(
+                        Icons.fullscreen,
+                        color: _pureWhite.withValues(alpha: 0.7),
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _openVideoLightbox(
+    BuildContext context,
+    String videoUrl,
+    String label, {
+    String? thumbnailUrl,
+  }) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: _voidBlack.withValues(alpha: 0.95),
+        barrierDismissible: true,
+        transitionDuration: const Duration(milliseconds: 250),
+        pageBuilder: (context, animation, _) => FadeTransition(
+          opacity: animation,
+          child: _VideoLightbox(
+            videoUrl: videoUrl,
+            label: label,
+            thumbnailUrl: thumbnailUrl,
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildGameplayGallery() {
     return SizedBox(
@@ -4795,6 +4984,147 @@ class _ExpandableOwnerRowState extends State<_ExpandableOwnerRow> {
             fontWeight: FontWeight.w800,
             fontSize: 14,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VIDEO LIGHTBOX — thumbnail + play button, taps open YouTube
+// ═══════════════════════════════════════════════════════════════════
+
+class _VideoLightbox extends StatelessWidget {
+  final String videoUrl;
+  final String label;
+  final String? thumbnailUrl;
+
+  const _VideoLightbox({
+    required this.videoUrl,
+    required this.label,
+    this.thumbnailUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Thumbnail background
+            if (thumbnailUrl != null)
+              Image.network(
+                thumbnailUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Container(color: const Color(0xFF121212)),
+              )
+            else
+              Container(color: const Color(0xFF121212)),
+
+            // Dark overlay
+            Container(color: Colors.black.withValues(alpha: 0.6)),
+
+            // Play button — taps open YouTube in browser tab
+            Center(
+              child: GestureDetector(
+                onTap: () => launchUrl(
+                  Uri.parse(videoUrl),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF39FF14),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF39FF14,
+                            ).withValues(alpha: 0.4),
+                            blurRadius: 32,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.black,
+                        size: 48,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF121212).withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF2C2C2C)),
+                      ),
+                      child: const Text(
+                        'TAP TO WATCH ON YOUTUBE',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Label + close
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 12,
+              left: 16,
+              right: 16,
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF121212).withValues(alpha: 0.9),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF2C2C2C).withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
