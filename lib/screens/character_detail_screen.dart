@@ -771,13 +771,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                           letterSpacing: 3,
                         ),
                       ),
-                      // Brand logo overlay on hero card
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: BrandLogoBadge(characterId: ch.id),
-                      ),
-                      BrandLogoBadge(characterId: ch.id),
                     ],
                   ),
                 ),
@@ -853,6 +846,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 ),
               ),
             ),
+          // Brand logo badge — always last so it overlays other content
+          BrandLogoBadge(characterId: ch.id),
+
           // Borrowed badge overlay (top-right)
           if (isBorrowed)
             Positioned(

@@ -205,6 +205,12 @@ class CharacterService {
         );
       }
 
+      // Extract brand card logo from first portal pass
+      final String? brandCardLogoUrl =
+          (passesByChar[charId]?.isNotEmpty ?? false)
+          ? passesByChar[charId]!.first['brand_card_logo_url'] as String?
+          : null;
+
       // Parse accent color
       Color accentColor = const Color(0xFF121212);
       final colorStr = row['accent_color'] as String?;
@@ -233,6 +239,7 @@ class CharacterService {
           characterClass: row['character_class'] ?? '',
           tags: tags,
           accentColorOverride: accentColor,
+          brandCardLogoUrl: brandCardLogoUrl,
           gameVariations: variations,
           portalPass: portalPass,
           specialRewards: rewards,

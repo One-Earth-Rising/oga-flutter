@@ -42,6 +42,7 @@ class OGACharacter {
   final DateTime? acquiredDate;
   final double progress;
   final Color? accentColorOverride;
+  final String? brandCardLogoUrl;
 
   const OGACharacter({
     required this.id,
@@ -66,6 +67,7 @@ class OGACharacter {
     this.acquiredDate,
     this.progress = 0.0,
     this.accentColorOverride,
+    this.brandCardLogoUrl,
   });
 
   String get imagePath => heroImage;
@@ -186,6 +188,7 @@ class OGACharacter {
       acquiredDate: acquiredDate ?? this.acquiredDate,
       progress: progress ?? this.progress,
       accentColorOverride: accentColorOverride,
+      brandCardLogoUrl: brandCardLogoUrl,
     );
   }
 }

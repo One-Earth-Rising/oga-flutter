@@ -4,6 +4,7 @@
 // Replaces/extends the existing portal pass section from the character detail screen.
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/fbs_service.dart';
@@ -33,6 +34,8 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
   List<FbsCharacter> _fbsCharacters = [];
   bool _loading = true;
   String? _successCharacterId;
+  String? _cobrandLogoUrl;
+  String? _brandLogoUrl;
 
   @override
   void initState() {
@@ -57,9 +60,24 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
 
   Future<void> _loadData() async {
     final chars = await FbsService.loadFbsCharactersForUser();
+
+    Map<String, dynamic>? passRow;
+    try {
+      passRow = await Supabase.instance.client
+          .from('portal_passes')
+          .select('brand_logo_url, brand_card_logo_url')
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+    } catch (e) {
+      debugPrint('⚠️ Portal pass logo load failed: $e');
+    }
+
     if (mounted) {
       setState(() {
         _fbsCharacters = chars;
+        _cobrandLogoUrl = passRow?['brand_logo_url'] as String?;
+        _brandLogoUrl = passRow?['brand_card_logo_url'] as String?;
         _loading = false;
       });
     }
@@ -122,14 +140,15 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
               onPressed: () => Navigator.of(context).pop(),
             ),
             actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: Image.network(
-                  'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/oga-files/fbs_season_1_cobrand_logo.png',
-                  height: 32,
-                  errorBuilder: (_, __, _) => const SizedBox.shrink(),
+              if (_cobrandLogoUrl != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: Image.network(
+                    _cobrandLogoUrl!,
+                    height: 32,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
                 ),
-              ),
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
@@ -728,6 +747,22 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
                       size: 32,
                     ),
                   ),
+                ),
+              ),
+            ),
+
+          // Brand card logo (top-right corner)
+          if (_brandLogoUrl != null)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: SizedBox(
+                width: 36,
+                height: 36,
+                child: Image.network(
+                  _brandLogoUrl!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
               ),
             ),

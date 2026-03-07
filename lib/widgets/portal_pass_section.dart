@@ -770,13 +770,6 @@ class _SpecialRewardCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// BRAND LOGO BADGE
-// Positioned top-right in the hero Stack.
-// Responsive: 72px on web, 48px on mobile.
-// Reads brand logo URL from the character's portal pass.
-// ═══════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════
 // CO-BRAND LOGO BADGE
 // Pane edge + portal pass section header.
 // Shows the brand × OGA cobrand logo (brand_logo_url).
@@ -830,21 +823,55 @@ class _CoBrandLogoBadgeState extends State<CoBrandLogoBadge> {
 
 // ═══════════════════════════════════════════════════════════════
 // BRAND LOGO BADGE
-// Hero card corner overlay.
-// Shows the solo brand logo (brand_card_logo_url).
+// Hero card corner overlay (top-right, 48×48).
+// Preferred: pass logoUrl directly from OGACharacter.brandCardLogoUrl.
+// Fallback: pass characterId to fetch from Supabase.
 // ═══════════════════════════════════════════════════════════════
 
-class BrandLogoBadge extends StatefulWidget {
-  final String characterId;
+class BrandLogoBadge extends StatelessWidget {
+  final String? logoUrl;
+  final String? characterId; // fallback if logoUrl not yet in model
 
-  const BrandLogoBadge({super.key, required this.characterId});
+  const BrandLogoBadge({super.key, this.logoUrl, this.characterId})
+    : assert(
+        logoUrl != null || characterId != null,
+        'Provide logoUrl or characterId',
+      );
 
   @override
-  State<BrandLogoBadge> createState() => _BrandLogoBadgeState();
+  Widget build(BuildContext context) {
+    if (logoUrl != null && logoUrl!.isNotEmpty) {
+      return _badge(logoUrl!);
+    }
+    return _BrandLogoBadgeFetcher(characterId: characterId!);
+  }
+
+  static Widget _badge(String url) {
+    return Positioned(
+      top: 12,
+      right: 12,
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: Image.network(
+          url,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        ),
+      ),
+    );
+  }
 }
 
-class _BrandLogoBadgeState extends State<BrandLogoBadge> {
-  PortalPassData? _pass;
+class _BrandLogoBadgeFetcher extends StatefulWidget {
+  final String characterId;
+  const _BrandLogoBadgeFetcher({required this.characterId});
+  @override
+  State<_BrandLogoBadgeFetcher> createState() => _BrandLogoBadgeFetcherState();
+}
+
+class _BrandLogoBadgeFetcherState extends State<_BrandLogoBadgeFetcher> {
+  String? _url;
 
   @override
   void initState() {
@@ -854,24 +881,14 @@ class _BrandLogoBadgeState extends State<BrandLogoBadge> {
 
   Future<void> _load() async {
     final p = await PortalPassService.getForCharacter(widget.characterId);
-    if (mounted && p?.brandCardLogoUrl != null) setState(() => _pass = p);
+    if (mounted && (p?.brandCardLogoUrl?.isNotEmpty ?? false)) {
+      setState(() => _url = p!.brandCardLogoUrl);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_pass?.brandCardLogoUrl == null) return const SizedBox.shrink();
-    return Positioned(
-      top: 12,
-      right: 12,
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: Image.network(
-          _pass!.brandCardLogoUrl!,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-        ),
-      ),
-    );
+    if (_url == null) return const SizedBox.shrink();
+    return BrandLogoBadge._badge(_url!);
   }
 }

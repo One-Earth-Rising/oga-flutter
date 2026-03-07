@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/oga_character.dart';
 import '../config/oga_storage.dart';
+import '../widgets/portal_pass_section.dart';
 
 /// Heimdal-aesthetic character card with IP-colored background,
 /// animated glow for owned characters, and progress ring.
@@ -326,6 +327,10 @@ class _CharacterCardState extends State<CharacterCard>
               ),
             ),
           ),
+
+        // Brand logo badge (portal pass co-branding)
+        if (widget.character.brandCardLogoUrl != null)
+          BrandLogoBadge(logoUrl: widget.character.brandCardLogoUrl),
 
         // Countdown badge for borrowed (top-right)
         if (widget.isBorrowed && widget.lendReturnDate != null)
