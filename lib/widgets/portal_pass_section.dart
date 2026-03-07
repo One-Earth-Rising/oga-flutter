@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/portal_pass_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // PORTAL PASS SECTION
@@ -846,21 +847,19 @@ class BrandLogoBadge extends StatelessWidget {
     return _BrandLogoBadgeFetcher(characterId: characterId!);
   }
 
-  static Widget _badge(String url) {
-    return Positioned(
-      top: 12,
-      right: 12,
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: Image.network(
-          url,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-        ),
+  static Widget _badge(String url) => Positioned(
+    top: 8,
+    right: 12,
+    child: SizedBox(
+      width: 48,
+      height: 48,
+      child: Image.network(
+        url,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _BrandLogoBadgeFetcher extends StatefulWidget {
@@ -880,9 +879,28 @@ class _BrandLogoBadgeFetcherState extends State<_BrandLogoBadgeFetcher> {
   }
 
   Future<void> _load() async {
-    final p = await PortalPassService.getForCharacter(widget.characterId);
-    if (mounted && (p?.brandCardLogoUrl?.isNotEmpty ?? false)) {
-      setState(() => _url = p!.brandCardLogoUrl);
+    try {
+      final charRow = await Supabase.instance.client
+          .from('characters')
+          .select('brand_id')
+          .eq('id', widget.characterId)
+          .maybeSingle();
+
+      final brandId = charRow?['brand_id'] as String?;
+      if (brandId == null) return;
+
+      final brandRow = await Supabase.instance.client
+          .from('brands')
+          .select('card_logo_url')
+          .eq('id', brandId)
+          .single();
+
+      final url = brandRow['card_logo_url'] as String?;
+      if (mounted && (url?.isNotEmpty ?? false)) {
+        setState(() => _url = url);
+      }
+    } catch (e) {
+      debugPrint('⚠️ BrandLogoBadge fetch failed: $e');
     }
   }
 
