@@ -588,112 +588,123 @@ class _SpecialRewardCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rewardUnlocked = isOwned && pass.isComplete;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'SPECIAL REWARD',
-          style: TextStyle(
-            color: _pureWhite,
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 2.5,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: _deepCharcoal,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: rewardUnlocked
-                  ? _neonGreen.withValues(alpha: 0.5)
-                  : _ironGrey,
+    return GestureDetector(
+      onTap: () => showSpecialRewardLightbox(
+        context,
+        imageUrl: pass.specialRewardImageUrl ?? '',
+        name: pass.specialRewardName ?? 'SPECIAL REWARD',
+        description:
+            pass.specialRewardDescription ??
+            'Collect all characters to unlock this legendary reward.',
+        ownedCount: pass.completedTasks,
+        requiredCount: pass.totalTasks,
+        isUnlocked: rewardUnlocked,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'SPECIAL REWARD',
+            style: TextStyle(
+              color: _pureWhite,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 2.5,
             ),
           ),
-          child: Stack(
-            children: [
-              // Glow when unlocked
-              if (rewardUnlocked)
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      gradient: RadialGradient(
-                        colors: [
-                          _neonGreen.withValues(alpha: 0.08),
-                          Colors.transparent,
-                        ],
-                        center: Alignment.topRight,
-                        radius: 1.2,
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: _deepCharcoal,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: rewardUnlocked
+                    ? _neonGreen.withValues(alpha: 0.5)
+                    : _ironGrey,
+              ),
+            ),
+            child: Stack(
+              children: [
+                if (rewardUnlocked)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: RadialGradient(
+                          colors: [
+                            _neonGreen.withValues(alpha: 0.08),
+                            Colors.transparent,
+                          ],
+                          center: Alignment.topRight,
+                          radius: 1.2,
+                        ),
                       ),
                     ),
                   ),
-                ),
-
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildRewardImage(rewardUnlocked),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (!rewardUnlocked)
-                            Container(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.07),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'LOCKED',
-                                style: TextStyle(
-                                  color: Colors.white38,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 2,
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildRewardImage(rewardUnlocked),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (!rewardUnlocked)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.07),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'LOCKED',
+                                  style: TextStyle(
+                                    color: Colors.white38,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 2,
+                                  ),
                                 ),
                               ),
-                            ),
-                          Text(
-                            (pass.specialRewardName ?? '').toUpperCase(),
-                            style: TextStyle(
-                              color: rewardUnlocked ? _neonGreen : _pureWhite,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          if (pass.specialRewardDescription != null)
                             Text(
-                              pass.specialRewardDescription!,
-                              style: const TextStyle(
-                                color: Colors.white60,
-                                fontSize: 12,
-                                height: 1.5,
+                              (pass.specialRewardName ?? '').toUpperCase(),
+                              style: TextStyle(
+                                color: rewardUnlocked ? _neonGreen : _pureWhite,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.3,
                               ),
                             ),
-                          const SizedBox(height: 12),
-                          _progressPill(),
-                        ],
+                            const SizedBox(height: 6),
+                            if (pass.specialRewardDescription != null)
+                              Text(
+                                pass.specialRewardDescription!,
+                                style: const TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 12,
+                                  height: 1.5,
+                                ),
+                              ),
+                            const SizedBox(height: 12),
+                            _progressPill(),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -908,5 +919,312 @@ class _BrandLogoBadgeFetcherState extends State<_BrandLogoBadgeFetcher> {
   Widget build(BuildContext context) {
     if (_url == null) return const SizedBox.shrink();
     return BrandLogoBadge._badge(_url!);
+  }
+}
+// ═══════════════════════════════════════════════════════════════════
+// SPECIAL REWARD LIGHTBOX
+// ═══════════════════════════════════════════════════════════════════
+
+void showSpecialRewardLightbox(
+  BuildContext context, {
+  required String imageUrl,
+  required String name,
+  required String description,
+  required int ownedCount,
+  required int requiredCount,
+  required bool isUnlocked,
+}) {
+  showDialog(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.9),
+    barrierDismissible: true,
+    builder: (context) => _SpecialRewardLightbox(
+      imageUrl: imageUrl,
+      name: name,
+      description: description,
+      ownedCount: ownedCount,
+      requiredCount: requiredCount,
+      isUnlocked: isUnlocked,
+    ),
+  );
+}
+
+class _SpecialRewardLightbox extends StatelessWidget {
+  final String imageUrl;
+  final String name;
+  final String description;
+  final int ownedCount;
+  final int requiredCount;
+  final bool isUnlocked;
+
+  const _SpecialRewardLightbox({
+    required this.imageUrl,
+    required this.name,
+    required this.description,
+    required this.ownedCount,
+    required this.requiredCount,
+    required this.isUnlocked,
+  });
+
+  static const _neonGreen = Color(0xFF39FF14);
+  static const _charcoal = Color(0xFF121212);
+  static const _ironGrey = Color(0xFF2C2C2C);
+  static const _white = Color(0xFFFFFFFF);
+  static const _black = Color(0xFF000000);
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = ownedCount / requiredCount.clamp(1, requiredCount);
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(
+          child: GestureDetector(
+            onTap: () {}, // prevent dismiss when tapping card
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+              decoration: BoxDecoration(
+                color: _charcoal,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isUnlocked
+                      ? _neonGreen.withValues(alpha: 0.6)
+                      : _ironGrey,
+                  width: isUnlocked ? 1.5 : 1,
+                ),
+                boxShadow: isUnlocked
+                    ? [
+                        BoxShadow(
+                          color: _neonGreen.withValues(alpha: 0.15),
+                          blurRadius: 40,
+                          spreadRadius: 4,
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 40,
+                        ),
+                      ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Hero image ───────────────────────────
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(23),
+                    ),
+                    child: Stack(
+                      children: [
+                        AspectRatio(
+                          aspectRatio: 1.0,
+                          child: Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: _black,
+                              child: Center(
+                                child: Icon(
+                                  Icons.emoji_events,
+                                  color: _neonGreen.withValues(alpha: 0.3),
+                                  size: 80,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // dim if locked
+                        if (!isUnlocked)
+                          Positioned.fill(
+                            child: Container(
+                              color: _black.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        // LEGENDARY badge top-left
+                        Positioned(
+                          top: 16,
+                          left: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFFFFD700,
+                              ).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(
+                                  0xFFFFD700,
+                                ).withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: const Text(
+                              'LEGENDARY',
+                              style: TextStyle(
+                                color: Color(0xFFFFD700),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // lock or unlocked badge top-right
+                        Positioned(
+                          top: 16,
+                          right: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isUnlocked
+                                  ? _neonGreen.withValues(alpha: 0.15)
+                                  : _black.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isUnlocked
+                                    ? _neonGreen.withValues(alpha: 0.5)
+                                    : _ironGrey,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isUnlocked
+                                      ? Icons.check_circle
+                                      : Icons.lock_outline,
+                                  color: isUnlocked
+                                      ? _neonGreen
+                                      : _white.withValues(alpha: 0.4),
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isUnlocked ? 'UNLOCKED' : 'LOCKED',
+                                  style: TextStyle(
+                                    color: isUnlocked
+                                        ? _neonGreen
+                                        : _white.withValues(alpha: 0.4),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Info section ─────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name.toUpperCase(),
+                          style: const TextStyle(
+                            color: _white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          description,
+                          style: TextStyle(
+                            color: _white.withValues(alpha: 0.6),
+                            fontSize: 13,
+                            height: 1.6,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Progress bar
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'COLLECTION PROGRESS',
+                              style: TextStyle(
+                                color: _white.withValues(alpha: 0.35),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            Text(
+                              '$ownedCount / $requiredCount',
+                              style: TextStyle(
+                                color: isUnlocked
+                                    ? _neonGreen
+                                    : _white.withValues(alpha: 0.5),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 6,
+                            backgroundColor: _ironGrey,
+                            valueColor: AlwaysStoppedAnimation(
+                              isUnlocked
+                                  ? _neonGreen
+                                  : _neonGreen.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Close button
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _white,
+                              side: BorderSide(color: _ironGrey),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'CLOSE',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
