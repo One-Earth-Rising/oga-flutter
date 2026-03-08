@@ -711,171 +711,186 @@ class _PortalPassScreenState extends State<PortalPassScreen> {
     final isUnlocked = char.isOwned;
     final isNewlyUnlocked = _successCharacterId == char.id;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeOutCubic,
-      decoration: BoxDecoration(
-        color: _charcoal,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isNewlyUnlocked
-              ? _neonGreen
-              : isUnlocked
-              ? _neonGreen.withValues(alpha: 0.4)
-              : _ironGrey,
-          width: isNewlyUnlocked ? 1.5 : 1,
-        ),
-        boxShadow: isNewlyUnlocked
-            ? [
-                BoxShadow(
-                  color: _neonGreen.withValues(alpha: 0.25),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
-              ]
-            : null,
-      ),
-      child: Stack(
-        children: [
-          // Character image / silhouette
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
-            child: SizedBox(
-              width: double.infinity,
-              height: 140,
-              child: Image.network(
-                'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/${char.id}.png',
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
-                    _fbsPlaceholder(char, locked: !isUnlocked),
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) => AnimatedContainer(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+        width: constraints.maxWidth,
+        height: constraints.maxHeight,
+        decoration: BoxDecoration(
+          color: _charcoal,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isNewlyUnlocked
+                ? _neonGreen
+                : isUnlocked
+                ? _neonGreen.withValues(alpha: 0.4)
+                : _ironGrey,
+            width: isNewlyUnlocked ? 1.5 : 1,
           ),
+          boxShadow: isNewlyUnlocked
+              ? [
+                  BoxShadow(
+                    color: _neonGreen.withValues(alpha: 0.25),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  ),
+                ]
+              : null,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // ── Full-bleed character image ──────────────────
+            Image.network(
+              'https://jmbzrbteizvuqwukojzu.supabase.co/storage/v1/object/public/characters/heroes/${char.id}.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              errorBuilder: (_, __, ___) =>
+                  _fbsPlaceholder(char, locked: !isUnlocked),
+            ),
 
-          // Locked overlay
-          if (!isUnlocked)
+            // ── Locked image dimming overlay ────────────────
+            if (!isUnlocked) Container(color: _black.withValues(alpha: 0.55)),
+
+            // ── Bottom gradient for text readability ────────
             Positioned(
-              top: 0,
+              bottom: 0,
               left: 0,
               right: 0,
-              height: 140,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(13),
+              height: 120,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      _black.withValues(alpha: 0.85),
+                    ],
+                  ),
                 ),
+              ),
+            ),
+
+            // ── Brand logo (top-right, semi-transparent bg) ─
+            if (_brandLogoUrl != null)
+              Positioned(
+                top: 8,
+                right: 8,
                 child: Container(
-                  color: _black.withValues(alpha: 0.6),
-                  child: Center(
-                    child: Icon(
-                      Icons.lock_outline,
-                      color: _neonGreen.withValues(alpha: 0.6),
-                      size: 32,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: _black.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: Image.network(
+                      _brandLogoUrl!,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
                   ),
                 ),
               ),
-            ),
 
-          // Brand card logo (top-right corner)
-          if (_brandLogoUrl != null)
+            // ── Lock icon (centre, locked only) ────────────
+            if (!isUnlocked)
+              Center(
+                child: Icon(
+                  Icons.lock_outline,
+                  color: _neonGreen.withValues(alpha: 0.7),
+                  size: 36,
+                ),
+              ),
+
+            // ── Info section (bottom overlay) ───────────────
             Positioned(
-              top: 8,
-              right: 8,
-              child: SizedBox(
-                width: 36,
-                height: 36,
-                child: Image.network(
-                  _brandLogoUrl!,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                ),
-              ),
-            ),
-
-          // Info section
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _charcoal,
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(13),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    char.name,
-                    style: const TextStyle(
-                      color: _white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                      fontFamily: 'Helvetica Neue',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    char.flavor,
-                    style: TextStyle(
-                      color: _white.withValues(alpha: 0.4),
-                      fontSize: 10,
-                      fontFamily: 'Helvetica Neue',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  // Status badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isUnlocked
-                          ? _neonGreen.withValues(alpha: 0.12)
-                          : _ironGrey,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      isUnlocked ? 'OWNED' : 'LOCKED',
-                      style: TextStyle(
-                        color: isUnlocked
-                            ? _neonGreen
-                            : _white.withValues(alpha: 0.3),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      char.name,
+                      style: const TextStyle(
+                        color: _white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
                         fontFamily: 'Helvetica Neue',
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Tap → character detail (multigameverse, portal pass, FOMO)
-          Positioned.fill(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: () => Navigator.of(context).pushNamed(
-                  '/character-detail',
-                  arguments: {'characterId': char.id},
+                    const SizedBox(height: 2),
+                    Text(
+                      char.flavor,
+                      style: TextStyle(
+                        color: _white.withValues(alpha: 0.5),
+                        fontSize: 10,
+                        fontFamily: 'Helvetica Neue',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isUnlocked
+                            ? _neonGreen.withValues(alpha: 0.15)
+                            : _black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: isUnlocked
+                              ? _neonGreen.withValues(alpha: 0.4)
+                              : _ironGrey.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Text(
+                        isUnlocked ? 'OWNED' : 'LOCKED',
+                        style: TextStyle(
+                          color: isUnlocked
+                              ? _neonGreen
+                              : _white.withValues(alpha: 0.4),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                          fontFamily: 'Helvetica Neue',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-        ],
+
+            // ── Tap target ──────────────────────────────────
+            Positioned.fill(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => Navigator.of(context).pushNamed(
+                    '/character-detail',
+                    arguments: {'characterId': char.id},
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
