@@ -17,6 +17,7 @@ import '../services/ownership_service.dart';
 import '../widgets/notification_bell_widget.dart';
 import 'activity_screen.dart';
 import '../modals/fbs_redeem_modal.dart';
+import '../widgets/onboarding_progress_widget.dart';
 
 class OGAAccountDashboard extends StatefulWidget {
   final String? sessionId;
@@ -431,6 +432,18 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _buildHeroSection(isMobile)),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 40),
+                child: OnboardingProgressWidget(
+                  onNavigate: (route) {
+                    if (route == 'settings') {
+                      _openSettings();
+                    }
+                  },
+                ),
+              ),
+            ),
             SliverToBoxAdapter(child: _buildSectionHeader(isMobile)),
             SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 40),
