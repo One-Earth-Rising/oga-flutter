@@ -980,246 +980,259 @@ class _SpecialRewardLightbox extends StatelessWidget {
       onTap: () => Navigator.of(context).pop(),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        body: Center(
-          child: GestureDetector(
-            onTap: () {}, // prevent dismiss when tapping card
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-              decoration: BoxDecoration(
-                color: _charcoal,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isUnlocked
-                      ? _neonGreen.withValues(alpha: 0.6)
-                      : _ironGrey,
-                  width: isUnlocked ? 1.5 : 1,
+        body: Align(
+          alignment: Alignment.topCenter,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: MediaQuery.of(context).size.width > 600
+                  ? (MediaQuery.of(context).size.width - 400) / 2
+                  : 24,
+              vertical: 48,
+            ),
+            child: GestureDetector(
+              onTap: () {}, // prevent dismiss when tapping card
+              child: Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxWidth: 400),
+                margin: EdgeInsets.zero,
+                decoration: BoxDecoration(
+                  color: _charcoal,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isUnlocked
+                        ? _neonGreen.withValues(alpha: 0.6)
+                        : _ironGrey,
+                    width: isUnlocked ? 1.5 : 1,
+                  ),
+                  boxShadow: isUnlocked
+                      ? [
+                          BoxShadow(
+                            color: _neonGreen.withValues(alpha: 0.15),
+                            blurRadius: 40,
+                            spreadRadius: 4,
+                          ),
+                        ]
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            blurRadius: 40,
+                          ),
+                        ],
                 ),
-                boxShadow: isUnlocked
-                    ? [
-                        BoxShadow(
-                          color: _neonGreen.withValues(alpha: 0.15),
-                          blurRadius: 40,
-                          spreadRadius: 4,
-                        ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          blurRadius: 40,
-                        ),
-                      ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ── Hero image ───────────────────────────
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(23),
-                    ),
-                    child: Stack(
-                      children: [
-                        AspectRatio(
-                          aspectRatio: 1.0,
-                          child: Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: _black,
-                              child: Center(
-                                child: Icon(
-                                  Icons.emoji_events,
-                                  color: _neonGreen.withValues(alpha: 0.3),
-                                  size: 80,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ── Hero image ───────────────────────────
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(23),
+                      ),
+                      child: Stack(
+                        children: [
+                          AspectRatio(
+                            aspectRatio: 1.0,
+                            child: Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: _black,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.emoji_events,
+                                    color: _neonGreen.withValues(alpha: 0.3),
+                                    size: 80,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        // dim if locked
-                        if (!isUnlocked)
-                          Positioned.fill(
+                          // dim if locked
+                          if (!isUnlocked)
+                            Positioned.fill(
+                              child: Container(
+                                color: _black.withValues(alpha: 0.55),
+                              ),
+                            ),
+                          // LEGENDARY badge top-left
+                          Positioned(
+                            top: 16,
+                            left: 16,
                             child: Container(
-                              color: _black.withValues(alpha: 0.55),
-                            ),
-                          ),
-                        // LEGENDARY badge top-left
-                        Positioned(
-                          top: 16,
-                          left: 16,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFFFD700,
-                              ).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
                                 color: const Color(
                                   0xFFFFD700,
-                                ).withValues(alpha: 0.5),
+                                ).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFFFFD700,
+                                  ).withValues(alpha: 0.5),
+                                ),
                               ),
-                            ),
-                            child: const Text(
-                              'LEGENDARY',
-                              style: TextStyle(
-                                color: Color(0xFFFFD700),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1,
+                              child: const Text(
+                                'LEGENDARY',
+                                style: TextStyle(
+                                  color: Color(0xFFFFD700),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        // lock or unlocked badge top-right
-                        Positioned(
-                          top: 16,
-                          right: 16,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isUnlocked
-                                  ? _neonGreen.withValues(alpha: 0.15)
-                                  : _black.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: isUnlocked
-                                    ? _neonGreen.withValues(alpha: 0.5)
-                                    : _ironGrey,
+                          // lock or unlocked badge top-right
+                          Positioned(
+                            top: 16,
+                            right: 16,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
                               ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isUnlocked
-                                      ? Icons.check_circle
-                                      : Icons.lock_outline,
+                              decoration: BoxDecoration(
+                                color: isUnlocked
+                                    ? _neonGreen.withValues(alpha: 0.15)
+                                    : _black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
                                   color: isUnlocked
-                                      ? _neonGreen
-                                      : _white.withValues(alpha: 0.4),
-                                  size: 12,
+                                      ? _neonGreen.withValues(alpha: 0.5)
+                                      : _ironGrey,
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  isUnlocked ? 'UNLOCKED' : 'LOCKED',
-                                  style: TextStyle(
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isUnlocked
+                                        ? Icons.check_circle
+                                        : Icons.lock_outline,
                                     color: isUnlocked
                                         ? _neonGreen
                                         : _white.withValues(alpha: 0.4),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.5,
+                                    size: 12,
                                   ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    isUnlocked ? 'UNLOCKED' : 'LOCKED',
+                                    style: TextStyle(
+                                      color: isUnlocked
+                                          ? _neonGreen
+                                          : _white.withValues(alpha: 0.4),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // ── Info section ─────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name.toUpperCase(),
+                            style: const TextStyle(
+                              color: _white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            description,
+                            style: TextStyle(
+                              color: _white.withValues(alpha: 0.6),
+                              fontSize: 13,
+                              height: 1.6,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Progress bar
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'COLLECTION PROGRESS',
+                                style: TextStyle(
+                                  color: _white.withValues(alpha: 0.35),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1,
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ── Info section ─────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name.toUpperCase(),
-                          style: const TextStyle(
-                            color: _white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          description,
-                          style: TextStyle(
-                            color: _white.withValues(alpha: 0.6),
-                            fontSize: 13,
-                            height: 1.6,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Progress bar
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'COLLECTION PROGRESS',
-                              style: TextStyle(
-                                color: _white.withValues(alpha: 0.35),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1,
                               ),
-                            ),
-                            Text(
-                              '$ownedCount / $requiredCount',
-                              style: TextStyle(
-                                color: isUnlocked
+                              Text(
+                                '$ownedCount / $requiredCount',
+                                style: TextStyle(
+                                  color: isUnlocked
+                                      ? _neonGreen
+                                      : _white.withValues(alpha: 0.5),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 6,
+                              backgroundColor: _ironGrey,
+                              valueColor: AlwaysStoppedAnimation(
+                                isUnlocked
                                     ? _neonGreen
-                                    : _white.withValues(alpha: 0.5),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
+                                    : _neonGreen.withValues(alpha: 0.4),
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 6,
-                            backgroundColor: _ironGrey,
-                            valueColor: AlwaysStoppedAnimation(
-                              isUnlocked
-                                  ? _neonGreen
-                                  : _neonGreen.withValues(alpha: 0.4),
-                            ),
                           ),
-                        ),
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 20),
 
-                        // Close button
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: _white,
-                              side: BorderSide(color: _ironGrey),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                          // Close button
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: _white,
+                                side: BorderSide(color: _ironGrey),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
-                            ),
-                            child: const Text(
-                              'CLOSE',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1,
-                                fontSize: 12,
+                              child: const Text(
+                                'CLOSE',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
