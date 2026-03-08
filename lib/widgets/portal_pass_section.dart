@@ -987,7 +987,7 @@ class _SpecialRewardLightbox extends StatelessWidget {
               horizontal: MediaQuery.of(context).size.width > 600
                   ? (MediaQuery.of(context).size.width - 400) / 2
                   : 24,
-              vertical: 48,
+              vertical: 8,
             ),
             child: GestureDetector(
               onTap: () {}, // prevent dismiss when tapping card
