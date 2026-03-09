@@ -1807,7 +1807,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           'recipient_email': counterpartyEmail,
           'type': 'trade_revoked',
           'message': 'Trade offer for ${ch.name} was revoked.',
-          'related_character_id': ch.id,
           'metadata': {'trade_id': tradeId},
         });
       }
@@ -1944,7 +1943,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           'recipient_email': counterpartyEmail,
           'type': 'trade_declined',
           'message': 'Your trade offer for ${ch.name} was declined.',
-          'related_character_id': ch.id,
           'metadata': {'trade_id': tradeId},
         });
       }
@@ -4207,8 +4205,9 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
-                        color: _neonGreen,
+                        color: Colors.transparent,
                         shape: BoxShape.circle,
+                        border: Border.all(color: _neonGreen, width: 2.5),
                         boxShadow: [
                           BoxShadow(
                             color: _neonGreen.withValues(alpha: 0.4),
@@ -4219,7 +4218,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                       ),
                       child: const Icon(
                         Icons.play_arrow_rounded,
-                        color: Colors.black,
+                        color: _neonGreen,
                         size: 32,
                       ),
                     ),
