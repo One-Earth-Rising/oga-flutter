@@ -175,6 +175,18 @@ class LendService {
         'action_url': '/lend-inbox',
       });
 
+      // Notify lender (self-confirmation)
+      await _supabase.from('notifications').insert({
+        'recipient_email': email,
+        'type': 'lend_proposed_self',
+        'reference_id': lendRow['id'],
+        'reference_type': 'lend',
+        'message':
+            'Your lend proposal was sent to ${borrowerEmail.split('@').first}.',
+        'sender_email': email,
+        'category': 'lend',
+        'action_url': '/lend-inbox',
+      });
       debugPrint('✅ LendService: lend proposed → $borrowerEmail');
       return 'success';
     } catch (e) {

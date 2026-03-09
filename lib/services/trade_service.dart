@@ -192,6 +192,18 @@ class TradeService {
         'action_url': '/trade-inbox',
       });
 
+      // Notify proposer (self-confirmation)
+      await _supabase.from('notifications').insert({
+        'recipient_email': email,
+        'type': 'trade_proposed_self',
+        'reference_id': tradeRow['id'],
+        'reference_type': 'trade',
+        'message':
+            'Your trade proposal was sent to ${receiverEmail.split('@').first}.',
+        'sender_email': email,
+        'category': 'trade',
+        'action_url': '/trade-inbox',
+      });
       debugPrint('✅ TradeService: trade proposed → $receiverEmail');
       return 'success';
     } catch (e) {
