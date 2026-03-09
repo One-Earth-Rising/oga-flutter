@@ -126,6 +126,8 @@ class CharacterService {
               characterImage: v['character_image'] ?? '',
               engineName: v['engine_name'] ?? '',
               description: v['description'] ?? '',
+              playstationUrl: v['playstation_url'] ?? '',
+              steamUrl: v['steam_url'] ?? '',
             ),
           )
           .toList();

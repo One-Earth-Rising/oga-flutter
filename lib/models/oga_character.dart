@@ -200,6 +200,8 @@ class GameVariation {
   final String characterImage;
   final String engineName;
   final String description;
+  final String playstationUrl;
+  final String steamUrl;
   const GameVariation({
     required this.gameId,
     required this.gameName,
@@ -207,6 +209,8 @@ class GameVariation {
     required this.characterImage,
     this.engineName = '',
     this.description = '',
+    this.playstationUrl = '',
+    this.steamUrl = '',
   });
 }
 

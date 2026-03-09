@@ -2935,28 +2935,111 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           ],
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.open_in_new, size: 14),
-            label: const Text(
-              'VIEW IN GAME',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1,
-                fontSize: 11,
+        Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.open_in_new, size: 14),
+                label: const Text(
+                  'VIEW IN GAME',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                    fontSize: 11,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _neonGreen,
+                  side: BorderSide(color: _neonGreen.withValues(alpha: 0.4)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _neonGreen,
-              side: BorderSide(color: _neonGreen.withValues(alpha: 0.4)),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+            if (variation.playstationUrl.isNotEmpty ||
+                variation.steamUrl.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  if (variation.playstationUrl.isNotEmpty)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final uri = Uri.parse(variation.playstationUrl);
+                          if (await canLaunchUrl(uri))
+                            launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                        },
+                        icon: const Icon(Icons.sports_esports, size: 13),
+                        label: const Text(
+                          'PLAYSTATION',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            fontSize: 10,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0070D1),
+                          side: BorderSide(
+                            color: const Color(
+                              0xFF0070D1,
+                            ).withValues(alpha: 0.4),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (variation.playstationUrl.isNotEmpty &&
+                      variation.steamUrl.isNotEmpty)
+                    const SizedBox(width: 8),
+                  if (variation.steamUrl.isNotEmpty)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final uri = Uri.parse(variation.steamUrl);
+                          if (await canLaunchUrl(uri))
+                            launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                        },
+                        icon: const Icon(Icons.computer, size: 13),
+                        label: const Text(
+                          'STEAM',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            fontSize: 10,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF8F98A0),
+                          side: BorderSide(
+                            color: const Color(
+                              0xFF8F98A0,
+                            ).withValues(alpha: 0.4),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
-          ),
+            ],
+          ],
         ),
       ],
     );
