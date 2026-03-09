@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/friend_service.dart';
+import '../services/analytics_service.dart';
 
 /// Helper to persist invite code across page reloads (uses shared_preferences
 /// which maps to localStorage on web — but through Flutter's abstraction,
@@ -555,6 +556,10 @@ class _InviteSignUpScreenState extends State<InviteSignUpScreen> {
     });
 
     try {
+      // Track funnel step
+      AnalyticsService.trackFeature('invite_signup_started', {
+        'invite_code': widget.inviteCode,
+      });
       // Persist invite code — survives page reload on web
       await PendingInvite.save(widget.inviteCode);
 
@@ -567,7 +572,9 @@ class _InviteSignUpScreenState extends State<InviteSignUpScreen> {
       );
 
       debugPrint('✅ Magic link sent to $email (invite: ${widget.inviteCode})');
-
+      AnalyticsService.trackFeature('invite_signup_completed', {
+        'invite_code': widget.inviteCode,
+      });
       setState(() {
         _emailSent = true;
         _sentToEmail = email;
