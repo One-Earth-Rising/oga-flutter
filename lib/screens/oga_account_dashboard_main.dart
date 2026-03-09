@@ -1498,6 +1498,10 @@ class _OGAAccountDashboardState extends State<OGAAccountDashboard> {
         'lendInfo':
             lendInfo ?? (mode == 'lent_out' ? {'character_id': ch.id} : null),
         'pendingTradeInfo': _pendingTrades[ch.id],
+        'assetId':
+            null, // populated later when OwnershipService returns asset UUIDs
+        'ownerEmail': supabase.auth.currentUser?.email,
+        'ownerName': _displayName,
       },
     );
   }
