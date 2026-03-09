@@ -32,6 +32,7 @@ import '../widgets/notification_bell_widget.dart';
 import '../modals/lend_proposal_modal.dart';
 import '../config/oga_storage.dart';
 import '../services/lend_service.dart';
+import 'connectors/game_link_screen.dart';
 import '../services/friend_service.dart';
 import '../widgets/portal_pass_section.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
@@ -96,6 +97,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
 
   // Gameplay videos loaded from character_gameplay_videos table
   List<Map<String, dynamic>> _gameplayVideos = [];
+  final GlobalKey _gameplaySectionKey = GlobalKey();
 
   // Cached invite code for share URL generation
   String? _userInviteCode;
@@ -1131,11 +1133,13 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           const SizedBox(height: 20),
 
           // ── GAMEPLAY ───────────────────────────────────
-          if (_gameplayVideos.isNotEmpty)
+          if (_gameplayVideos.isNotEmpty) ...[
+            SizedBox(key: _gameplaySectionKey, height: 0),
             _buildSectionCard(
               title: 'GAMEPLAY',
               child: _buildGameplayCarousel(),
             ),
+          ],
 
           const SizedBox(height: 40),
         ],
@@ -2940,7 +2944,15 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  if (_gameplaySectionKey.currentContext != null) {
+                    Scrollable.ensureVisible(
+                      _gameplaySectionKey.currentContext!,
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeInOut,
+                    );
+                  }
+                },
                 icon: const Icon(Icons.open_in_new, size: 14),
                 label: const Text(
                   'VIEW IN GAME',
@@ -3037,6 +3049,40 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                       ),
                     ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              Builder(
+                builder: (ctx) => RichText(
+                  text: TextSpan(
+                    style: TextStyle(
+                      color: _pureWhite.withValues(alpha: 0.35),
+                      fontSize: 10,
+                      height: 1.5,
+                    ),
+                    children: [
+                      const TextSpan(
+                        text:
+                            'NOTE: When the game is installed, connect your OGA account using the QR scanner in ',
+                      ),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: GestureDetector(
+                          onTap: () => GameLinkScreen.show(ctx),
+                          child: const Text(
+                            'Settings > Connect > Link a Game',
+                            style: TextStyle(
+                              color: _neonGreen,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.underline,
+                              decorationColor: _neonGreen,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ],
