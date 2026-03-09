@@ -34,6 +34,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   List<Map<String, dynamic>> _activeBetaUsers = [];
   List<Map<String, dynamic>> _pendingBetaUsers = [];
   List<Map<String, dynamic>> _recentEvents = [];
+  final TextEditingController _userSearchController = TextEditingController();
+  String _userSearchQuery = '';
   List<Map<String, dynamic>> _topCharacters = [];
   double _avgSessionDuration = 0;
 
@@ -154,6 +156,12 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
         );
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _userSearchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -403,17 +411,63 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   // ─── USERS TAB (UPDATED) ──────────────────────────────────
 
   Widget _buildUsersTab(bool isMobile) {
+    final query = _userSearchQuery.toLowerCase();
+    final filteredActive = _activeBetaUsers
+        .where((u) => (u['email'] ?? '').toLowerCase().contains(query))
+        .toList();
+    final filteredPending = _pendingBetaUsers
+        .where((u) => (u['email'] ?? '').toLowerCase().contains(query))
+        .toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // === SEARCH FIELD ===
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: deepCharcoal,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: ironGrey),
+            ),
+            child: TextField(
+              controller: _userSearchController,
+              onChanged: (v) => setState(() => _userSearchQuery = v),
+              style: const TextStyle(color: pureWhite, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search users by email...',
+                hintStyle: TextStyle(color: dimWhite, fontSize: 13),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: neonGreen,
+                  size: 20,
+                ),
+                suffixIcon: _userSearchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          color: neonGreen,
+                          size: 18,
+                        ),
+                        onPressed: () {
+                          _userSearchController.clear();
+                          setState(() => _userSearchQuery = '');
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
           // === PENDING USERS SECTION ===
           _buildCard(
             'PENDING APPROVAL',
-            '${_pendingBetaUsers.length} users',
+            '${filteredPending.length} users',
             Column(
-              children: _pendingBetaUsers.isEmpty
+              children: filteredPending.isEmpty
                   ? [
                       Padding(
                         padding: const EdgeInsets.all(24),
@@ -423,7 +477,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                         ),
                       ),
                     ]
-                  : _pendingBetaUsers.map((user) {
+                  : filteredPending.map((user) {
                       final email = user['email'] ?? 'Unknown';
                       final joined = _formatDate(user['created_at']);
                       return _buildUserRow(
@@ -441,9 +495,9 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
           // === ACTIVE USERS SECTION ===
           _buildCard(
             'ACTIVE BETA USERS',
-            '${_activeBetaUsers.length} users',
+            '${filteredActive.length} users',
             Column(
-              children: _activeBetaUsers.isEmpty
+              children: filteredActive.isEmpty
                   ? [
                       Padding(
                         padding: const EdgeInsets.all(24),
@@ -453,7 +507,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                         ),
                       ),
                     ]
-                  : _activeBetaUsers.map((user) {
+                  : filteredActive.map((user) {
                       final email = user['email'] ?? 'Unknown';
                       final isAdmin = user['is_admin'] == true;
                       final subtitle = isAdmin ? 'Admin' : 'Beta Tester';
