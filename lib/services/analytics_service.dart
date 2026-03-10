@@ -176,10 +176,8 @@ class AnalyticsService {
     try {
       // Refresh email if we don't have it yet (late auth)
       _userEmail ??= _supabase.auth.currentUser?.email;
-      if (_userEmail == null) return; // Can't track without user
-
       await _supabase.from('beta_analytics').insert({
-        'user_email': _userEmail,
+        'user_email': _userEmail ?? 'anon',
         'event_type': eventType,
         'event_data': data ?? {},
         'page_context': page ?? _currentPage,
