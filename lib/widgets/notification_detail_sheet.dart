@@ -157,7 +157,9 @@ class _DetailSheetState extends State<_DetailSheet> {
         24,
         12,
         24,
-        MediaQuery.of(context).viewInsets.bottom + 32,
+        MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).viewPadding.bottom +
+            48,
       ),
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.7,
