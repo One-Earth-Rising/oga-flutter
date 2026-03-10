@@ -173,81 +173,83 @@ class _DetailSheetState extends State<_DetailSheet> {
           right: BorderSide(color: _ironGrey, width: 1),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: _ironGrey,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Title
-          Text(
-            widget.notification.title,
-            style: const TextStyle(
-              color: _pureWhite,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: CircularProgressIndicator(
-                color: _neonGreen,
-                strokeWidth: 2,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _ironGrey,
+                borderRadius: BorderRadius.circular(2),
               ),
-            )
-          else if (_error != null)
-            _buildErrorState()
-          else ...[
-            // Sender info
-            _buildSenderRow(),
+            ),
+            const SizedBox(height: 20),
+
+            // Title
+            Text(
+              widget.notification.title,
+              style: const TextStyle(
+                color: _pureWhite,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+              ),
+            ),
             const SizedBox(height: 16),
 
-            // Detail content based on type
-            if (_details?['type'] == 'trade')
-              _buildTradeDetails()
-            else if (_details?['type'] == 'lend')
-              _buildLendDetails()
-            else if (_details?['type'] == 'friend')
-              _buildFriendDetails()
-            else
-              _buildGenericDetails(),
-
-            // Message
-            if (widget.notification.message != null) ...[
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(
+                  color: _neonGreen,
+                  strokeWidth: 2,
+                ),
+              )
+            else if (_error != null)
+              _buildErrorState()
+            else ...[
+              // Sender info
+              _buildSenderRow(),
               const SizedBox(height: 16),
-              _buildMessageCard(),
+
+              // Detail content based on type
+              if (_details?['type'] == 'trade')
+                _buildTradeDetails()
+              else if (_details?['type'] == 'lend')
+                _buildLendDetails()
+              else if (_details?['type'] == 'friend')
+                _buildFriendDetails()
+              else
+                _buildGenericDetails(),
+
+              // Message
+              if (widget.notification.message != null) ...[
+                const SizedBox(height: 16),
+                _buildMessageCard(),
+              ],
+
+              // Action buttons
+              if (_isActionable) ...[
+                const SizedBox(height: 20),
+                _buildActionButtons(),
+              ],
             ],
 
-            // Action buttons
-            if (_isActionable) ...[
-              const SizedBox(height: 20),
-              _buildActionButtons(),
-            ],
-          ],
+            const SizedBox(height: 16),
 
-          const SizedBox(height: 16),
-
-          // Timestamp
-          Text(
-            _formatTimestamp(widget.notification.createdAt),
-            style: TextStyle(
-              color: _pureWhite.withValues(alpha: 0.2),
-              fontSize: 10,
+            // Timestamp
+            Text(
+              _formatTimestamp(widget.notification.createdAt),
+              style: TextStyle(
+                color: _pureWhite.withValues(alpha: 0.2),
+                fontSize: 10,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
