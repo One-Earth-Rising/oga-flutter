@@ -273,6 +273,7 @@ class _NotificationDropdownPanelState
   List<OGANotification> _notifications = [];
   bool _isLoading = true;
   final Set<String> _actedOnIds = {};
+  final Set<String> _revokedIds = {};
   final Map<String, String?> _avatarCache = {};
   static const int _maxVisible = 5;
 
@@ -492,9 +493,39 @@ class _NotificationDropdownPanelState
 
   Widget _buildNotificationRow(OGANotification notification) {
     final isUnread = !notification.isRead;
+    final isRevoked = _revokedIds.contains(notification.id);
     final showButtons = _shouldShowButtons(notification);
-
-    if (showButtons) {
+    if (isRevoked) {
+      // ─── REVOKED: sender cancelled before receiver acted ───
+      return Container(
+        color: Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInfoRow(notification, isUnread: false),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.white24, width: 1),
+              ),
+              child: const Text(
+                'TRADE OFFER WAS REVOKED BY SENDER',
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (showButtons) {
       // ─── ACTIONABLE: info row tappable for detail, buttons stay ───
       return Container(
         color: _neonGreen.withValues(alpha: 0.05),
@@ -896,8 +927,16 @@ class _NotificationDropdownPanelState
       debugPrint('>>> ACCEPT success: $successMsg');
     } else {
       // Rollback — show buttons again
-      setState(() => _actedOnIds.remove(notification.id));
-      _showSnackBar(result, isSuccess: false);
+      final isRevoked =
+          result.contains('not found') ||
+          result.contains('already resolved') ||
+          result.contains('no longer pending');
+      if (isRevoked) {
+        setState(() => _revokedIds.add(notification.id));
+      } else {
+        setState(() => _actedOnIds.remove(notification.id));
+        _showSnackBar(result, isSuccess: false);
+      }
       debugPrint('>>> ACCEPT failed: $result');
     }
   }
@@ -942,8 +981,16 @@ class _NotificationDropdownPanelState
       _showSnackBar(successMsg, isSuccess: true);
       debugPrint('>>> DECLINE success: $successMsg');
     } else {
-      setState(() => _actedOnIds.remove(notification.id));
-      _showSnackBar(result, isSuccess: false);
+      final isRevoked =
+          result.contains('not found') ||
+          result.contains('already resolved') ||
+          result.contains('no longer pending');
+      if (isRevoked) {
+        setState(() => _revokedIds.add(notification.id));
+      } else {
+        setState(() => _actedOnIds.remove(notification.id));
+        _showSnackBar(result, isSuccess: false);
+      }
       debugPrint('>>> DECLINE failed: $result');
     }
   }
