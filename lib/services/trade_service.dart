@@ -224,16 +224,17 @@ class TradeService {
       // Call the server-side atomic swap function
       final result = await _supabase.rpc(
         'execute_trade',
-        params: {'p_trade_id': tradeId},
+        params: {'trade_id': tradeId},
       );
 
-      final message = result?.toString() ?? 'Unknown error';
-      if (message == 'success') {
+      final success = result != null && result['success'] == true;
+      if (success) {
         debugPrint('✅ TradeService: trade accepted → $tradeId');
+        return 'success';
       } else {
-        debugPrint('⚠️ TradeService: trade failed → $message');
+        debugPrint('⚠️ TradeService: trade failed → $result');
+        return 'Something went wrong. Please try again.';
       }
-      return message;
     } catch (e) {
       debugPrint('❌ TradeService.acceptTrade error: $e');
       return 'Something went wrong. Please try again.';
@@ -383,7 +384,7 @@ class TradeService {
       final rows = await _supabase
           .from('trades')
           .select()
-          .eq('status', 'accepted')
+          .eq('status', 'completed')
           .or(
             'offered_character_id.eq.$characterId,requested_character_id.eq.$characterId',
           )
