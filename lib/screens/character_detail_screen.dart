@@ -172,7 +172,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               .from('character_ownership')
               .select('asset_id')
               .eq('character_id', ch.id)
-              .eq('owner_email', userEmail)
               .eq('status', 'active')
               .maybeSingle();
           if (row != null) {
