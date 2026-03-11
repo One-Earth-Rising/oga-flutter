@@ -60,7 +60,7 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
         inviteCode: widget.inviteCode,
         characterId: widget.characterId,
       );
-      AnalyticsService.trackFeature('invite_landing', {
+      AnalyticsService.trackFeature('invite_landing_viewed', {
         'invite_code': widget.inviteCode,
         if (widget.characterId != null) 'character_id': widget.characterId,
       });
