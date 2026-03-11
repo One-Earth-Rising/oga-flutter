@@ -53,17 +53,17 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
       _isLoading = false;
     });
 
+    // === TRACK INVITE CLICK (Sprint 11A) ===
+    // Fires for ALL invite visits — outside profile null check intentionally
+    AnalyticsService.trackFeature('invite_landing_viewed', {
+      'invite_code': widget.inviteCode,
+      if (widget.characterId != null) 'character_id': widget.characterId,
+    });
     if (profile != null) {
-      // === TRACK INVITE CLICK (Sprint 11A) ===
-      // Fires for ALL invite visits (library + character-specific)
       InviteService.recordClick(
         inviteCode: widget.inviteCode,
         characterId: widget.characterId,
       );
-      AnalyticsService.trackFeature('invite_landing_viewed', {
-        'invite_code': widget.inviteCode,
-        if (widget.characterId != null) 'character_id': widget.characterId,
-      });
 
       // Ensure character catalog is loaded (guests skip normal boot)
       if (OGACharacter.allCharacters.isEmpty) {
