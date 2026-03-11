@@ -166,12 +166,14 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       // This happens when the user owns this character and
       // _assetId wasn't forwarded through route args.
       if (_assetId == null) {
-        final userEmail = supabase.auth.currentUser?.email;
-        if (userEmail != null) {
+        final lookupEmail =
+            widget.ownerEmail ?? supabase.auth.currentUser?.email;
+        if (lookupEmail != null) {
           final row = await supabase
               .from('character_ownership')
               .select('asset_id')
               .eq('character_id', ch.id)
+              .eq('owner_email', lookupEmail)
               .eq('status', 'active')
               .maybeSingle();
           if (row != null) {
@@ -180,7 +182,6 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
           }
         }
       }
-
       // If still null, nothing to show
       if (_assetId == null || _assetId!.isEmpty) {
         debugPrint('⚠️ asset_id still null after resolution — no history');
@@ -1863,7 +1864,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
       final supabase = Supabase.instance.client;
 
       // Use RPC to execute the trade atomically (swap ownership)
-      await supabase.rpc('execute_trade', params: {'p_trade_id': tradeId});
+      await supabase.rpc('execute_trade', params: {'trade_id': tradeId});
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
