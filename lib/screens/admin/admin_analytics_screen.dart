@@ -634,59 +634,68 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
         ? 1
         : _inviteFunnel.values.reduce((a, b) => a > b ? a : b);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: _buildCard(
-        'INVITE FUNNEL',
-        'Last 30 days',
-        Column(
-          children: funnelSteps.map((step) {
-            final count = _inviteFunnel[step] ?? 0;
-            final ratio = maxVal > 0 ? count / maxVal : 0.0;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        funnelLabels[step] ?? step.toUpperCase(),
-                        style: const TextStyle(
-                          color: pureWhite,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
+    return RefreshIndicator(
+      color: neonGreen,
+      backgroundColor: deepCharcoal,
+      onRefresh: _loadAllData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: _buildCard(
+          'INVITE FUNNEL',
+          'Last 30 days',
+          Column(
+            children: funnelSteps.map((step) {
+              final count = _inviteFunnel[step] ?? 0;
+              final ratio = maxVal > 0 ? count / maxVal : 0.0;
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          funnelLabels[step] ?? step.toUpperCase(),
+                          style: const TextStyle(
+                            color: pureWhite,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '$count',
-                        style: const TextStyle(
-                          color: neonGreen,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
+                        Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: neonGreen,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  // Bar
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: ratio,
-                      minHeight: 8,
-                      backgroundColor: ironGrey,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        neonGreen,
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // Bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: ratio,
+                        minHeight: 8,
+                        backgroundColor: ironGrey,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          neonGreen,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
