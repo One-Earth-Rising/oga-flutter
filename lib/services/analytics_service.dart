@@ -253,6 +253,8 @@ class AnalyticsService {
         funnel[row['event_type'] as String] = int.parse(
           row['count'].toString(),
         );
+        if (kDebugMode)
+          print('🔢 funnel row: ${row['event_type']} = ${row['count']}');
       }
       return funnel;
     } catch (e) {
