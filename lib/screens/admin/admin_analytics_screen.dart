@@ -51,8 +51,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     _loadAllData();
   }
 
-  Future<void> _loadAllData() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadAllData({bool showSpinner = true}) async {
+    if (showSpinner) setState(() => _isLoading = true);
     try {
       final results = await Future.wait([
         AnalyticsService.getDailyActiveUsers(days: 14),
@@ -637,7 +637,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     return RefreshIndicator(
       color: neonGreen,
       backgroundColor: deepCharcoal,
-      onRefresh: _loadAllData,
+      onRefresh: () => _loadAllData(showSpinner: false),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
