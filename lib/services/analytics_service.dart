@@ -250,7 +250,9 @@ class AnalyticsService {
       final list = List<Map<String, dynamic>>.from(response ?? []);
       final funnel = <String, int>{};
       for (final row in list) {
-        funnel[row['event_type'] as String] = (row['count'] as num).toInt();
+        funnel[row['event_type'] as String] = int.parse(
+          row['count'].toString(),
+        );
       }
       return funnel;
     } catch (e) {
