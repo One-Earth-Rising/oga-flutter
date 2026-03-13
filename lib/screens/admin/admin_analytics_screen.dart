@@ -395,7 +395,14 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
               children: [
                 Row(
                   children: [
-                    Expanded(child: _buildKpiCard('DAU', '$todayDAU', 'Today')),
+                    Expanded(
+                      child: _buildKpiCard(
+                        'DAU',
+                        '$todayDAU',
+                        'Tap to view',
+                        onTap: _showActiveUsersDialog, // 👈 Added click action
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildKpiCard(
@@ -412,7 +419,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                     Expanded(
                       child: _buildKpiCard(
                         'AVG SESSION',
-                        '${avgDuration.toStringAsFixed(0)}s',
+                        '${(avgDuration / 60).toStringAsFixed(1)}m', // 👈 Converted to minutes
                         'Last 7 days',
                       ),
                     ),
@@ -431,7 +438,14 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
           else
             Row(
               children: [
-                Expanded(child: _buildKpiCard('DAU', '$todayDAU', 'Today')),
+                Expanded(
+                  child: _buildKpiCard(
+                    'DAU',
+                    '$todayDAU',
+                    'Tap to view',
+                    onTap: _showActiveUsersDialog, // 👈 Added click action
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _buildKpiCard(
@@ -444,7 +458,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                 Expanded(
                   child: _buildKpiCard(
                     'AVG SESSION',
-                    '${avgDuration.toStringAsFixed(0)}s',
+                    '${(avgDuration / 60).toStringAsFixed(1)}m', // 👈 Converted to minutes
                     'Last 7 days',
                   ),
                 ),
@@ -860,46 +874,61 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     String subtitle, {
     VoidCallback? onTap,
   }) {
-    final card = Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: deepCharcoal,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ironGrey, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: dimWhite,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.5,
+    return MouseRegion(
+      cursor: onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
+      child: GestureDetector(
+        onTap: onTap, // 👈 This is the critical connection!
+        behavior:
+            HitTestBehavior.opaque, // 👈 Ensures the whole card is clickable
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: deepCharcoal,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: onTap != null ? ironGrey : ironGrey.withValues(alpha: 0.5),
+              width: 1,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              color: neonGreen,
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: dimWhite,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: neonGreen,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: dimWhite, fontSize: 11),
+                  ),
+                  if (onTap != null) ...[
+                    const Spacer(),
+                    const Icon(Icons.touch_app, color: dimWhite, size: 12),
+                  ],
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(subtitle, style: TextStyle(color: dimWhite, fontSize: 11)),
-        ],
+        ),
       ),
     );
-
-    return onTap != null
-        ? MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(onTap: onTap, child: card),
-          )
-        : card;
   }
 
   Widget _buildCard(String title, String subtitle, Widget content) {
