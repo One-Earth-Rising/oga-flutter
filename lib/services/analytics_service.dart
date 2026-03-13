@@ -243,18 +243,30 @@ class AnalyticsService {
           .subtract(Duration(days: days))
           .toUtc()
           .toIso8601String();
+
       final response = await _supabase.rpc(
         'get_invite_funnel',
         params: {'since_date': since},
       );
-      final list = List<Map<String, dynamic>>.from(response ?? []);
+
       final funnel = <String, int>{};
-      for (final row in list) {
-        funnel[row['event_type'] as String] = int.parse(
-          row['count'].toString(),
-        );
-        if (kDebugMode)
-          print('🔢 funnel row: ${row['event_type']} = ${row['count']}');
+
+      // Safely parse the dynamic List without strict casting
+      if (response is List) {
+        for (final row in response) {
+          if (row is Map) {
+            final key = row['event_type']?.toString();
+            // Handle both int and double safely coming from Postgres JSON
+            final count = (row['count'] as num?)?.toInt() ?? 0;
+
+            if (key != null) {
+              funnel[key] = count;
+              if (kDebugMode) {
+                print('🔢 funnel row: $key = $count');
+              }
+            }
+          }
+        }
       }
       return funnel;
     } catch (e) {
