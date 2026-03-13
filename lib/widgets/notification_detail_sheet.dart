@@ -16,6 +16,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/notification_service.dart';
 import '../models/oga_character.dart';
 import '../config/oga_storage.dart';
+import '../services/trade_service.dart';
 
 const Color _voidBlack = Color(0xFF000000);
 const Color _deepCharcoal = Color(0xFF121212);
@@ -427,9 +428,105 @@ class _DetailSheetState extends State<_DetailSheet> {
           const SizedBox(height: 12),
           // Status
           _buildStatusRow(status, _neonGreen),
+          // ── REVOKE button (only for trade initiator, while pending) ──
+          if (status == 'pending' &&
+              _details?['proposer_email'] ==
+                  Supabase.instance.client.auth.currentUser?.email) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: OutlinedButton.icon(
+                onPressed: _handleRevokeTrade,
+                icon: const Icon(Icons.cancel_outlined, size: 16),
+                label: const Text(
+                  'REVOKE TRADE',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                    fontSize: 11,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.redAccent,
+                  side: const BorderSide(color: Colors.redAccent),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  // ─── REVOKE TRADE ─────────────────────────────────────────────────
+
+  Future<void> _handleRevokeTrade() async {
+    final tradeId = widget.notification.referenceId;
+    debugPrint('>>> REVOKE TRADE tapped: tradeId=$tradeId');
+
+    final result = await TradeService.cancelTrade(tradeId);
+
+    if (!mounted) return;
+
+    if (result == 'success') {
+      setState(() {
+        _details?['status'] = 'cancelled';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: _voidBlack,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: _neonGreen.withValues(alpha: 0.3)),
+          ),
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle, color: _neonGreen, size: 16),
+              SizedBox(width: 8),
+              Text(
+                'Trade revoked.',
+                style: TextStyle(color: _pureWhite, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      );
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) Navigator.pop(context);
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: _voidBlack,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
+          ),
+          content: Row(
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Colors.redAccent,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  result,
+                  style: const TextStyle(color: _pureWhite, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   // ─── LEND DETAILS ────────────────────────────────────────────────
