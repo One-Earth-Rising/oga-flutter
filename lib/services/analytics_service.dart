@@ -195,6 +195,7 @@ class AnalyticsService {
   // ─── ADMIN QUERIES ────────────────────────────────────────
   // These methods are for the admin analytics screen.
   // They read from beta_analytics + invite_analytics + profiles.
+
   /// Get a list of unique user emails active today
   static Future<List<String>> getTodayActiveUsers() async {
     try {
@@ -223,7 +224,7 @@ class AnalyticsService {
     }
   }
 
-  /// Get daily active users for the last N days
+  /// Get daily active users for the last N days (Bulletproof version)
   static Future<List<Map<String, dynamic>>> getDailyActiveUsers({
     int days = 14,
   }) async {
@@ -236,14 +237,29 @@ class AnalyticsService {
         'get_daily_active_users',
         params: {'since_date': since},
       );
-      return List<Map<String, dynamic>>.from(response ?? []);
+
+      final list = <Map<String, dynamic>>[];
+
+      // Safely parse regardless of Supabase stringifying BigInts
+      if (response is List) {
+        for (final row in response) {
+          if (row is Map) {
+            list.add({
+              'day': row['day']?.toString() ?? '',
+              'user_count':
+                  int.tryParse(row['user_count']?.toString() ?? '0') ?? 0,
+            });
+          }
+        }
+      }
+      return list;
     } catch (e) {
       if (kDebugMode) print('⚠️ getDailyActiveUsers failed: $e');
       return [];
     }
   }
 
-  /// Get feature usage counts
+  /// Get feature usage counts (Restored)
   static Future<List<Map<String, dynamic>>> getFeatureUsage({
     int days = 7,
   }) async {
@@ -275,8 +291,6 @@ class AnalyticsService {
         'get_invite_funnel',
         params: {'since_date': since},
       );
-
-      print('🚨 RAW SUPABASE RESPONSE: $response');
 
       final funnel = <String, int>{};
 
@@ -358,7 +372,7 @@ class AnalyticsService {
     }
   }
 
-  /// Get average session duration in seconds
+  /// Get average session duration in seconds (Bulletproof version)
   static Future<double> getAvgSessionDuration({int days = 7}) async {
     try {
       final since = DateTime.now()
@@ -369,7 +383,22 @@ class AnalyticsService {
         'get_avg_session_duration',
         params: {'since_date': since},
       );
-      return (response as num?)?.toDouble() ?? 0.0;
+
+      // Handle raw numbers
+      if (response is num) return response.toDouble();
+      // Handle stringified numbers
+      if (response is String) return double.tryParse(response) ?? 0.0;
+
+      // Handle Supabase wrapping scalar results in a List of Maps
+      if (response is List && response.isNotEmpty) {
+        final first = response.first;
+        if (first is Map && first.values.isNotEmpty) {
+          final val = first.values.first;
+          if (val is num) return val.toDouble();
+          if (val is String) return double.tryParse(val) ?? 0.0;
+        }
+      }
+      return 0.0;
     } catch (e) {
       if (kDebugMode) print('⚠️ getAvgSessionDuration failed: $e');
       return 0.0;
