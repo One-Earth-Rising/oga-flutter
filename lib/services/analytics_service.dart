@@ -195,6 +195,33 @@ class AnalyticsService {
   // ─── ADMIN QUERIES ────────────────────────────────────────
   // These methods are for the admin analytics screen.
   // They read from beta_analytics + invite_analytics + profiles.
+  /// Get a list of unique user emails active today
+  static Future<List<String>> getTodayActiveUsers() async {
+    try {
+      // Start of today in UTC
+      final today = DateTime.now()
+          .copyWith(hour: 0, minute: 0, second: 0, millisecond: 0)
+          .toUtc()
+          .toIso8601String();
+
+      final response = await _supabase
+          .from('beta_analytics')
+          .select('user_email')
+          .gte('created_at', today)
+          .neq('user_email', 'anon');
+
+      // Extract unique emails
+      final uniqueEmails = response
+          .map((e) => e['user_email'] as String)
+          .toSet()
+          .toList();
+
+      return uniqueEmails;
+    } catch (e) {
+      if (kDebugMode) print('⚠️ getTodayActiveUsers failed: $e');
+      return [];
+    }
+  }
 
   /// Get daily active users for the last N days
   static Future<List<Map<String, dynamic>>> getDailyActiveUsers({

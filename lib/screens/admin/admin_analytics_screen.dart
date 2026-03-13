@@ -51,6 +51,82 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     _loadAllData();
   }
 
+  Future<void> _showActiveUsersDialog() async {
+    showDialog(
+      context: context,
+      barrierColor: voidBlack.withValues(alpha: 0.8),
+      builder: (context) =>
+          const Center(child: CircularProgressIndicator(color: neonGreen)),
+    );
+
+    final activeEmails = await AnalyticsService.getTodayActiveUsers();
+
+    if (!mounted) return;
+    Navigator.pop(context); // remove loader
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: deepCharcoal,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: ironGrey),
+        ),
+        title: const Text(
+          'TODAY\'S ACTIVE USERS',
+          style: TextStyle(
+            color: pureWhite,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+          ),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: activeEmails.isEmpty
+              ? const Center(
+                  child: Text(
+                    'No active users yet today',
+                    style: TextStyle(color: dimWhite),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: activeEmails.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.circle, color: neonGreen, size: 8),
+                          const SizedBox(width: 12),
+                          Text(
+                            activeEmails[index],
+                            style: const TextStyle(
+                              color: pureWhite,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'CLOSE',
+              style: TextStyle(color: neonGreen, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _loadAllData({bool showSpinner = true}) async {
     if (showSpinner) setState(() => _isLoading = true);
     try {
@@ -778,8 +854,13 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
 
   // ─── WIDGET BUILDERS ──────────────────────────────────────
 
-  Widget _buildKpiCard(String label, String value, String subtitle) {
-    return Container(
+  Widget _buildKpiCard(
+    String label,
+    String value,
+    String subtitle, {
+    VoidCallback? onTap,
+  }) {
+    final card = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: deepCharcoal,
@@ -812,6 +893,13 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
         ],
       ),
     );
+
+    return onTap != null
+        ? MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(onTap: onTap, child: card),
+          )
+        : card;
   }
 
   Widget _buildCard(String title, String subtitle, Widget content) {
