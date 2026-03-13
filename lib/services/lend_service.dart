@@ -312,6 +312,7 @@ class LendService {
           .eq('id', lendId)
           .eq('borrower_email', email)
           .eq('status', 'pending')
+          .limit(1)
           .maybeSingle();
 
       if (lend == null) return 'Lend not found or already resolved';
@@ -364,6 +365,7 @@ class LendService {
           .eq('id', lendId)
           .eq('lender_email', email)
           .eq('status', 'requested')
+          .limit(1)
           .maybeSingle();
 
       if (lend == null) return 'Request not found or already resolved';

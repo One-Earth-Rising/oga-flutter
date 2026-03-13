@@ -143,7 +143,7 @@ class _GetCharacterSheet extends StatelessWidget {
             context,
             icon: Icons.handshake_outlined,
             iconColor: _lendCyan,
-            title: 'REQUEST LEND',
+            title: 'REQUEST BORROW',
             subtitle: 'Ask $ownerName to lend you this character temporarily',
             onTap: () {
               Navigator.pop(context); // Close this sheet

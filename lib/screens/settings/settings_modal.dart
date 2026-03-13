@@ -321,7 +321,7 @@ class _SettingsModalState extends State<SettingsModal> {
 
   Widget _buildSidebarTab(int index, String label) {
     final isActive = _selectedTabIndex == index;
-    final showDot = label == 'Account';
+    final showDot = isActive;
 
     return GestureDetector(
       onTap: () => setState(() => _selectedTabIndex = index),

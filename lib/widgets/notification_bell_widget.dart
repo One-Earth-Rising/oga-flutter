@@ -314,6 +314,60 @@ class _NotificationDropdownPanelState
           debugPrint('!!! Avatar fetch error: $e');
         }
       }
+
+      // ── Pre-check: filter out revoked/resolved trades & lends ──
+      final tradeNotifs = all
+          .where((n) => !n.isRead && n.type == 'trade_proposed')
+          .toList();
+      final lendNotifs = all
+          .where(
+            (n) =>
+                !n.isRead &&
+                (n.type == 'lend_proposed' || n.type == 'lend_requested'),
+          )
+          .toList();
+
+      if (tradeNotifs.isNotEmpty) {
+        try {
+          final tradeIds = tradeNotifs.map((n) => n.referenceId).toList();
+          final trades = await Supabase.instance.client
+              .from('trades')
+              .select('id, status')
+              .inFilter('id', tradeIds);
+          for (final t in trades) {
+            if (t['status'] != 'pending') {
+              final match = tradeNotifs.where((n) => n.referenceId == t['id']);
+              for (final n in match) {
+                _revokedIds.add(n.id);
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('!!! Trade status pre-check error: $e');
+        }
+      }
+
+      if (lendNotifs.isNotEmpty) {
+        try {
+          final lendIds = lendNotifs.map((n) => n.referenceId).toList();
+          final lends = await Supabase.instance.client
+              .from('lends')
+              .select('id, status')
+              .inFilter('id', lendIds);
+          for (final l in lends) {
+            final s = l['status'] as String;
+            if (s != 'pending' && s != 'requested') {
+              final match = lendNotifs.where((n) => n.referenceId == l['id']);
+              for (final n in match) {
+                _revokedIds.add(n.id);
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('!!! Lend status pre-check error: $e');
+        }
+      }
+
       if (mounted) {
         setState(() {
           _notifications = all;

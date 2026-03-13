@@ -440,9 +440,12 @@ class _DetailSheetState extends State<_DetailSheet> {
     final durationDays = durationHours ~/ 24;
     final status = _details?['status'] ?? 'unknown';
     final returnDueStr = _details?['return_due_at'] as String?;
+    final returnedAtStr = _details?['returned_at'] as String?;
 
     String timeInfo;
-    if (returnDueStr != null) {
+    if (returnedAtStr != null) {
+      timeInfo = 'Returned';
+    } else if (returnDueStr != null) {
       final returnDue = DateTime.tryParse(returnDueStr);
       if (returnDue != null) {
         final remaining = returnDue.difference(DateTime.now());
@@ -742,63 +745,66 @@ class _DetailSheetState extends State<_DetailSheet> {
   // ─── ACTION BUTTONS ──────────────────────────────────────────────
 
   Widget _buildActionButtons() {
-    return Row(
-      children: [
-        Expanded(
-          child: SizedBox(
-            height: 44,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                widget.onAccept?.call();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _getTypeColor(),
-                foregroundColor: _voidBlack,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+    return SafeArea(
+      top: false,
+      child: Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 44,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onAccept?.call();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _getTypeColor(),
+                  foregroundColor: _voidBlack,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
                 ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'ACCEPT',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.5,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: SizedBox(
-            height: 44,
-            child: OutlinedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                widget.onDecline?.call();
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _pureWhite.withValues(alpha: 0.5),
-                side: const BorderSide(color: _ironGrey),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text(
-                'DECLINE',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                  fontSize: 13,
+                child: const Text(
+                  'ACCEPT',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: SizedBox(
+              height: 44,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onDecline?.call();
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _pureWhite.withValues(alpha: 0.5),
+                  side: const BorderSide(color: _ironGrey),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'DECLINE',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
