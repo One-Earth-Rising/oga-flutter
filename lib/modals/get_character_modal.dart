@@ -141,7 +141,7 @@ class _GetCharacterSheet extends StatelessWidget {
           // now correctly calls LendRequestModal (ask THEM to lend THEIR character).
           _buildOption(
             context,
-            icon: Icons.handshake_outlined,
+            icon: Icons.handshake,
             iconColor: _lendCyan,
             title: 'REQUEST BORROW',
             subtitle: 'Ask $ownerName to lend you this character temporarily',
@@ -162,7 +162,7 @@ class _GetCharacterSheet extends StatelessWidget {
           // ── Option 3: Buy (coming later) ────────────────────
           _buildOption(
             context,
-            icon: Icons.shopping_cart_outlined,
+            icon: Icons.shopping_cart,
             iconColor: _pureWhite.withValues(alpha: 0.25),
             title: 'BUY CHARACTER',
             subtitle: 'Marketplace coming soon',
