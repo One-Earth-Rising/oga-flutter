@@ -76,11 +76,28 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
           .where((p) => !activeEmails.contains(p['email']))
           .toList();
 
+      // Safely parse the funnel data from Supabase List to Dart Map
+      final rawFunnel = results[2];
+      final Map<String, int> parsedFunnel = {};
+
+      if (rawFunnel is List) {
+        for (var item in rawFunnel) {
+          if (item is Map) {
+            final key = item['event_type'] as String?;
+            final count = (item['count'] as num?)?.toInt() ?? 0;
+            if (key != null) parsedFunnel[key] = count;
+          }
+        }
+      } else if (rawFunnel is Map) {
+        // Fallback in case AnalyticsService is already mapping it
+        parsedFunnel.addAll(Map<String, int>.from(rawFunnel));
+      }
+
       if (mounted) {
         setState(() {
           _dauData = results[0] as List<Map<String, dynamic>>;
           _featureUsage = results[1] as List<Map<String, dynamic>>;
-          _inviteFunnel = results[2] as Map<String, int>;
+          _inviteFunnel = parsedFunnel; // Assigned the safely parsed map
           _activeBetaUsers = activeBetaUsers;
           _pendingBetaUsers = List<Map<String, dynamic>>.from(pendingUsers);
           _recentEvents = results[4] as List<Map<String, dynamic>>;
