@@ -249,6 +249,8 @@ class AnalyticsService {
         params: {'since_date': since},
       );
 
+      print('🚨 RAW SUPABASE RESPONSE: $response');
+
       final funnel = <String, int>{};
 
       // Safely parse the dynamic List without strict casting

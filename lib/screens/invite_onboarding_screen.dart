@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/oga_image.dart';
+import '../services/analytics_service.dart';
 
 /// Profile setup screen shown after invite signup flow.
 /// 3-step onboarding: Identity → Pick Starter → Preferences
@@ -249,6 +250,12 @@ class _InviteOnboardingScreenState extends State<InviteOnboardingScreen>
       debugPrint('✅ Beta access granted via invite flow');
 
       debugPrint('✅ Onboarding complete: $fullName, char=$_selectedCharacter');
+
+      // 🎯 INJECT FUNNEL TRACKING: Conversion
+      AnalyticsService.trackFeature('invite_conversion', {
+        'character_claimed': _selectedCharacter,
+        'genres': _selectedGenres.toList(),
+      });
 
       if (mounted) {
         Navigator.of(context).pushReplacementNamed('/dashboard');

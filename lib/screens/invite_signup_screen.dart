@@ -585,6 +585,10 @@ class _InviteSignUpScreenState extends State<InviteSignUpScreen> {
       setState(() {
         _error = 'Failed to send email. Please try again.';
         _isLoading = false;
+
+        // 🎯 INJECT FUNNEL TRACKING: Signup Completed
+        // Add this AFTER the user is successfully created in Supabase Auth
+        AnalyticsService.trackFeature('invite_signup_completed');
       });
     }
   }

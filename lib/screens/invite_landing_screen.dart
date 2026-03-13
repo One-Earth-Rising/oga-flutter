@@ -931,6 +931,11 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
     // Save invite code early — survives PKCE redirect
     await PendingInvite.save(widget.inviteCode);
 
+    // 🎯 INJECT FUNNEL TRACKING: Signup Started
+    AnalyticsService.trackFeature('invite_signup_started', {
+      'invite_code': widget.inviteCode,
+    });
+
     // If inviter was found, go to dedicated sign-up page
     if (_inviter != null) {
       Navigator.push(
