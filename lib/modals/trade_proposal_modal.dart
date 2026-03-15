@@ -107,11 +107,26 @@ class _TradeProposalModalState extends State<TradeProposalModal> {
       );
       // If prefilled character, auto-select and advance
       if (widget.prefillCharacterId != null) {
-        final match = _theirCharacters
+        // Try exact match first, then prefix match
+        var match = _theirCharacters
             .where((c) => c.characterId == widget.prefillCharacterId)
             .toList();
+        if (match.isEmpty) {
+          match = _theirCharacters
+              .where(
+                (c) =>
+                    c.characterId.startsWith(widget.prefillCharacterId!) ||
+                    widget.prefillCharacterId!.startsWith(c.characterId),
+              )
+              .toList();
+        }
         if (match.isNotEmpty) {
           _selectedTheirChar = match.first;
+          await _loadYourCharacters();
+          _step = 2;
+        } else if (_theirCharacters.length == 1) {
+          // Only one character — auto-select it
+          _selectedTheirChar = _theirCharacters.first;
           await _loadYourCharacters();
           _step = 2;
         }

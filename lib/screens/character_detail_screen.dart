@@ -2106,17 +2106,23 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 child: ElevatedButton(
                   onPressed: () {
                     if (isGuest) return;
-                    if (widget.ownerEmail != null &&
-                        widget.ownerEmail!.isNotEmpty) {
+                    final currentEmail =
+                        Supabase.instance.client.auth.currentUser?.email;
+                    final isFriendOwned =
+                        widget.ownerEmail != null &&
+                        widget.ownerEmail!.isNotEmpty &&
+                        widget.ownerEmail != currentEmail;
+                    if (isFriendOwned) {
                       GetCharacterModal.show(
                         context,
                         characterId: ch.id,
                         ownerEmail: widget.ownerEmail!,
                         ownerName: widget.ownerName ?? 'Friend',
                         characterName: ch.name,
+                        characterImageUrl: OgaStorage.resolve(ch.heroImage),
                       );
                     } else {
-                      _showMarketplaceComingSoon();
+                      FriendsWhoOwnModal.show(context, ch);
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -2467,17 +2473,23 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 GestureDetector(
                   onTap: () {
                     if (isGuest) return;
-                    if (widget.ownerEmail != null &&
-                        widget.ownerEmail!.isNotEmpty) {
+                    final currentEmail =
+                        Supabase.instance.client.auth.currentUser?.email;
+                    final isFriendOwned =
+                        widget.ownerEmail != null &&
+                        widget.ownerEmail!.isNotEmpty &&
+                        widget.ownerEmail != currentEmail;
+                    if (isFriendOwned) {
                       GetCharacterModal.show(
                         context,
                         characterId: ch.id,
                         ownerEmail: widget.ownerEmail!,
                         ownerName: widget.ownerName ?? 'Friend',
                         characterName: ch.name,
+                        characterImageUrl: OgaStorage.resolve(ch.heroImage),
                       );
                     } else {
-                      _showMarketplaceComingSoon();
+                      FriendsWhoOwnModal.show(context, ch);
                     }
                   },
                   child: Container(

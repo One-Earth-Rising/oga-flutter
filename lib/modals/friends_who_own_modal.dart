@@ -15,12 +15,13 @@ import '../models/oga_character.dart';
 import '../config/oga_storage.dart';
 import '../modals/trade_proposal_modal.dart';
 import '../modals/lend_proposal_modal.dart';
+import '../modals/lend_request_modal.dart';
 
 const Color _voidBlack = Color(0xFF000000);
 const Color _deepCharcoal = Color(0xFF121212);
 const Color _neonGreen = Color(0xFF39FF14);
 const Color _ironGrey = Color(0xFF2C2C2C);
-const Color _pureWhite = Color(0xFFFFFFFF);
+const Color _pureWhite = Color.fromARGB(255, 103, 7, 7);
 const Color _lendCyan = Color(0xFF00BCD4);
 
 class FriendsWhoOwnModal extends StatefulWidget {
@@ -732,7 +733,7 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
               ),
             ),
             child: Text(
-              'LEND',
+              'BORROW',
               style: TextStyle(
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.5,
@@ -810,14 +811,26 @@ class _FriendsWhoOwnModalState extends State<FriendsWhoOwnModal> {
 
   void _onTrade(_FriendOwnerRow owner) {
     Navigator.of(context).pop();
-    // TODO: Enhance modal to pre-select counterparty (owner.email)
-    TradeProposalModal.show(context, characterId: owner.characterId);
+    TradeProposalModal.show(
+      context,
+      friendEmail: owner.email,
+      characterId: owner.characterId,
+    );
   }
 
   void _onLend(_FriendOwnerRow owner) {
     Navigator.of(context).pop();
-    // TODO: Enhance modal to pre-select counterparty (owner.email)
-    LendProposalModal.show(context, characterId: owner.characterId);
+    final character = OGACharacter.fromId(owner.characterId);
+    LendRequestModal.show(
+      context,
+      characterId: owner.characterId,
+      characterName: character?.name ?? owner.characterId,
+      ownerEmail: owner.email,
+      ownerName: owner.displayName,
+      characterImageUrl: character != null
+          ? OgaStorage.resolve(character.heroImage)
+          : null,
+    );
   }
 
   // ─── HELPERS ─────────────────────────────────────────────────
