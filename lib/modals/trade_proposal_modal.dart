@@ -108,12 +108,6 @@ class _TradeProposalModalState extends State<TradeProposalModal> {
       );
       // If prefilled character, auto-select and advance
       if (widget.prefillCharacterId != null) {
-        debugPrint(
-          '>>> TRADE PREFILL: looking for "${widget.prefillCharacterId}"',
-        );
-        debugPrint(
-          '>>> TRADE PREFILL: their chars = ${_theirCharacters.map((c) => c.characterId).toList()}',
-        );
         // Try exact match first, then prefix match
         var match = _theirCharacters
             .where((c) => c.characterId == widget.prefillCharacterId)
