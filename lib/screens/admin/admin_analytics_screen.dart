@@ -203,6 +203,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       }, onConflict: 'email');
 
       // Show success feedback
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Approved $email'), backgroundColor: neonGreen),
       );
@@ -230,6 +231,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
           .eq('email', email);
 
       // Show warning feedback
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Revoked access for $email'),
@@ -244,6 +246,39 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to revoke: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _declineUser(String email) async {
+    try {
+      final adminEmail = Supabase.instance.client.auth.currentUser?.email;
+      // Ensure entry exists, then mark as declined
+      await Supabase.instance.client.from('beta_access').upsert({
+        'email': email,
+        'granted_by': adminEmail,
+        'notes': 'Declined',
+        'revoked_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'email');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Declined: $email'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      _loadAllData(); // Refresh the list
+    } catch (e) {
+      debugPrint('Error declining user: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to decline: $e'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -684,21 +719,43 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
           ),
           // Actions
           if (isPending)
-            ElevatedButton(
-              onPressed: () => _approveUser(email),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: neonGreen,
-                foregroundColor: voidBlack,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 0,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElevatedButton(
+                  onPressed: () => _approveUser(email),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: neonGreen,
+                    foregroundColor: voidBlack,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 0,
+                    ),
+                    minimumSize: const Size(0, 32),
+                  ),
+                  child: const Text(
+                    'APPROVE',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+                  ),
                 ),
-                minimumSize: const Size(0, 32),
-              ),
-              child: const Text(
-                'APPROVE',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
-              ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: () => _declineUser(email),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange,
+                    side: const BorderSide(color: Colors.orange),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    minimumSize: const Size(0, 32),
+                  ),
+                  child: const Text(
+                    'DECLINE',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             )
           else if (!isAdmin)
             TextButton(
