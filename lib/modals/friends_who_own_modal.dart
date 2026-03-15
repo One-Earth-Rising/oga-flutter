@@ -21,7 +21,7 @@ const Color _voidBlack = Color(0xFF000000);
 const Color _deepCharcoal = Color(0xFF121212);
 const Color _neonGreen = Color(0xFF39FF14);
 const Color _ironGrey = Color(0xFF2C2C2C);
-const Color _pureWhite = Color.fromARGB(255, 103, 7, 7);
+const Color _pureWhite = Color(0xFFFFFFFF);
 const Color _lendCyan = Color(0xFF00BCD4);
 
 class FriendsWhoOwnModal extends StatefulWidget {

@@ -2122,7 +2122,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                         characterImageUrl: OgaStorage.resolve(ch.heroImage),
                       );
                     } else {
-                      FriendsWhoOwnModal.show(context, ch);
+                      _showMarketplaceComingSoon();
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -2489,7 +2489,7 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                         characterImageUrl: OgaStorage.resolve(ch.heroImage),
                       );
                     } else {
-                      FriendsWhoOwnModal.show(context, ch);
+                      _showMarketplaceComingSoon();
                     }
                   },
                   child: Container(
