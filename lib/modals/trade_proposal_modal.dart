@@ -89,7 +89,8 @@ class _TradeProposalModalState extends State<TradeProposalModal> {
         if (match.isNotEmpty) {
           _selectedFriend = match.first;
           await _loadTheirCharacters();
-          _step = 1;
+          // Only set step 1 if _loadTheirCharacters didn't already advance further
+          if (_step < 1) _step = 1;
         }
       }
     } catch (e) {
