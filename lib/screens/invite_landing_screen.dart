@@ -8,6 +8,7 @@ import '../widgets/oga_image.dart';
 import '../services/invite_service.dart';
 import '../services/analytics_service.dart';
 import '../services/character_service.dart';
+import 'invite_character_detail.dart';
 
 /// Public invite landing page — no auth required.
 /// Loads inviter's profile and shows their library in a guest-friendly view.
@@ -922,6 +923,7 @@ class _InviteLandingScreenState extends State<InviteLandingScreen> {
           isOwned: owned,
           isGuest: !isAuthenticated,
           inviterName: _inviter?.displayName,
+          onGuestSignUp: _navigateToSignUp,
         ),
       ),
     );

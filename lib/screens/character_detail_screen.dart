@@ -57,6 +57,7 @@ class CharacterDetailScreen extends StatefulWidget {
   final String? ownerEmail;
   final String? ownerName;
   final String? assetId;
+  final VoidCallback? onGuestSignUp;
   const CharacterDetailScreen({
     super.key,
     required this.character,
@@ -71,6 +72,7 @@ class CharacterDetailScreen extends StatefulWidget {
     this.ownerEmail,
     this.ownerName,
     this.assetId,
+    this.onGuestSignUp,
   });
 
   @override
@@ -2105,7 +2107,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {
-                    if (isGuest) return;
+                    if (isGuest) {
+                      _showGuestSignUpPopup();
+                      return;
+                    }
                     final currentEmail =
                         Supabase.instance.client.auth.currentUser?.email;
                     final isFriendOwned =
@@ -2170,6 +2175,84 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _showGuestSignUpPopup() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (context) => AlertDialog(
+        backgroundColor: _deepCharcoal,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: _neonGreen.withValues(alpha: 0.3)),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.rocket_launch, color: _neonGreen, size: 40),
+            const SizedBox(height: 16),
+            const Text(
+              'JOIN OGA',
+              style: TextStyle(
+                color: _pureWhite,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Create your OGA account to trade characters, build your library, and get a free character.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _pureWhite.withValues(alpha: 0.6),
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onGuestSignUp?.call();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _neonGreen,
+                  foregroundColor: _voidBlack,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'GET A FREE CHARACTER',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'MAYBE LATER',
+                style: TextStyle(
+                  color: _pureWhite.withValues(alpha: 0.4),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2320,22 +2403,18 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    backgroundColor: _deepCharcoal,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      side: BorderSide(
-                        color: _neonGreen.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    content: const Text(
-                      'Trading coming soon! Stay tuned.',
-                      style: TextStyle(color: _pureWhite),
-                    ),
-                  ),
-                );
+                if (isGuest) {
+                  _showGuestSignUpPopup();
+                  return;
+                }
+                if (widget.ownerEmail != null &&
+                    widget.ownerEmail!.isNotEmpty) {
+                  TradeProposalModal.show(
+                    context,
+                    friendEmail: widget.ownerEmail!,
+                    characterId: ch.id,
+                  );
+                }
               },
               icon: const Icon(Icons.swap_horiz, size: 18),
               label: const Text(
@@ -2472,7 +2551,10 @@ class _CharacterDetailScreenState extends State<CharacterDetailScreen>
                 const SizedBox(height: 12),
                 GestureDetector(
                   onTap: () {
-                    if (isGuest) return;
+                    if (isGuest) {
+                      _showGuestSignUpPopup();
+                      return;
+                    }
                     final currentEmail =
                         Supabase.instance.client.auth.currentUser?.email;
                     final isFriendOwned =
